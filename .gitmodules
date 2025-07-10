@@ -1,0 +1,3 @@
+[submodule "api.consumet.org"]
+	path = api.consumet.org
+	url = https://github.com/eatmynerds/api.consumet.org.git
