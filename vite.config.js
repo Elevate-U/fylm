@@ -5,6 +5,7 @@ import preact from '@preact/preset-vite';
 export default defineConfig({
   base: '/ai-business/',
   plugins: [preact()],
+  publicDir: 'public',
   server: {
     proxy: {
       // Proxy requests from /api to the backend server
