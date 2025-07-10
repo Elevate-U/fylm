@@ -5,7 +5,10 @@ import preact from '@preact/preset-vite';
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
-    preact(),
+    preact({
+      devToolsEnabled: true,
+      prefreshEnabled: true,
+    }),
     /* VitePWA({
       registerType: 'autoUpdate',
       includeAssets: [],
@@ -18,6 +21,12 @@ export default defineConfig({
       }
     }) */
   ],
+  resolve: {
+    alias: {
+      'react': 'preact/compat',
+      'react-dom': 'preact/compat'
+    }
+  },
   server: {
     proxy: {
       '/api': {

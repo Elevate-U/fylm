@@ -2,7 +2,7 @@ import { h } from 'preact';
 import { Router } from 'preact-router';
 import { createHashHistory } from 'history';
 import { AuthProvider } from './context/Auth';
-import { Toaster } from 'react-hot-toast';
+import toast, { Toaster } from 'react-hot-toast';
 
 import Header from './components/Header';
 import Home from './pages/Home';
