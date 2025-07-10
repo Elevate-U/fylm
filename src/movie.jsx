@@ -108,11 +108,11 @@ const MoviePage = () => {
 
     let streamUrl = '';
     if (mediaType === 'movie') {
-        streamUrl = `/api/stream-url?server=${server}&type=movie&id=${mediaId}`;
+        streamUrl = `${API_BASE_URL}/stream-url?server=${server}&type=movie&id=${mediaId}`;
     } else if (mediaType === 'tv') {
-        streamUrl = `/api/stream-url?server=${server}&type=tv&id=${mediaId}&season=${season}&episode=${episode}`;
+        streamUrl = `${API_BASE_URL}/stream-url?server=${server}&type=tv&id=${mediaId}&season=${season}&episode=${episode}`;
     } else if (mediaType === 'anime') {
-        streamUrl = `/api/stream-url?server=${server}&type=anime&id=${mediaId}&episode=${episode}&dub=${isDubbed}`;
+        streamUrl = `${API_BASE_URL}/stream-url?server=${server}&type=anime&id=${mediaId}&episode=${episode}&dub=${isDubbed}`;
     }
     
     fetch(streamUrl)
@@ -155,7 +155,12 @@ const MoviePage = () => {
                     <img src={`${IMAGE_BASE_URL}${mediaData.poster_path}`} alt={mediaData.title || mediaData.name} />
                 </div>
                 <div class="info">
-                    <h1>{mediaData.title || mediaData.name}</h1>
+                    <div class="title-container">
+                        <h1>{mediaData.title || mediaData.name}</h1>
+                        <button id="favorite-btn" class={favorited ? 'favorited' : ''} onClick={handleFavoriteClick}>
+                            {favorited ? '♥ Favorited' : '♡ Add to Favorites'}
+                        </button>
+                    </div>
                     <div class="meta">
                         <span>{mediaData.release_date || mediaData.first_air_date}</span>
                         <span>{mediaData.genres.map(g => g.name).join(', ')}</span>
@@ -167,9 +172,6 @@ const MoviePage = () => {
                          {videos.find(v => v.type === 'Trailer') &&
                             <button id="watch-trailer-btn" onClick={() => document.getElementById('trailer-modal').style.display = 'block'}>Watch Trailer</button>
                          }
-                        <button id="favorite-btn" class={favorited ? 'favorited' : ''} onClick={handleFavoriteClick}>
-                            ❤
-                        </button>
                     </div>
                 </div>
             </section>

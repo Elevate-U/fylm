@@ -4,8 +4,9 @@ import { route } from 'preact-router';
 import Helmet from 'preact-helmet';
 import { useStore } from '../store';
 import MovieCard from '../components/MovieCard';
-import { getWatchHistory, saveWatchProgress, getContentKey, getSeriesHistory, getLastWatchedEpisode } from '../utils/watchHistory';
+import { getWatchProgressForMedia, saveWatchProgress, getSeriesHistory, getLastWatchedEpisode } from '../utils/watchHistory';
 import './Watch.css';
+import { API_BASE_URL } from '../config';
 
 const Watch = (props) => {
     const [mediaDetails, setMediaDetails] = useState(null);
@@ -31,7 +32,19 @@ const Watch = (props) => {
 
     const { id, type } = props.matches;
 
-    const { addFavorite, removeFavorite, isFavorited, addToHistory } = useStore();
+    const { addFavorite, removeFavorite, isFavorited, setCurrentMediaItem } = useStore();
+
+    useEffect(() => {
+        // When the component mounts or mediaDetails changes, update the global state
+        if (mediaDetails) {
+            setCurrentMediaItem({ ...mediaDetails, type });
+        }
+        
+        // When the component unmounts, clear the global state
+        return () => {
+            setCurrentMediaItem(null);
+        };
+    }, [mediaDetails, type, setCurrentMediaItem]);
 
     useEffect(() => {
         if (!id || !type) {
@@ -53,15 +66,15 @@ const Watch = (props) => {
             setLoading(true);
             try {
                 const [detailsData, videosData, recommendationsData] = await Promise.all([
-                    fetch(`/api/tmdb/${type}/${id}`).then(res => res.json()),
-                    fetch(`/api/tmdb/${type}/${id}/videos`).then(res => res.json()),
-                    fetch(`/api/tmdb/${type}/${id}/recommendations`).then(res => res.json())
+                    fetch(`${API_BASE_URL}/tmdb/${type}/${id}`).then(res => res.json()),
+                    fetch(`${API_BASE_URL}/tmdb/${type}/${id}/videos`).then(res => res.json()),
+                    fetch(`${API_BASE_URL}/tmdb/${type}/${id}/recommendations`).then(res => res.json())
                 ]);
                 setMediaDetails(detailsData);
                 setVideos(videosData.results || []);
                 setRecommendations(recommendationsData.results || []);
                 if ((type === 'tv' || type === 'anime') && detailsData.seasons && detailsData.seasons.length > 0) {
-                    const lastWatched = getLastWatchedEpisode(id);
+                    const lastWatched = await getLastWatchedEpisode(id);
                     if (lastWatched && lastWatched.season && lastWatched.episode) {
                         setCurrentSeason(lastWatched.season);
                         setCurrentEpisode(lastWatched.episode);
@@ -71,9 +84,8 @@ const Watch = (props) => {
                         setCurrentEpisode(1);
                     }
                 }
-                addToHistory({ ...detailsData, type });
                 if (type === 'tv' || type === 'anime') {
-                    const history = getSeriesHistory(id);
+                    const history = await getSeriesHistory(id);
                     setSeriesWatchHistory(history);
                 }
             } catch (error) {
@@ -90,8 +102,8 @@ const Watch = (props) => {
             if (type !== 'tv' && type !== 'anime' || !id || !currentSeason) return;
             setEpisodesLoading(true);
             try {
-                const apiPath = type === 'anime' ? 'anime' : 'tv';
-                const res = await fetch(`/api/tmdb/${apiPath}/${id}/season/${currentSeason}`);
+                // Use the existing TMDB proxy route to fetch season details
+                const res = await fetch(`${API_BASE_URL}/tmdb/${type}/${id}/season/${currentSeason}`);
                 if (res.ok) {
                     const data = await res.json();
                     setSeasonDetails(data);
@@ -116,7 +128,7 @@ const Watch = (props) => {
             setShowNextEpisodePrompt(false);
             setNextEpisodeCountdown(null);
 
-            let url = `/api/stream-url?type=${type}&id=${id}&source=${currentSource}`;
+            let url = `${API_BASE_URL}/stream-url?type=${type}&id=${id}&source=${currentSource}`;
             if (type === 'tv' || type === 'anime') {
                 url += `&season=${currentSeason}&episode=${currentEpisode}`;
                 if (type === 'anime') {
@@ -188,15 +200,21 @@ const Watch = (props) => {
         const videoElement = videoRef.current;
         if (!videoElement || !isDirectSource) return;
 
-        const handleLoadedMetadata = () => {
-            const history = getWatchHistory(id, type, currentSeason, currentEpisode);
-            if (history && history.progress) {
-                videoElement.currentTime = history.progress;
+        const handleLoadedMetadata = async () => {
+            const history = await getWatchProgressForMedia(id, type, currentSeason, currentEpisode);
+            if (history && history.progress_seconds) {
+                videoElement.currentTime = history.progress_seconds;
             }
         };
 
         const handleTimeUpdate = () => {
-            saveWatchProgress(id, type, currentSeason, currentEpisode, videoElement.currentTime, videoElement.duration);
+            if (mediaDetails) {
+                 saveWatchProgress(
+                    { ...mediaDetails, type, season: currentSeason, episode: currentEpisode },
+                    videoElement.currentTime,
+                    mediaDetails.runtime
+                );
+            }
             
             // Show next episode prompt
             if (videoElement.duration > 0 && 
@@ -215,7 +233,7 @@ const Watch = (props) => {
             videoElement.removeEventListener('loadedmetadata', handleLoadedMetadata);
             videoElement.removeEventListener('timeupdate', handleTimeUpdate);
         };
-    }, [streamUrl, isDirectSource, id, type, currentSeason, currentEpisode, handleNextEpisode, showNextEpisodePrompt]);
+    }, [streamUrl, isDirectSource, id, type, currentSeason, currentEpisode, mediaDetails, showNextEpisodePrompt]);
     
     if (loading) {
         return <div class="loading-spinner"></div>;
@@ -240,7 +258,7 @@ const Watch = (props) => {
     return (
         <div>
             <Helmet>
-                <title>{title || name} - MyStream</title>
+                <title>{title || name} - FreeStream</title>
             </Helmet>
             <div class="player-container">
                 {!streamUrl && (
@@ -273,7 +291,7 @@ const Watch = (props) => {
             <div class="container">
                 <div class="media-details-layout">
                     <div class="poster">
-                        <img src={poster_path ? `/api/image/t/p/w500${poster_path}` : 'https://via.placeholder.com/500x750.png?text=No+Image'} alt={title || name} />
+                        <img src={poster_path ? `${API_BASE_URL}/image/t/p/w500${poster_path}` : 'https://via.placeholder.com/500x750.png?text=No+Image'} alt={title || name} />
                     </div>
                     <div class="details">
                         <div class="title-container">
@@ -370,9 +388,9 @@ const Watch = (props) => {
                         ) : (
                             <div class="episode-list">
                                 {seasonDetails?.episodes?.map(episode => {
-                                    const episodeKey = getContentKey(id, type, currentSeason, episode.episode_number);
+                                    const episodeKey = `${id}-${type}-${currentSeason}-${episode.episode_number}`;
                                     const episodeHistory = seriesWatchHistory[episodeKey];
-                                    const progressPercent = episodeHistory ? (episodeHistory.progress / episodeHistory.duration) * 100 : 0;
+                                    const progressPercent = episodeHistory ? (episodeHistory.progress_seconds / episodeHistory.duration_seconds) * 100 : 0;
 
                                     return (
                                         <div 
@@ -381,7 +399,7 @@ const Watch = (props) => {
                                             onClick={() => setCurrentEpisode(episode.episode_number)}
                                         >
                                             <div class="episode-card-image">
-                                                <img src={episode.still_path ? `/api/image/t/p/w300${episode.still_path}` : `https://via.placeholder.com/300x169.png?text=${encodeURIComponent(episode.name)}`} alt={episode.name} />
+                                                <img src={episode.still_path ? `${API_BASE_URL}/image/t/p/w300${episode.still_path}` : `https://via.placeholder.com/300x169.png?text=${encodeURIComponent(episode.name)}`} alt={episode.name} />
                                                 <div class="episode-number-badge">{episode.episode_number}</div>
                                                 {progressPercent > 0 && (
                                                     <div class="episode-progress-bar">

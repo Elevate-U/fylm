@@ -2,6 +2,7 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import MovieCard from '../components/MovieCard';
 import './Home.css'; // Re-use some styling
+import { API_BASE_URL } from '../config';
 
 const SearchPage = (props) => {
   const [results, setResults] = useState([]);
@@ -23,7 +24,7 @@ const SearchPage = (props) => {
   const performSearch = async (searchQuery) => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/tmdb/search/multi?query=${encodeURIComponent(searchQuery)}`);
+      const res = await fetch(`${API_BASE_URL}/tmdb/search/multi?query=${encodeURIComponent(searchQuery)}`);
       const data = await res.json();
       if (data && data.results) {
         const validResults = data.results.filter(item => (item.media_type === 'movie' || item.media_type === 'tv') && item.poster_path);

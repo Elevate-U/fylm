@@ -9,5 +9,7 @@
 
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
 const ORIGINAL_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/original';
-// All API requests will now go through our own proxy server.
-const API_BASE_URL = '/api/proxy'; 
+
+const API_BASE_URL = '/api';
+
+export { API_BASE_URL, IMAGE_BASE_URL, ORIGINAL_IMAGE_BASE_URL }; 

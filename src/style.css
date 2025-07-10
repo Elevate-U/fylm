@@ -421,4 +421,186 @@ footer {
 
 .favorite-icon.favorited {
     color: var(--primary-color); /* Red heart color */
+}
+
+/* This is for the button in movie.jsx, let's consolidate later */
+#favorite-btn {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-size: 2.5rem;
+    cursor: pointer;
+    line-height: 1;
+    transition: all 0.2s ease-in-out;
+}
+
+#favorite-btn:hover {
+    transform: scale(1.1);
+}
+
+#favorite-btn.favorited {
+    color: #e50914;
+} 
+
+/* --- MOVIE/MEDIA DETAILS PAGE --- */
+
+#media-details-content {
+    position: relative;
+    z-index: 2;
+    padding: 2rem;
+    background: linear-gradient(to top, rgba(10, 10, 10, 1) 50%, rgba(10, 10, 10, 0.8));
+}
+
+#media-header {
+    display: flex;
+    gap: 3rem;
+    margin-bottom: 3rem;
+}
+
+#media-header .poster img {
+    width: 280px;
+    border-radius: 12px;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+}
+
+#media-header .info h1 {
+    font-size: 3.5rem;
+    margin-top: 0;
+    margin-bottom: 1rem;
+    color: #fff;
+    text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+}
+
+#media-header .info .meta {
+    display: flex;
+    gap: 1.5rem;
+    align-items: center;
+    margin-bottom: 1.5rem;
+    color: #ccc;
+    font-size: 1.1rem;
+}
+
+#media-header .info .rating {
+    font-weight: bold;
+    color: #f5c518;
+    background: rgba(0,0,0,0.4);
+    padding: 5px 10px;
+    border-radius: 5px;
+}
+
+#media-header .info .overview {
+    font-size: 1.1rem;
+    line-height: 1.7;
+    max-width: 800px;
+    margin-bottom: 2rem;
+}
+
+#media-header .info .actions {
+    display: flex;
+    gap: 1rem;
+    align-items: center;
+    margin-top: 1.5rem;
+}
+
+.title-container {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem; /* Space below title/heart */
+}
+
+/* Responsive Styles */
+@media (max-width: 1024px) {
+    .hero-content h1 {
+        font-size: 3rem;
+    }
+
+    .hero-content {
+        max-width: 60%;
+    }
+
+    .movie-grid {
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    body {
+        font-size: 90%;
+    }
+
+    .container {
+        width: 95%;
+    }
+
+    header {
+        padding: 0.8rem 0;
+    }
+
+    #logo {
+        font-size: 1.5rem;
+    }
+
+    #search input {
+        width: 200px;
+    }
+
+    #hero {
+        height: 50vh;
+    }
+
+    .hero-content {
+        max-width: 80%;
+        padding: 1.5rem;
+    }
+
+    .hero-content h1 {
+        font-size: 2.5rem;
+    }
+
+    .hero-content p {
+        font-size: 1rem;
+    }
+
+    h2 {
+        font-size: 1.5rem;
+    }
+
+    .movie-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: 1rem;
+    }
+
+    .movie-info h3 {
+        font-size: 1rem;
+    }
+}
+
+@media (max-width: 480px) {
+    #hero {
+        height: 40vh;
+    }
+    
+    .hero-content {
+        max-width: 100%;
+        padding: 1rem;
+        text-align: center;
+        background: rgba(20, 20, 20, 0.2);
+    }
+
+    .hero-content h1 {
+        font-size: 2rem;
+    }
+
+    .hero-content p {
+       display: none;
+    }
+
+    .movie-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    }
+
+    .movie-info {
+        padding: 0.8rem;
+    }
 } 
