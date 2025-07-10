@@ -1,0 +1,47 @@
+header {
+    background-color: #1a1a1a;
+    padding: 1rem 0;
+    border-bottom: 1px solid #444;
+}
+
+header .container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 1rem;
+}
+
+.logo {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: #e50914; /* Netflix red */
+    text-decoration: none;
+}
+
+header nav {
+    display: flex;
+    gap: 1.5rem;
+}
+
+header nav a {
+    text-decoration: none;
+    color: #fff;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+header nav a:hover,
+header nav a.active {
+    color: #e50914;
+}
+
+.search-container input {
+    background-color: #333;
+    border: 1px solid #555;
+    color: #fff;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    width: 250px;
+} 
