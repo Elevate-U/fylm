@@ -19,6 +19,10 @@
   },
   "rewrites": [
     {
+      "source": "/api/tmdb/(.*)",
+      "destination": "/api/tmdb/$1"
+    },
+    {
       "source": "/image-proxy",
       "destination": "/api/image"
     },
