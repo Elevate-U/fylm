@@ -242,7 +242,7 @@ const MoviePage = () => {
                 <section id="recommendations">
                     <h2>Recommendations</h2>
                     <div class="movie-grid">
-                        {recommendations.map(item => <MovieCard item={item} mediaType={mediaType} />)}
+                        {recommendations.map(item => <MovieCard item={item} type={mediaType} />)}
                     </div>
                 </section>
             )}

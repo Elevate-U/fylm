@@ -2,27 +2,49 @@ import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
 import { useStore } from '../store';
 import MovieCard from '../components/MovieCard';
-import { getWatchHistory } from '../utils/watchHistory';
+import { getContinueWatching } from '../utils/watchHistory';
+import { useAuth } from '../context/Auth';
 import { API_BASE_URL } from '../config';
+import FeaturesShowcase from '../components/FeaturesShowcase';
+import LoadingSpinner from '../components/LoadingSpinner';
+import WelcomeMessage from '../components/WelcomeMessage';
 import './Home.css';
 
-const Home = () => {
+const Home = (props) => {
     const { 
         trending, 
         popularMovies, 
         popularTv, 
         topRatedMovies, 
         topRatedTv,
+        upcomingMovies,
+        nowPlayingMovies,
+        airingTodayTv,
         fetchTrending,
         fetchPopularMovies,
         fetchPopularTv,
         fetchTopRatedMovies,
-        fetchTopRatedTv 
+        fetchTopRatedTv,
+        fetchUpcomingMovies,
+        fetchNowPlayingMovies,
+        fetchAiringTodayTv 
     } = useStore();
     
+    const { user } = useAuth(); // Add auth context
     const [watchHistory, setWatchHistory] = useState({});
     const [continueWatching, setContinueWatching] = useState([]);
     const [loadingContinueWatching, setLoadingContinueWatching] = useState(true);
+    const [mediaType, setMediaType] = useState('all');
+
+    useEffect(() => {
+        if (props.path === '/movies') {
+            setMediaType('movie');
+        } else if (props.path === '/tv') {
+            setMediaType('tv');
+        } else {
+            setMediaType('all');
+        }
+    }, [props.path]);
 
     useEffect(() => {
         // Fetch initial data if not already in store
@@ -31,96 +53,60 @@ const Home = () => {
         fetchPopularTv();
         fetchTopRatedMovies();
         fetchTopRatedTv();
-    }, [fetchTrending, fetchPopularMovies, fetchPopularTv, fetchTopRatedMovies, fetchTopRatedTv]);
+        fetchUpcomingMovies();
+        fetchNowPlayingMovies();
+        fetchAiringTodayTv();
+    }, [fetchTrending, fetchPopularMovies, fetchPopularTv, fetchTopRatedMovies, fetchTopRatedTv, fetchUpcomingMovies, fetchNowPlayingMovies, fetchAiringTodayTv]);
 
     useEffect(() => {
-        const fetchHistory = async () => {
+        const fetchContinueWatching = async () => {
             setLoadingContinueWatching(true);
-            const history = await getWatchHistory();
-            if (!history) {
+            
+            // Only fetch continue watching if user is authenticated
+            if (!user) {
+                setContinueWatching([]);
                 setLoadingContinueWatching(false);
                 return;
-            };
+            }
+            
+            const items = await getContinueWatching();
+            if (!items || items.length === 0) {
+                setContinueWatching([]);
+                setLoadingContinueWatching(false);
+                return;
+            }
 
-            const historyMap = history.reduce((acc, item) => {
-                const key = `${item.media_type}-${item.media_id}${item.media_type !== 'movie' ? '-s'+item.season_number+'-e'+item.episode_number : '' }`;
-                acc[key] = item;
-                if (item.media_type === 'tv' || item.media_type === 'anime') {
-                    const seriesKey = `${item.media_type}-${item.id}`;
-                    if (!acc[seriesKey] || new Date(item.watched_at) > new Date(acc[seriesKey].watched_at)) {
-                         acc[seriesKey] = item;
-                    }
+            // getContinueWatching now returns complete data with TMDB details
+            // Deduplicate to show only one card per series
+            const uniqueInProgressItems = items.reduce((acc, current) => {
+                if (!acc.some(item => item.media_id === current.media_id)) {
+                    acc.push(current);
                 }
                 return acc;
-            }, {});
-            setWatchHistory(historyMap);
+            }, []);
 
-            const inProgressItems = history
-                .filter(item => {
-                    if (item.duration_seconds > 0) {
-                        return (item.progress_seconds / item.duration_seconds) < 0.95;
-                    }
-                    return true; // Keep if duration is not known
-                })
-                .sort((a, b) => new Date(b.watched_at) - new Date(a.watched_at));
-            
-            if (inProgressItems.length > 0) {
-                 const detailedItems = await Promise.all(
-                    inProgressItems.map(async (item) => {
-                        try {
-                            const res = await fetch(`${API_BASE_URL}/tmdb/${item.media_type}/${item.media_id}`);
-                            if (res.ok) {
-                                const data = await res.json();
-                                // Combine TMDB data with our progress data
-                                return { ...data, ...item, type: item.media_type };
-                            }
-                            return null;
-                        } catch {
-                            return null;
-                        }
-                    })
-                );
-                setContinueWatching(detailedItems.filter(Boolean));
-            } else {
-                setContinueWatching([]);
-            }
+            setContinueWatching(uniqueInProgressItems);
             setLoadingContinueWatching(false);
         };
-        fetchHistory();
-    }, []);
+        fetchContinueWatching();
+    }, [user]); // Add user as dependency to refetch when auth state changes
 
-    const renderSection = (title, items, type, loading) => {
-        if (loading) {
-            return (
-                <section class="home-section">
-                    <h2>{title}</h2>
-                    <div class="movie-list-placeholder">
-                        {[...Array(5)].map((_, i) => <div key={i} class="movie-card-placeholder" />)}
-                    </div>
-                </section>
-            );
-        }
+    const renderSection = (title, items, media_type) => {
+        // A loading placeholder can be shown here if you have a generic loading state
         if (!items || items.length === 0) {
-            // Don't render empty sections except for "Continue Watching"
-            if (title !== "Continue Watching") {
-                 return null;
-            }
+            return null;
         }
         return (
             <section class="home-section">
                 <h2>{title}</h2>
-                <div class="movie-list">
-                    {items.map(item => {
-                        const itemType = item.media_type || type;
-                        return (
-                            <MovieCard 
-                                key={item.id} 
-                                item={{ ...item, type: itemType }} 
-                                type={itemType} 
-                                progress={watchHistory[`${itemType}-${item.id}`] || item}
-                            />
-                        );
-                    })}
+                <div class="scrolling-row">
+                    {items.map(item => (
+                        <MovieCard 
+                            key={item.id} 
+                            item={item} 
+                            type={media_type || item.media_type}
+                        />
+                    ))}
                 </div>
             </section>
         );
@@ -128,13 +114,72 @@ const Home = () => {
 
     return (
         <div class="container home-page">
-            <h1 class="main-title">Discover</h1>
-            {renderSection('Continue Watching', continueWatching, 'movie', loadingContinueWatching)}
-            {renderSection('Trending This Week', trending, 'movie')}
-            {renderSection('Popular Movies', popularMovies, 'movie')}
-            {renderSection('Top Rated Movies', topRatedMovies, 'movie')}
-            {renderSection('Popular TV Shows', popularTv, 'tv')}
-            {renderSection('Top Rated TV Shows', topRatedTv, 'tv')}
+            <h1 class="main-title">
+                {mediaType === 'movie' && 'Movies'}
+                {mediaType === 'tv' && 'TV Shows'}
+                {mediaType === 'all' && 'Discover'}
+            </h1>
+
+            {/* Show Features Showcase for non-logged-in users */}
+            {!user && mediaType === 'all' && (
+                <>
+                    <div class="guest-info-banner" style={{
+                        backgroundColor: 'var(--bg-secondary)',
+                        border: '1px solid var(--border-color)',
+                        borderRadius: '8px',
+                        padding: '16px',
+                        marginBottom: '24px',
+                        textAlign: 'center'
+                    }}>
+                        <h3 style={{ margin: '0 0 8px 0', color: 'var(--text-primary)' }}>
+                            🎬 Start Streaming Instantly
+                        </h3>
+                        <p style={{ margin: '0', color: 'var(--text-secondary)' }}>
+                            No account required! Click any movie or TV show to start watching immediately. 
+                            <a href="/login" style={{ color: 'var(--accent-color)', textDecoration: 'none', marginLeft: '4px' }}>
+                                Sign up
+                            </a> to save favorites, track progress, and continue watching across devices.
+                        </p>
+                    </div>
+                    <FeaturesShowcase />
+                </>
+            )}
+            
+            {/* Show Welcome Message for logged-in users */}
+            {user && mediaType === 'all' && (
+                <WelcomeMessage />
+            )}
+
+            {loadingContinueWatching ? (
+                <LoadingSpinner text="Loading your continue watching..." />
+            ) : continueWatching.length > 0 && (
+                <section class="home-section">
+                    <h2>Continue Watching</h2>
+                    <div class="scrolling-row scrolling-row--compact">
+                        {continueWatching.map(item => (
+                            <MovieCard 
+                                key={`${item.type}-${item.id}`} 
+                                item={item} 
+                                type={item.type} 
+                                progress={item.progress_seconds}
+                                duration={item.duration_seconds}
+                            />
+                        ))}
+                    </div>
+                </section>
+            )}
+
+            {mediaType === 'all' && renderSection('Trending This Week', trending, 'movie')}
+            
+            {mediaType !== 'tv' && renderSection("Popular Movies", popularMovies, 'movie')}
+            {mediaType !== 'tv' && renderSection("Now Playing Movies", nowPlayingMovies, 'movie')}
+            {mediaType !== 'movie' && renderSection("Popular TV Shows", popularTv, 'tv')}
+            
+            {(mediaType === 'all' || mediaType === 'movie') && renderSection('Top Rated Movies', topRatedMovies, 'movie')}
+            {(mediaType === 'all' || mediaType === 'movie') && renderSection('Upcoming Movies', upcomingMovies, 'movie')}
+            
+            {(mediaType === 'all' || mediaType === 'tv') && renderSection('Top Rated TV Shows', topRatedTv, 'tv')}
+            {(mediaType === 'all' || mediaType === 'tv') && renderSection('Airing Today', airingTodayTv, 'tv')}
         </div>
     );
 };

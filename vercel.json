@@ -1,8 +1,52 @@
 {
+  "buildCommand": "npm run build",
+  "installCommand": "npm install --legacy-peer-deps --force",
+  "outputDirectory": "dist",
+  "framework": "vite",
+  "functions": {
+    "api/tmdb/[...path].js": {
+      "maxDuration": 30
+    },
+    "api/image.js": {
+      "maxDuration": 30
+    },
+    "api/stream-url.js": {
+      "maxDuration": 30
+    },
+    "api/index.js": {
+      "maxDuration": 30
+    }
+  },
   "rewrites": [
     {
-      "source": "/api/tmdb/:path*",
-      "destination": "/api/index.cjs"
+      "source": "/image-proxy",
+      "destination": "/api/image"
+    },
+    {
+      "source": "/api/stream-url",
+      "destination": "/api/stream-url"
     }
-  ]
+  ],
+  "headers": [
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "GET, POST, PUT, DELETE, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type, Authorization"
+        }
+      ]
+    }
+  ],
+  "env": {
+    "NODE_ENV": "production"
+  }
 } 

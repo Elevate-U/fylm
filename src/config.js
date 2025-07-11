@@ -10,6 +10,11 @@
 const IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/w500';
 const ORIGINAL_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/original';
 
-const API_BASE_URL = '/api';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
-export { API_BASE_URL, IMAGE_BASE_URL, ORIGINAL_IMAGE_BASE_URL }; 
+export function getProxiedImageUrl(url) {
+  if (!url) return '';
+  return `/image-proxy?url=${encodeURIComponent(url)}`;
+}
+
+export { IMAGE_BASE_URL, ORIGINAL_IMAGE_BASE_URL }; 

@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { route } from 'preact-router';
 import { supabase } from '../supabase';
-import toast from 'react-hot-toast';
+import toast from '../components/Toast';
 import './Auth.css';
 
 export default function Login() {

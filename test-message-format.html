@@ -1,0 +1,56 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test New Message Format</title>
+</head>
+<body>
+    <h1>Test New PROGRESS_UPDATE Format</h1>
+    <button onclick="testNewFormat()">Test New Format</button>
+    <button onclick="testLegacyFormat()">Test Legacy Format</button>
+    <div id="status"></div>
+
+    <script>
+        function testNewFormat() {
+            const message = {
+                type: 'PROGRESS_UPDATE',
+                data: {
+                    mediaId: 'tv-62650',
+                    mediaType: 'tv',
+                    season: 2,
+                    episode: 3,
+                    progress: {
+                        watched: 15.2,
+                        duration: 2499
+                    },
+                    timestamp: Date.now()
+                }
+            };
+            
+            window.parent.postMessage(message, '*');
+            document.getElementById('status').innerHTML = 'Sent efficient PROGRESS_UPDATE message';
+        }
+
+        function testLegacyFormat() {
+            const message = {
+                type: 'MEDIA_DATA',
+                data: JSON.stringify({
+                    "tv-62650": {
+                        "poster": "https://image.tmdb.org/t/p/w300/1QdXdRYfktUSONkl1oD5gc6Be0s.jpg",
+                        "progress": {"duration": 2499, "watched": 15.2},
+                        "show_progress": {
+                            "s2e3": {
+                                "season": "2",
+                                "episode": "3",
+                                "progress": {"watched": 15.2, "duration": 2499}
+                            }
+                        }
+                    }
+                })
+            };
+            
+            window.parent.postMessage(message, '*');
+            document.getElementById('status').innerHTML = 'Sent legacy MEDIA_DATA message';
+        }
+    </script>
+</body>
+</html> 
