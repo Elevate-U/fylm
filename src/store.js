@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { supabase } from './supabase';
 import { persist } from 'zustand/middleware';
+import { getContinueWatching } from './utils/watchHistory';
 
 
 const fetchAllPages = async (url, totalPages = 3) => {
@@ -34,6 +35,37 @@ export const useStore = create(
       favorites: [],
       favoritesFetched: false,
       currentMediaItem: null,
+      continueWatching: [],
+      continueWatchingFetched: false,
+
+      fetchContinueWatching: async () => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            set({ continueWatching: [], continueWatchingFetched: true });
+            return;
+        }
+
+        const items = await getContinueWatching();
+        if (!items || items.length === 0) {
+            set({ continueWatching: [], continueWatchingFetched: true });
+            return;
+        }
+
+        const uniqueInProgressItems = items.reduce((acc, current) => {
+            if (!acc.some(item => item.media_id === current.media_id)) {
+                acc.push(current);
+            }
+            return acc;
+        }, []);
+
+        set({ continueWatching: uniqueInProgressItems, continueWatchingFetched: true });
+      },
+
+      removeContinueWatchingItem: (mediaId) => {
+        set((state) => ({
+            continueWatching: state.continueWatching.filter(item => item.media_id !== mediaId)
+        }));
+      },
 
       setCurrentMediaItem: (mediaItem) => set({ currentMediaItem: mediaItem }),
 
@@ -243,7 +275,8 @@ export const useStore = create(
             topRatedTv: state.topRatedTv,
             upcomingMovies: state.upcomingMovies,
             nowPlayingMovies: state.nowPlayingMovies,
-            airingTodayTv: state.airingTodayTv
+            airingTodayTv: state.airingTodayTv,
+            continueWatching: state.continueWatching
         }),
     }
     )

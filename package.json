@@ -4,33 +4,35 @@
   "version": "0.0.0",
   "type": "module",
   "engines": {
-    "node": "18.x",
-    "npm": ">=8.0.0"
+    "node": "22.x",
+    "npm": ">=10.0.0"
   },
   "scripts": {
-    "dev": "concurrently \"nodemon api/index.js\" \"vite\"",
-    "start": "node api/index.js",
+    "dev": "concurrently \"npm run dev:api\" \"vite\"",
+    "dev:api": "nodemon _local/server.js",
+    "start": "node _local/server.cjs",
     "build": "vite build",
+    "lint": "eslint . --ext js,jsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.50.4",
+    "@preact/signals": "^1.3.0",
+    "@supabase/supabase-js": "^2.50.5",
     "cors": "^2.8.5",
-    "dotenv": "^17.2.0",
-    "express": "^4.18.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
     "history": "^5.3.0",
     "node-cache": "^5.1.2",
-    "node-fetch": "^2.6.7",
-    "preact": "^10.26.9",
-    "preact-helmet": "^4.0.0-alpha.4",
+    "preact": "^10.23.1",
+    "preact-helmet": "^4.0.0-alpha-3",
     "preact-router": "^4.1.2",
-    "zustand": "^4.5.2"
+    "zustand": "^5.0.6"
   },
   "devDependencies": {
-    "@preact/preset-vite": "^2.8.2",
-    "concurrently": "^8.2.2",
-    "nodemon": "^3.1.0",
-    "vite": "^5.4.19",
+    "@preact/preset-vite": "^2.10.2",
+    "concurrently": "^9.2.0",
+    "nodemon": "^3.1.10",
+    "vite": "^7.0.4",
     "vite-plugin-pwa": "^1.0.1"
   }
 }

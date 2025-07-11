@@ -27,13 +27,13 @@ const Home = (props) => {
         fetchTopRatedTv,
         fetchUpcomingMovies,
         fetchNowPlayingMovies,
-        fetchAiringTodayTv 
+        fetchAiringTodayTv,
+        continueWatching,
+        continueWatchingFetched,
+        fetchContinueWatching
     } = useStore();
     
     const { user } = useAuth(); // Add auth context
-    const [watchHistory, setWatchHistory] = useState({});
-    const [continueWatching, setContinueWatching] = useState([]);
-    const [loadingContinueWatching, setLoadingContinueWatching] = useState(true);
     const [mediaType, setMediaType] = useState('all');
 
     useEffect(() => {
@@ -59,37 +59,10 @@ const Home = (props) => {
     }, [fetchTrending, fetchPopularMovies, fetchPopularTv, fetchTopRatedMovies, fetchTopRatedTv, fetchUpcomingMovies, fetchNowPlayingMovies, fetchAiringTodayTv]);
 
     useEffect(() => {
-        const fetchContinueWatching = async () => {
-            setLoadingContinueWatching(true);
-            
-            // Only fetch continue watching if user is authenticated
-            if (!user) {
-                setContinueWatching([]);
-                setLoadingContinueWatching(false);
-                return;
-            }
-            
-            const items = await getContinueWatching();
-            if (!items || items.length === 0) {
-                setContinueWatching([]);
-                setLoadingContinueWatching(false);
-                return;
-            }
-
-            // getContinueWatching now returns complete data with TMDB details
-            // Deduplicate to show only one card per series
-            const uniqueInProgressItems = items.reduce((acc, current) => {
-                if (!acc.some(item => item.media_id === current.media_id)) {
-                    acc.push(current);
-                }
-                return acc;
-            }, []);
-
-            setContinueWatching(uniqueInProgressItems);
-            setLoadingContinueWatching(false);
-        };
-        fetchContinueWatching();
-    }, [user]); // Add user as dependency to refetch when auth state changes
+        if (user && !continueWatchingFetched) {
+            fetchContinueWatching();
+        }
+    }, [user, continueWatchingFetched, fetchContinueWatching]);
 
     const renderSection = (title, items, media_type) => {
         // A loading placeholder can be shown here if you have a generic loading state
@@ -102,7 +75,7 @@ const Home = (props) => {
                 <div class="scrolling-row">
                     {items.map(item => (
                         <MovieCard 
-                            key={item.id} 
+                            key={`${title}-${item.id}`} 
                             item={item} 
                             type={media_type || item.media_type}
                         />
@@ -150,7 +123,7 @@ const Home = (props) => {
                 <WelcomeMessage />
             )}
 
-            {loadingContinueWatching ? (
+            {!continueWatchingFetched ? (
                 <LoadingSpinner text="Loading your continue watching..." />
             ) : continueWatching.length > 0 && (
                 <section class="home-section">
@@ -158,7 +131,7 @@ const Home = (props) => {
                     <div class="scrolling-row scrolling-row--compact">
                         {continueWatching.map(item => (
                             <MovieCard 
-                                key={`${item.type}-${item.id}`} 
+                                key={`continue-watching-${item.type}-${item.id}`} 
                                 item={item} 
                                 type={item.type} 
                                 progress={item.progress_seconds}

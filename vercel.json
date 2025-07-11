@@ -1,52 +1,32 @@
 {
-  "buildCommand": "npm run build",
-  "installCommand": "npm install --legacy-peer-deps --force",
-  "outputDirectory": "dist",
-  "framework": "vite",
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "cleanUrls": true,
   "functions": {
     "api/tmdb/[...path].js": {
-      "maxDuration": 30
-    },
-    "api/image.js": {
+      "runtime": "edge",
+      "memory": 256,
       "maxDuration": 30
     },
     "api/stream-url.js": {
+      "runtime": "edge",
+      "memory": 256,
       "maxDuration": 30
     },
-    "api/index.js": {
+    "api/image-proxy.js": {
+      "runtime": "edge",
+      "memory": 512,
+      "maxDuration": 30
+    },
+    "api/image.js": {
+      "runtime": "edge", 
+      "memory": 512,
       "maxDuration": 30
     }
   },
   "rewrites": [
     {
-      "source": "/image-proxy",
-      "destination": "/api/image"
-    },
-    {
-      "source": "/api/stream-url",
-      "destination": "/api/stream-url"
+      "source": "/((?!api/).*)",
+      "destination": "/index.html"
     }
-  ],
-  "headers": [
-    {
-      "source": "/api/(.*)",
-      "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        },
-        {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, PUT, DELETE, OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type, Authorization"
-        }
-      ]
-    }
-  ],
-  "env": {
-    "NODE_ENV": "production"
-  }
+  ]
 } 

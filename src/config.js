@@ -36,7 +36,8 @@ export const API_BASE_URL = getApiBaseUrl();
 
 export function getProxiedImageUrl(url) {
   if (!url) return '';
-  return `/image-proxy?url=${encodeURIComponent(url)}`;
+  // Use the API_BASE_URL to construct the full proxy path
+  return `${API_BASE_URL}/image-proxy?url=${encodeURIComponent(url)}`;
 }
 
 console.log(`🚀 API Base URL: ${API_BASE_URL}`);

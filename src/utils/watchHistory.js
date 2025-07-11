@@ -322,7 +322,7 @@ export const getContinueWatching = async () => {
     }
 };
 
-export const saveWatchProgress = async (item, progress, durationInMinutes, forceHistoryEntry = false) => {
+export const saveWatchProgress = async (item, progress, durationInSeconds, forceHistoryEntry = false) => {
     const userId = await getCurrentUserId();
     if (!userId) {
         console.error('❌ Cannot save watch progress: No authenticated user');
@@ -330,7 +330,7 @@ export const saveWatchProgress = async (item, progress, durationInMinutes, force
     }
 
     if (!item || typeof progress === 'undefined' || progress < 0) {
-        console.error('❌ Invalid progress data:', { item, progress, durationInMinutes });
+        console.error('❌ Invalid progress data:', { item, progress, durationInSeconds });
         return false;
     }
 
@@ -339,8 +339,8 @@ export const saveWatchProgress = async (item, progress, durationInMinutes, force
         p_media_type: item.type,
         p_season_number: item.season || null,
         p_episode_number: item.episode || null,
-        p_progress_seconds: Math.round(progress),
-        p_duration_seconds: durationInMinutes ? Math.round(durationInMinutes * 60) : null,
+        p_progress_seconds: progress > 0 ? Math.ceil(progress) : 0,
+        p_duration_seconds: durationInSeconds ? Math.round(durationInSeconds) : null,
         p_force_history_entry: forceHistoryEntry
     };
 
@@ -366,7 +366,7 @@ export const saveWatchProgress = async (item, progress, durationInMinutes, force
     // Attempt 3: Direct DB write fallback
     console.warn(`⚠️ RPC (v1) also failed, attempting direct DB write. Error: ${rpcErrorV1.message}`);
     try {
-        const fallbackSuccess = await saveWatchProgressFallback(userId, item, progress, durationInMinutes, forceHistoryEntry);
+        const fallbackSuccess = await saveWatchProgressFallback(userId, item, progress, durationInSeconds, forceHistoryEntry);
         if (fallbackSuccess) {
             // The fallback function already logs its own success
             return true;
@@ -380,7 +380,7 @@ export const saveWatchProgress = async (item, progress, durationInMinutes, force
 };
 
 // Fallback function for direct database operations
-const saveWatchProgressFallback = async (userId, item, progress, durationInMinutes, forceHistoryEntry) => {
+const saveWatchProgressFallback = async (userId, item, progress, durationInSeconds, forceHistoryEntry) => {
     try {
         console.log('🔄 Using direct database fallback for watch progress');
         
@@ -393,8 +393,8 @@ const saveWatchProgressFallback = async (userId, item, progress, durationInMinut
                 media_type: item.type,
                 season_number: item.season || null,
                 episode_number: item.episode || null,
-                progress_seconds: Math.round(progress),
-                duration_seconds: durationInMinutes ? Math.round(durationInMinutes * 60) : null,
+                progress_seconds: progress > 0 ? Math.ceil(progress) : 0,
+                duration_seconds: durationInSeconds ? Math.round(durationInSeconds) : null,
                 updated_at: new Date().toISOString()
             }, {
                 onConflict: 'user_id,media_id,media_type,season_number,episode_number'

@@ -1,60 +1,59 @@
-export default async function handler(req, res) {
+export const runtime = 'edge';
+
+// Named export for GET requests - Vercel requirement
+export async function GET(req) {
+  const { searchParams } = new URL(req.url);
+  const type = searchParams.get('type');
+  const id = searchParams.get('id');
+  const source = searchParams.get('source') || 'videasy';
+  const season = searchParams.get('season');
+  const episode = searchParams.get('episode');
+  const dub = searchParams.get('dub');
+  const progress = searchParams.get('progress');
+
+  console.log('Stream URL request:', { type, id, source, season, episode, dub, progress });
+
+  const headers = {
+    'Content-Type': 'application/json',
+    'Access-Control-Allow-Origin': '*',
+  };
+
+  if (!id || !type) {
+    return new Response(JSON.stringify({ message: 'Missing required parameters: id and type' }), {
+      status: 400,
+      headers,
+    });
+  }
+
   try {
-    const { type, id, source = 'videasy', season, episode, dub, progress } = req.query;
-    
-    console.log('Stream URL request:', { type, id, source, season, episode, dub, progress });
-
-    // Set CORS headers
-    res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
-
-    if (!id || !type) {
-      return res.status(400).json({ 
-        message: 'Missing required parameters: id and type' 
-      });
-    }
-
     let streamData = null;
     let availableSources = ['videasy', 'vidsrc', 'embedsu'];
     let lastError = null;
 
-    // Try primary source first
+    const sourceFunctions = {
+      videasy: getVideasyStream,
+      vidsrc: getVidSrcStream,
+      embedsu: getEmbedSuStream,
+      consumet: getConsumetStream,
+    };
+
     try {
-      console.log(`Attempting to get stream from ${source}...`);
-      
-      if (source === 'videasy') {
-        streamData = await getVideasyStream(type, id, season, episode, dub, progress);
-      } else if (source === 'vidsrc') {
-        streamData = await getVidSrcStream(type, id, season, episode, progress);
-      } else if (source === 'embedsu') {
-        streamData = await getEmbedSuStream(type, id, season, episode, progress);
-      } else if (source === 'consumet') {
-        streamData = await getConsumetStream(type, id, season, episode, dub);
+      if (sourceFunctions[source]) {
+        console.log(`Attempting to get stream from ${source}...`);
+        streamData = await sourceFunctions[source](type, id, season, episode, dub, progress);
+        console.log(`Successfully got stream from ${source}`);
+      } else {
+        throw new Error(`Source '${source}' is not supported.`);
       }
-      
-      console.log(`Successfully got stream from ${source}`);
     } catch (error) {
       console.error(`Error with primary source ${source}:`, error.message);
       lastError = error;
-      
-      // Try fallback sources if primary fails
+
       const fallbackSources = availableSources.filter(s => s !== source);
-      
       for (const fallbackSource of fallbackSources) {
         try {
           console.log(`Trying fallback source: ${fallbackSource}...`);
-          
-          if (fallbackSource === 'videasy') {
-            streamData = await getVideasyStream(type, id, season, episode, dub, progress);
-          } else if (fallbackSource === 'vidsrc') {
-            streamData = await getVidSrcStream(type, id, season, episode, progress);
-          } else if (fallbackSource === 'embedsu') {
-            streamData = await getEmbedSuStream(type, id, season, episode, progress);
-          } else if (fallbackSource === 'consumet') {
-            streamData = await getConsumetStream(type, id, season, episode, dub);
-          }
-          
+          streamData = await sourceFunctions[fallbackSource](type, id, season, episode, dub, progress);
           if (streamData) {
             console.log(`Successfully got stream from fallback source: ${fallbackSource}`);
             break;
@@ -67,35 +66,57 @@ export default async function handler(req, res) {
     }
 
     if (!streamData) {
-      return res.status(503).json({
+      return new Response(JSON.stringify({
         message: 'All streaming sources are currently unavailable. Please try again later.',
         availableSources,
         currentSource: source,
         error: lastError?.message || 'Unknown error',
-        retryAfter: 300 // Suggest retry after 5 minutes
+        retryAfter: 300,
+      }), {
+        status: 503,
+        headers,
       });
     }
 
-    res.status(200).json({
+    return new Response(JSON.stringify({
       ...streamData,
       currentSource: source,
       availableSources
+    }), {
+      status: 200,
+      headers,
     });
 
   } catch (error) {
     console.error('Stream URL error:', error);
-    res.status(500).json({ 
+    return new Response(JSON.stringify({ 
       message: 'Internal Server Error', 
       error: error.message,
-      retryAfter: 60 // Suggest retry after 1 minute
+      retryAfter: 60,
+    }), {
+      status: 500,
+      headers,
     });
   }
 }
 
+// Handle OPTIONS requests (preflight)
+export async function OPTIONS(req) {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, POST, PUT, DELETE, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
+    },
+  });
+}
+
 async function getConsumetStream(type, id, season, episode, dub) {
   try {
-    // The consumet API is expected to be running locally on port 3000
-    const consumetBaseUrl = 'http://localhost:3000';
+    // Use an environment variable for the Consumet API URL.
+    // Fallback to localhost for local development if not set.
+    const consumetBaseUrl = process.env.VITE_CONSUMET_API_URL || 'http://localhost:3000';
     let url;
 
     // This logic assumes a similar URL structure to the other providers.
@@ -289,3 +310,5 @@ async function getEmbedSuStream(type, id, season, episode, progress) {
     throw new Error(`EmbedSu stream generation failed: ${error.message}`);
   }
 }
+
+export default handler;

@@ -1,0 +1,5 @@
+# Ignore the local development server file
+api/index.js
+
+# Ignore Node.js dependency directory
+node_modules 

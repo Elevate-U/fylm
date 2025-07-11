@@ -7,6 +7,7 @@ import { useAuth } from '../context/Auth';
 import { testSupabaseConnection } from '../supabase';
 import { API_BASE_URL } from '../config';
 import MovieCard from '../components/MovieCard';
+import { useStore } from '../store';
 
 // Helper function to fetch with retry logic
 const fetchWithRetry = async (url, maxRetries = 3, delay = 1000) => {
@@ -49,6 +50,7 @@ const History = () => {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const { removeContinueWatchingItem, fetchContinueWatching } = useStore();
 
     const fetchHistory = useCallback(async () => {
         if (!user) {
@@ -92,6 +94,7 @@ const History = () => {
                             id: details.id, // TMDB ID
                             watch_id: `${item.user_id}-${item.media_id}-${item.media_type}-${item.season_number || 0}-${item.episode_number || 0}`, // Unique key for deletion
                             type: item.media_type,
+                            media_type: item.media_type,
                             media_id: item.media_id, // Database media_id for reference
                             season_number: item.season_number,
                             episode_number: item.episode_number,
@@ -125,6 +128,7 @@ const History = () => {
                             id: item.media_id,
                             watch_id: `${item.user_id}-${item.media_id}-${item.media_type}-${item.season_number || 0}-${item.episode_number || 0}`,
                             type: item.media_type,
+                            media_type: item.media_type,
                             media_id: item.media_id,
                             season_number: item.season_number,
                             episode_number: item.episode_number,
@@ -165,8 +169,21 @@ const History = () => {
         // Optimistically remove the item from the UI using the unique watch_id
         setHistory(history.filter(item => item.watch_id !== itemToDelete.watch_id));
         
-        // Call the delete function from the utils
-        await deleteWatchItem(itemToDelete);
+        // Optimistically remove from the global "Continue Watching" state
+        removeContinueWatchingItem(itemToDelete.media_id);
+
+        try {
+            // Call the delete function from the utils
+            await deleteWatchItem(itemToDelete);
+
+            // Refetch continue watching to ensure it's up to date
+            await fetchContinueWatching();
+        } catch (error) {
+            console.error("Failed to delete item or refetch continue watching:", error);
+            // Optionally, add the item back to the history list on failure
+            // and show a toast notification to the user.
+            // For now, we'll just log the error.
+        }
     };
 
     const handleRetry = () => {

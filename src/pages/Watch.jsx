@@ -519,7 +519,7 @@ const Watch = (props) => {
                     const saveResult = await saveWatchProgress(
                         { ...mediaDetails, id: mediaDetails.id, type, season: currentSeason, episode: currentEpisode },
                         progressData.progress,
-                        progressData.duration / 60
+                        progressData.duration
                     );
                     
                     if (saveResult) {
@@ -614,7 +614,7 @@ const Watch = (props) => {
                         const saveResult = await saveWatchProgress(
                             { ...mediaDetails, id: mediaDetails.id, type, season: currentSeason, episode: currentEpisode },
                             progressData.progress,
-                            progressData.duration / 60
+                            progressData.duration
                         );
                         
                         if (saveResult) {
