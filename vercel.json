@@ -17,6 +17,7 @@
       "maxDuration": 30
     }
   },
+  "regions": ["all"],
   "rewrites": [
     {
       "source": "/api/tmdb/(.*)",

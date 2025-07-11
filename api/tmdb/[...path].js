@@ -1,29 +1,39 @@
-import fetch from 'node-fetch';
-
-const API_KEY = process.env.TMDB_API_KEY;
-const API_BASE_URL = 'https://api.themoviedb.org/3';
-
-if (!API_KEY) {
-    throw new Error('TMDB_API_KEY environment variable is not set.');
-}
-
 export default async function handler(req, res) {
     // Set CORS headers for all requests
     res.setHeader('Access-Control-Allow-Origin', '*');
-    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
-    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
-    // Handle OPTIONS requests
+    // Handle OPTIONS requests (preflight)
     if (req.method === 'OPTIONS') {
         return res.status(200).end();
     }
 
     try {
+        // Check if API key is available
+        const API_KEY = process.env.TMDB_API_KEY;
+        if (!API_KEY) {
+            console.error('TMDB_API_KEY environment variable is not set');
+            return res.status(500).json({ 
+                error: 'TMDB_API_KEY not configured',
+                message: 'Please set TMDB_API_KEY environment variable in Vercel project settings'
+            });
+        }
+
         // Extract path from Vercel's dynamic routing
         const { path } = req.query;
-        const tmdbPath = Array.isArray(path) ? '/' + path.join('/') : `/${path}`;
+        let tmdbPath;
+        
+        if (Array.isArray(path)) {
+            tmdbPath = '/' + path.join('/');
+        } else if (path) {
+            tmdbPath = `/${path}`;
+        } else {
+            return res.status(400).json({ error: 'No path provided' });
+        }
 
-        const url = new URL(`${API_BASE_URL}${tmdbPath}`);
+        // Build TMDB API URL
+        const url = new URL(`https://api.themoviedb.org/3${tmdbPath}`);
         url.searchParams.set('api_key', API_KEY);
 
         // Forward any additional query params from the original request
@@ -33,20 +43,17 @@ export default async function handler(req, res) {
             }
         }
 
-        console.log(`Forwarding TMDB request to: ${url}`);
+        console.log(`Forwarding TMDB request to: ${url.toString()}`);
 
-        // Create timeout promise for compatibility
-        const timeoutPromise = new Promise((_, reject) => {
-            setTimeout(() => reject(new Error('TMDB API request timeout')), 15000);
-        });
-
-        const fetchPromise = fetch(url.toString(), {
+        // Make request to TMDB API
+        const fetch = (await import('node-fetch')).default;
+        const tmdbResponse = await fetch(url.toString(), {
             headers: {
-                'User-Agent': 'FreeStream-App/1.0'
-            }
+                'User-Agent': 'FreeStream-App/1.0',
+                'Accept': 'application/json'
+            },
+            timeout: 15000
         });
-
-        const tmdbResponse = await Promise.race([fetchPromise, timeoutPromise]);
         
         if (!tmdbResponse.ok) {
             console.error(`TMDB API error: ${tmdbResponse.status} ${tmdbResponse.statusText}`);
@@ -58,10 +65,14 @@ export default async function handler(req, res) {
         }
 
         const data = await tmdbResponse.json();
-        res.status(200).json(data);
+        
+        // Set cache headers for better performance
+        res.setHeader('Cache-Control', 'public, max-age=300'); // 5 minutes cache
+        
+        return res.status(200).json(data);
     } catch (error) {
         console.error('TMDB proxy error:', error);
-        res.status(500).json({ 
+        return res.status(500).json({ 
             message: 'Internal Server Error', 
             error: error.message,
             timestamp: new Date().toISOString()
