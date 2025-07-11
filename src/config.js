@@ -12,23 +12,14 @@ const ORIGINAL_IMAGE_BASE_URL = 'https://image.tmdb.org/t/p/original';
 
 // Enhanced API base URL configuration for different environments
 const getApiBaseUrl = () => {
-  // Check if we're in development mode
-  const isDevelopment = import.meta.env.MODE === 'development' || 
-                       window.location.hostname === 'localhost' || 
-                       window.location.hostname === '127.0.0.1' ||
-                       window.location.port === '5173';
-  
   // Custom environment variable override
   if (import.meta.env.VITE_API_BASE_URL) {
     return import.meta.env.VITE_API_BASE_URL;
   }
-  
-  // Development: use local Express server
-  if (isDevelopment) {
-    return 'http://localhost:3001/api';
-  }
-  
-  // Production: use Vercel serverless functions
+
+  // Both development and production will now use a relative path.
+  // The Vite dev server proxy will handle it locally, and Vercel's
+  // rewrites will handle it in production.
   return '/api';
 };
 

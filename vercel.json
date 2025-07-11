@@ -1,32 +1,26 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "cleanUrls": true,
-  "functions": {
-    "api/tmdb/[...path].js": {
-      "runtime": "edge",
-      "memory": 256,
-      "maxDuration": 30
-    },
-    "api/stream-url.js": {
-      "runtime": "edge",
-      "memory": 256,
-      "maxDuration": 30
-    },
-    "api/image-proxy.js": {
-      "runtime": "edge",
-      "memory": 512,
-      "maxDuration": 30
-    },
-    "api/image.js": {
-      "runtime": "edge", 
-      "memory": 512,
-      "maxDuration": 30
+  "headers": [
+    {
+      "source": "/(.*)",
+      "headers": [
+        { "key": "X-Content-Type-Options", "value": "nosniff" },
+        { "key": "X-Frame-Options", "value": "DENY" },
+        { "key": "Referrer-Policy", "value": "strict-origin-when-cross-origin" },
+        { "key": "X-XSS-Protection", "value": "1; mode=block" },
+        { "key": "Strict-Transport-Security", "value": "max-age=31536000; includeSubDomains; preload" }
+      ]
     }
-  },
+  ],
   "rewrites": [
     {
-      "source": "/((?!api/).*)",
+      "source": "/api/(.*)",
+      "destination": "/api"
+    },
+    {
+      "source": "/((?!api|\\.).)*$",
       "destination": "/index.html"
     }
   ]
-} 
+}  

@@ -1,7 +1,7 @@
 // Test script for Vercel API endpoints
 // Run with: node test-vercel-apis.js
 
-const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:5173';
+const baseUrl = process.env.TEST_BASE_URL || 'http://localhost:5174';
 
 const testEndpoints = [
   {
@@ -16,7 +16,7 @@ const testEndpoints = [
   },
   {
     name: 'Stream URL',
-    url: `${baseUrl}/api/stream-url?type=movie&id=550`,
+    url: `${baseUrl}/api/stream-url?type=movie&id=550&source=videasy`,
     description: 'Test stream URL generation'
   },
   {
