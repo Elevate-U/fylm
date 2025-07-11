@@ -10,13 +10,25 @@ export default async function handler(req, res) {
     }
 
     try {
+        console.log('TMDB Handler - Request received:', {
+            method: req.method,
+            url: req.url,
+            query: req.query,
+            headers: req.headers
+        });
+
         // Check if API key is available
         const API_KEY = process.env.TMDB_API_KEY;
         if (!API_KEY) {
             console.error('TMDB_API_KEY environment variable is not set');
             return res.status(500).json({ 
                 error: 'TMDB_API_KEY not configured',
-                message: 'Please set TMDB_API_KEY environment variable in Vercel project settings'
+                message: 'Please set TMDB_API_KEY environment variable in Vercel project settings',
+                debug: {
+                    url: req.url,
+                    query: req.query,
+                    method: req.method
+                }
             });
         }
 
@@ -24,12 +36,28 @@ export default async function handler(req, res) {
         const { path } = req.query;
         let tmdbPath;
         
+        console.log('Path extracted from query:', path);
+        
         if (Array.isArray(path)) {
             tmdbPath = '/' + path.join('/');
         } else if (path) {
             tmdbPath = `/${path}`;
         } else {
-            return res.status(400).json({ error: 'No path provided' });
+            // If no path in query, try to extract from URL
+            const urlPath = req.url.replace('/api/tmdb', '');
+            if (urlPath && urlPath !== '/') {
+                tmdbPath = urlPath;
+            } else {
+                console.error('No path provided in query or URL');
+                return res.status(400).json({ 
+                    error: 'No path provided',
+                    debug: {
+                        url: req.url,
+                        query: req.query,
+                        extractedPath: urlPath
+                    }
+                });
+            }
         }
 
         // Build TMDB API URL
@@ -60,7 +88,8 @@ export default async function handler(req, res) {
             return res.status(tmdbResponse.status).json({ 
                 error: 'TMDB API error', 
                 status: tmdbResponse.status,
-                message: tmdbResponse.statusText 
+                message: tmdbResponse.statusText,
+                requestedUrl: url.toString()
             });
         }
 
@@ -69,13 +98,19 @@ export default async function handler(req, res) {
         // Set cache headers for better performance
         res.setHeader('Cache-Control', 'public, max-age=300'); // 5 minutes cache
         
+        console.log(`TMDB request successful for path: ${tmdbPath}`);
         return res.status(200).json(data);
     } catch (error) {
         console.error('TMDB proxy error:', error);
         return res.status(500).json({ 
             message: 'Internal Server Error', 
             error: error.message,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
+            debug: {
+                url: req.url,
+                query: req.query,
+                method: req.method
+            }
         });
     }
 } 
