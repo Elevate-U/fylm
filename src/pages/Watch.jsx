@@ -53,7 +53,8 @@ const Watch = (props) => {
     const { id, type, season, episode } = props.matches;
     const { user } = useAuth(); // Get authentication state
 
-    const { addFavorite, removeFavorite, isFavorited, setCurrentMediaItem, favoritesFetched } = useStore();
+    const { setCurrentMediaItem, favoritesFetched } = useStore();
+    const { addFavoriteShow, removeFavoriteShow, isShowFavorited } = require('../utils/favorites');
 
     // Initialize season and episode from URL parameters immediately
     useEffect(() => {
@@ -838,42 +839,15 @@ const Watch = (props) => {
     const { title, name, overview, vote_average, release_date, first_air_date, runtime, number_of_seasons, genres, poster_path } = mediaDetails;
     
     // For TV episodes, check if this specific episode is favorited
-    const isEpisode = (type === 'tv' || type === 'anime') && currentSeason && currentEpisode;
-    const favorited = isEpisode 
-        ? isFavorited(mediaDetails.id, type, currentSeason, currentEpisode)
-        : isFavorited(mediaDetails.id, type);
+    const favorited = isShowFavorited(mediaDetails.id);
     
     const year = release_date || first_air_date ? new Date(release_date || first_air_date).getFullYear() : '';
 
     const handleFavoriteClick = () => {
-        if (!user) {
-            // Show a message prompting to log in for favorites
-            if (window.confirm('You need to log in to save favorites. Would you like to go to the login page?')) {
-                route('/login');
-            }
-            return;
-        }
-        
         if (favorited) {
-            if (isEpisode) {
-                removeFavorite(mediaDetails.id, currentSeason, currentEpisode);
-            } else {
-                removeFavorite(mediaDetails.id);
-            }
+            removeFavoriteShow(mediaDetails);
         } else {
-            if (isEpisode) {
-                // For TV episodes, we need to get episode name from season details
-                const currentEpisodeData = seasonDetails?.episodes?.find(ep => ep.episode_number === currentEpisode);
-                addFavorite({ 
-                    ...mediaDetails, 
-                    type, 
-                    season_number: currentSeason, 
-                    episode_number: currentEpisode,
-                    episode_name: currentEpisodeData?.name || `Episode ${currentEpisode}`
-                });
-            } else {
-                addFavorite({ ...mediaDetails, type });
-            }
+            addFavoriteShow({ ...mediaDetails, type });
         }
     };
 

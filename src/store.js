@@ -122,193 +122,118 @@ export const useStore = create(
       fetchFavorites: async () => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) {
-            set({ favorites: [], favoritesFetched: true });
-            return;
+          set({ favorites: [], favoritesFetched: true });
+          return;
         }
 
         const { data, error } = await supabase
-            .from('favorites')
-            .select('media_id, media_type, season_number, episode_number, episode_name')
-            .eq('user_id', user.id);
-        
+          .from('favorites')
+          .select('media_id, media_type')
+          .eq('user_id', user.id);
+
         if (error) {
-            console.error('Error fetching favorites:', error);
-            set({ favoritesFetched: true });
-            return;
+          console.error('Error fetching favorites:', error);
+          set({ favoritesFetched: true });
+          return;
         }
 
-        // Create a unique key for each favorited item for reliable lookup
-        const favoritedMedia = new Set(data.map(fav => 
-            `${fav.media_id}-${fav.media_type}-${fav.season_number || null}-${fav.episode_number || null}`
-        ));
+        const favoritedMedia = new Set(data.map(fav => `${fav.media_id}-${fav.media_type}`));
         set({ favoritedMedia, favoritesFetched: true });
-        
-        const favoritesWithDetails = await Promise.all(data.map(async (fav) => {
+
+        const favoritesWithDetails = await Promise.all(
+          data.map(async (fav) => {
             try {
-                const response = await fetch(`/api/tmdb/${fav.media_type}/${fav.media_id}`);
-                if (response.ok) {
-                    const details = await response.json();
-                    
-                    // For TV episodes, we need to fetch episode-specific data
-                    if (fav.media_type === 'tv' && fav.season_number && fav.episode_number) {
-                        try {
-                            const episodeResponse = await fetch(`/api/tmdb/tv/${fav.media_id}/season/${fav.season_number}/episode/${fav.episode_number}`);
-                            if (episodeResponse.ok) {
-                                const episodeDetails = await episodeResponse.json();
-                                return {
-                                    ...details,
-                                    type: fav.media_type,
-                                    season_number: fav.season_number,
-                                    episode_number: fav.episode_number,
-                                    episode_name: episodeDetails.name || fav.episode_name,
-                                    still_path: episodeDetails.still_path,
-                                    vote_average: episodeDetails.vote_average || details.vote_average,
-                                    overview: episodeDetails.overview || details.overview
-                                };
-                            }
-                        } catch (error) {
-                            console.error('Error fetching episode details:', error);
-                        }
-                        
-                        // Fallback to stored episode data if API fails
-                        return {
-                            ...details,
-                            type: fav.media_type,
-                            season_number: fav.season_number,
-                            episode_number: fav.episode_number,
-                            episode_name: fav.episode_name
-                        };
-                    }
-                    
-                    return { ...details, type: fav.media_type };
-                }
-                return null;
+              const response = await fetch(`/api/tmdb/${fav.media_type}/${fav.media_id}`);
+              if (response.ok) {
+                const details = await response.json();
+                return { ...details, type: fav.media_type };
+              }
+              return null;
             } catch (err) {
-                console.warn(`Could not fetch details for favorited item ${fav.media_type}:${fav.media_id}. It will not appear in the favorites list.`, err);
-                return null;
+              console.warn(`Could not fetch details for favorited item ${fav.media_type}:${fav.media_id}. It will not appear in the favorites list.`, err);
+              return null;
             }
-        }));
-        
+          })
+        );
+
         set({ favorites: favoritesWithDetails.filter(Boolean) });
       },
 
-      isFavorited: (mediaId, mediaType, seasonNumber = null, episodeNumber = null) => {
-        const key = `${mediaId}-${mediaType}-${seasonNumber || null}-${episodeNumber || null}`;
-        return get().favoritedMedia.has(key);
+      isFavorited: (mediaId, mediaType) => {
+        if (mediaType === 'tv' || mediaType === 'anime') {
+          return get().favoritedMedia.has(`${mediaId}-tv`);
+        }
+        return get().favoritedMedia.has(`${mediaId}-${mediaType}`);
       },
 
       addFavorite: async (mediaItem) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
-        
-        const { id, type, season_number, episode_number, name, title, poster_path, vote_average } = mediaItem;
-        const key = `${id}-${type}-${season_number || null}-${episode_number || null}`;
-
-        // Prevent adding if it's already in the local state, as a safeguard
+      
+        const { id, type } = mediaItem;
+        const key = `${id}-${type}`;
+      
         if (get().favoritedMedia.has(key)) {
-            console.warn('Attempted to add an already existing favorite. Aborting.', mediaItem);
-            return;
+          return;
         }
-        
+      
         // Optimistic update
-        set((state) => ({ 
-            favorites: [mediaItem, ...state.favorites],
-            favoritedMedia: new Set(state.favoritedMedia).add(key)
+        set((state) => ({
+          favorites: [mediaItem, ...state.favorites],
+          favoritedMedia: new Set(state.favoritedMedia).add(key)
         }));
-
-        const favoriteData = {
-            user_id: user.id, 
-            media_id: id, 
-            media_type: type
-        };
-
-        // Add episode-specific data for TV shows
-        if (type === 'tv' && season_number && episode_number) {
-            favoriteData.season_number = season_number;
-            favoriteData.episode_number = episode_number;
-            favoriteData.episode_name = mediaItem.episode_name;
-        }
-
-        const { error } = await supabase
-            .from('favorites')
-            .insert(favoriteData, { onConflict: 'user_id, media_id, media_type, season_number, episode_number' });
-
+      
+        const { error } = await supabase.from('favorites').insert({
+          user_id: user.id,
+          media_id: id,
+          media_type: type
+        });
+      
         if (error) {
-            console.error('Error adding favorite:', error);
-            // Revert on error
-            set((state) => {
-                const newFavoritedMedia = new Set(state.favoritedMedia);
-                newFavoritedMedia.delete(key);
-                return { 
-                    favoritedMedia: newFavoritedMedia,
-                    favorites: state.favorites.filter(f => 
-                        f.id !== id || 
-                        f.season_number !== season_number || 
-                        f.episode_number !== episode_number
-                    )
-                }
-            });
-        }
-      },
-      removeFavorite: async (mediaId, mediaType, seasonNumber = null, episodeNumber = null) => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
-
-        const key = `${mediaId}-${mediaType}-${seasonNumber || null}-${episodeNumber || null}`;
-
-        const originalFavorites = get().favorites;
-        const originalFavoritedMedia = get().favoritedMedia;
-
-        // Optimistic update - remove matching favorite
-        set((state) => {
+          console.error('Error adding favorite:', error);
+          // Revert on error
+          set((state) => {
             const newFavoritedMedia = new Set(state.favoritedMedia);
             newFavoritedMedia.delete(key);
             return {
-                favoritedMedia: newFavoritedMedia,
-                favorites: state.favorites.filter((item) => 
-                    !(item.id === mediaId && 
-                      item.season_number === seasonNumber && 
-                      item.episode_number === episodeNumber)
-                )
-            }
-        });
-
-        const deleteQuery = supabase
-            .from('favorites')
-            .delete()
-            .match({ user_id: user.id, media_id: mediaId });
-
-        // Add episode-specific filters if provided
-        if (seasonNumber !== null && episodeNumber !== null) {
-            deleteQuery.match({ season_number: seasonNumber, episode_number: episodeNumber });
-        } else {
-            // For movies, ensure we're only deleting items without episode data
-            deleteQuery.is('season_number', null).is('episode_number', null);
-        }
-
-        const { error } = await deleteQuery;
-        
-        if (error) {
-            console.error('Error removing favorite:', error);
-            // Revert on error
-            set({ favorites: originalFavorites, favoritedMedia: originalFavoritedMedia });
+              favoritedMedia: newFavoritedMedia,
+              favorites: state.favorites.filter(f => f.id !== id || f.type !== type)
+            };
+          });
         }
       },
-      isFavorited: (mediaId, mediaType, seasonNumber = null, episodeNumber = null) => {
-        const { favoritedMedia, favoritesFetched } = get();
-        if (!favoritesFetched) {
-            return false;
+      
+      removeFavorite: async (mediaId, mediaType) => {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) return;
+      
+        const key = `${mediaId}-${mediaType}`;
+      
+        // Optimistic update
+        set((state) => {
+          const newFavoritedMedia = new Set(state.favoritedMedia);
+          newFavoritedMedia.delete(key);
+          return {
+            favoritedMedia: newFavoritedMedia,
+            favorites: state.favorites.filter(item => !(item.id === mediaId && item.type === mediaType))
+          };
+        });
+      
+        const { error } = await supabase.from('favorites').delete().match({
+          user_id: user.id,
+          media_id: mediaId,
+          media_type: mediaType
+        });
+      
+        if (error) {
+          console.error('Error removing favorite:', error);
+          // Revert on error
+          set((state) => ({
+            ...state,
+            favorites: get().favorites,
+            favoritedMedia: get().favoritedMedia
+          }));
         }
-        const exactKey = `${mediaId}-${mediaType}-${seasonNumber || null}-${episodeNumber || null}`;
-        if (favoritedMedia.has(exactKey)) {
-          return true;
-        }
-        // Check if it's a TV episode and the series is favorited
-        if (mediaType === 'tv' && seasonNumber !== null && episodeNumber !== null) {
-          const seriesKey = `${mediaId}-${mediaType}-null-null`;
-          return favoritedMedia.has(seriesKey);
-        }
-        return false;
       }
     }),
     {
