@@ -52,7 +52,7 @@ const Watch = (props) => {
     const { id, type, season, episode } = props.matches;
     const { user } = useAuth(); // Get authentication state
 
-    const { addFavorite, removeFavorite, isFavorited, setCurrentMediaItem } = useStore();
+    const { addFavorite, removeFavorite, isFavorited, setCurrentMediaItem, favoritesFetched } = useStore();
 
     // Initialize season and episode from URL parameters immediately
     useEffect(() => {
@@ -819,8 +819,8 @@ const Watch = (props) => {
     // For TV episodes, check if this specific episode is favorited
     const isEpisode = (type === 'tv' || type === 'anime') && currentSeason && currentEpisode;
     const favorited = isEpisode 
-        ? isFavorited(mediaDetails.id, currentSeason, currentEpisode)
-        : isFavorited(mediaDetails.id);
+        ? isFavorited(mediaDetails.id, type, currentSeason, currentEpisode)
+        : isFavorited(mediaDetails.id, type);
     
     const year = release_date || first_air_date ? new Date(release_date || first_air_date).getFullYear() : '';
 
@@ -987,8 +987,12 @@ const Watch = (props) => {
                                             <div class="details">
                         <div class="title-container">
                             <h1>{title || name}</h1>
-                            <button onClick={handleFavoriteClick} class={`favorite-btn ${favorited ? 'favorited' : ''}`}>
-                                {favorited ? '♥ Favorited' : '♡'}
+                            <button 
+                                onClick={handleFavoriteClick} 
+                                class={`favorite-btn ${favorited ? 'favorited' : ''}`}
+                                disabled={!favoritesFetched}
+                            >
+                                {favoritesFetched ? (favorited ? '♥ Favorited' : '♡ Favorite') : '...'}
                             </button>
                             {!user && (
                                 <span class="login-hint">

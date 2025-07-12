@@ -198,13 +198,25 @@ body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
-  overflow-x: hidden;
+  /* overflow-x: hidden; */ /* This can interfere with sticky positioning */
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
   scroll-behavior: smooth;
   position: relative;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+main {
+  flex: 1;
+  width: 100%;
 }
 
 /* Floating Particle Background - RECOMMENDATION: Disable for cleaner look */

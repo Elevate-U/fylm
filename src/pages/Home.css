@@ -302,12 +302,12 @@
 /* Compact version for "Continue Watching" */
 .scrolling-row--compact {
     gap: 1rem;
+    padding-bottom: var(--spacing-sm);
 }
 
 .scrolling-row--compact .movie-card-container {
-    flex: 0 0 clamp(170px, 20vw, 240px);
-    min-width: clamp(170px, 20vw, 240px);
-    width: clamp(170px, 20vw, 240px);
+    flex: 0 0 280px; /* Adjust base size for compact view */
+    /* Remove max-width to allow cards to be wider */
 }
 
 @media (min-width: 768px) {

@@ -9,15 +9,11 @@ import { getProgressForHistoryItems } from '../utils/watchHistory';
 const Favorites = () => {
     const { user } = useAuth();
     const favorites = useStore((state) => state.favorites);
-    const fetchFavorites = useStore((state) => state.fetchFavorites);
     const [progressData, setProgressData] = useState({});
 
     useEffect(() => {
         document.title = 'My Favorites - FreeStream';
-        if (user) {
-            fetchFavorites();
-        }
-    }, [user, fetchFavorites]);
+    }, []);
 
     // Fetch progress data when favorites change
     useEffect(() => {

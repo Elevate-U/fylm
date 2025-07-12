@@ -1,6 +1,7 @@
 import { h } from 'preact';
 import { Link } from 'preact-router/match';
 import { useStore } from '../store';
+import { useAuth } from '../context/Auth';
 import './MovieCard.css';
 import { getProxiedImageUrl, IMAGE_BASE_URL } from '../config';
 
@@ -31,8 +32,9 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete 
     // Calculate year from release date
     const year = (release_date || first_air_date) ? new Date(release_date || first_air_date).getFullYear() : null;
 
-    const { addFavorite, removeFavorite, isFavorited } = useStore();
-    const favorited = isFavorited(item.id, item.season_number, item.episode_number);
+    const { user } = useAuth();
+    const { addFavorite, removeFavorite, isFavorited, favoritesFetched } = useStore();
+    const favorited = isFavorited(item.id, type, item.season_number, item.episode_number);
 
     const handleFavoriteClick = (e) => {
         e.preventDefault();
@@ -87,9 +89,16 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete 
                         {/* Standardized Title Display */}
                         <div className="title-row">
                             <h3 className="card-title">{seriesTitle}</h3>
-                            <button className={`favorite-btn ${favorited ? 'favorited' : ''}`} onClick={handleFavoriteClick}>
-                                {favorited ? '♥' : '♡'}
-                            </button>
+                            {user && (
+                                <button
+                                    className={`favorite-btn ${favorited ? 'favorited' : ''}`}
+                                    onClick={handleFavoriteClick}
+                                    aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
+                                    disabled={!favoritesFetched}
+                                >
+                                    {favoritesFetched ? '♥︎' : '...'}
+                                </button>
+                            )}
                         </div>
                         {subtitleText && (
                             <p className="card-subtitle">{subtitleText}</p>

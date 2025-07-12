@@ -19,10 +19,21 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       strictPort: true,
       proxy: {
-        '/api': {
-          target: 'http://localhost:3001',
+        '/api/tmdb': {
+          target: 'https://api.themoviedb.org/3',
           changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/tmdb/, ''),
         },
+        '/api/consumet': {
+          target: 'https://api.consumet.org',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/consumet/, ''),
+        },
+        '/api/anify': {
+          target: 'https://api.anify.tv',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api\/anify/, ''),
+        }
       },
     },
     build: {

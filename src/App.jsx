@@ -5,6 +5,7 @@ import { createHashHistory } from 'history';
 import { AuthProvider, useAuth } from './context/Auth';
 import { Toaster } from './components/Toast';
 import { initializeTheme } from './utils/themeUtils';
+import { useStore } from './store';
 
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -22,6 +23,21 @@ import ScrollToTop from './components/ScrollToTop';
 
 const MainApp = () => {
     const { user } = useAuth();
+    const fetchFavorites = useStore((state) => state.fetchFavorites);
+    const favoritesFetched = useStore((state) => state.favoritesFetched);
+    const fetchContinueWatching = useStore((state) => state.fetchContinueWatching);
+    const continueWatchingFetched = useStore((state) => state.continueWatchingFetched);
+
+    useEffect(() => {
+        if (user) {
+            if (!favoritesFetched) {
+                fetchFavorites();
+            }
+            if (!continueWatchingFetched) {
+                fetchContinueWatching();
+            }
+        }
+    }, [user, favoritesFetched, fetchFavorites, continueWatchingFetched, fetchContinueWatching]);
 
     return (
         <div class="app">
