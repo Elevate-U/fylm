@@ -217,6 +217,19 @@ body {
 main {
   flex: 1;
   width: 100%;
+  padding-top: 73px; /* Account for fixed header height */
+}
+
+@media (max-width: 768px) {
+  main {
+    padding-top: 70px; /* Reduced padding for mobile header */
+  }
+}
+
+@media (max-width: 480px) {
+  main {
+    padding-top: 65px; /* Further reduced for very small screens */
+  }
 }
 
 /* Floating Particle Background - RECOMMENDATION: Disable for cleaner look */

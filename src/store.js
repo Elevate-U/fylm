@@ -192,7 +192,10 @@ export const useStore = create(
         set({ favorites: favoritesWithDetails.filter(Boolean) });
       },
 
-
+      isFavorited: (mediaId, mediaType, seasonNumber = null, episodeNumber = null) => {
+        const key = `${mediaId}-${mediaType}-${seasonNumber || null}-${episodeNumber || null}`;
+        return get().favoritedMedia.has(key);
+      },
 
       addFavorite: async (mediaItem) => {
         const { data: { user } } = await supabase.auth.getUser();
@@ -251,7 +254,6 @@ export const useStore = create(
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-       // Construct the key using the provided mediaType
         const key = `${mediaId}-${mediaType}-${seasonNumber || null}-${episodeNumber || null}`;
 
         const originalFavorites = get().favorites;
@@ -297,8 +299,16 @@ export const useStore = create(
         if (!favoritesFetched) {
             return false;
         }
-        const key = `${mediaId}-${mediaType}-${seasonNumber || null}-${episodeNumber || null}`;
-        return favoritedMedia.has(key);
+        const exactKey = `${mediaId}-${mediaType}-${seasonNumber || null}-${episodeNumber || null}`;
+        if (favoritedMedia.has(exactKey)) {
+          return true;
+        }
+        // Check if it's a TV episode and the series is favorited
+        if (mediaType === 'tv' && seasonNumber !== null && episodeNumber !== null) {
+          const seriesKey = `${mediaId}-${mediaType}-null-null`;
+          return favoritedMedia.has(seriesKey);
+        }
+        return false;
       }
     }),
     {

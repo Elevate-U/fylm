@@ -2,11 +2,13 @@ header {
   background: var(--glass-bg), var(--glass-highlight);
   backdrop-filter: var(--glass-blur-heavy);
   -webkit-backdrop-filter: var(--glass-blur-heavy);
-  padding: var(--spacing-sm) 0;
+  padding: calc(var(--spacing-sm) * 0.60) 0;
   border: none;
   border-bottom: var(--glass-border);
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
+  right: 0;
   z-index: 1000;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: var(--glass-shadow);
@@ -79,7 +81,7 @@ header nav a {
   color: var(--text-secondary);
   font-weight: var(--font-weight-medium);
   font-size: var(--font-size-sm);
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: 6px var(--spacing-md);
   border-radius: var(--radius-md);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
@@ -198,12 +200,15 @@ header nav a::after {
   border: var(--glass-border);
   box-shadow: var(--glass-shadow);
   color: var(--text-primary);
-  padding: var(--spacing-sm) var(--spacing-md);
+  padding: 0 var(--spacing-md);
   border-radius: var(--radius-full);
   width: 280px;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-regular);
+  height: 32px;
+  display: flex;
+  align-items: center;
 }
 
 .search-container input:focus {
@@ -354,7 +359,7 @@ header nav a::after {
   background: var(--glass-bg), var(--glass-highlight);
   backdrop-filter: var(--glass-blur-light);
   border: var(--glass-border);
-  padding: var(--spacing-xs) var(--spacing-sm);
+  padding: 0 var(--spacing-md);
   border-radius: var(--radius-md);
   cursor: pointer;
   font-size: var(--font-size-sm);
@@ -362,6 +367,9 @@ header nav a::after {
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   box-shadow: var(--glass-shadow);
   white-space: nowrap;
+  height: 32px;
+  display: flex;
+  align-items: center;
 }
 
 .auth-link:hover,
@@ -395,13 +403,22 @@ header nav a::after {
 .user-email {
   color: var(--text-secondary);
   font-size: var(--font-size-sm);
-  margin-right: var(--spacing-sm);
   white-space: nowrap;
+  height: 36px;
+  padding: 0 var(--spacing-sm);
+  display: flex;
+  align-items: center;
 }
 
 /* Add a separator for clarity */
 .auth-links .user-email + .auth-button {
   margin-left: var(--spacing-sm);
+}
+
+.auth-links {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
 }
 
 /* Mobile Responsive Design */
@@ -411,7 +428,7 @@ header nav a::after {
   }
 
   header nav {
-    display: none;
+    display: flex;
     position: fixed;
     top: 0;
     right: -100%;
@@ -428,7 +445,6 @@ header nav a::after {
   }
 
   header nav.active {
-    display: flex;
     right: 0;
   }
 

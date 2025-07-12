@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useState } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import { Link, route } from 'preact-router';
 import { useAuth } from '../context/Auth';
 import ThemeToggle from './ThemeToggle';
@@ -10,49 +10,175 @@ const Header = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const { user, signOut } = useAuth();
+    const menuRef = useRef(null);
+    const hamburgerRef = useRef(null);
+    const searchRef = useRef(null);
 
     const handleSearch = (e) => {
         e.preventDefault();
         if (query.trim()) {
             route(`/search?q=${encodeURIComponent(query.trim())}`);
             setQuery('');
-            setIsSearchOpen(false); // Close search on mobile after search
+            setIsSearchOpen(false);
+            setIsMenuOpen(false);
         }
     };
 
     const handleLogout = async () => {
         await signOut();
         route('/');
-    };
-
-    const toggleMenu = () => {
-        setIsMenuOpen(!isMenuOpen);
-        setIsSearchOpen(false); // Close search when menu is toggled
+        setIsMenuOpen(false);
     };
 
     const toggleSearch = () => {
-        setIsSearchOpen(!isSearchOpen);
-        setIsMenuOpen(false); // Close menu when search is toggled
+        const newSearchState = !isSearchOpen;
+        setIsSearchOpen(newSearchState);
+        setIsMenuOpen(false);
+        
+        if (newSearchState) {
+            document.body.classList.add('menu-open');
+        } else {
+            document.body.classList.remove('menu-open');
+        }
     };
 
+    const toggleMenu = () => {
+        const newMenuState = !isMenuOpen;
+        setIsMenuOpen(newMenuState);
+        setIsSearchOpen(false);
+        
+        if (newMenuState) {
+            document.body.classList.add('menu-open');
+        } else {
+            document.body.classList.remove('menu-open');
+        }
+    };
+
+    const closeMenu = () => {
+        setIsMenuOpen(false);
+        setIsSearchOpen(false);
+        document.body.classList.remove('menu-open');
+    };
+
+    // Close menu on route change
+    useEffect(() => {
+        const originalRoute = route;
+        
+        // Override route function to close menu before navigation
+        const newRoute = (...args) => {
+            closeMenu();
+            return originalRoute(...args);
+        };
+        
+        // Copy properties from original route
+        Object.keys(originalRoute).forEach(key => {
+            newRoute[key] = originalRoute[key];
+        });
+        
+        // Replace global route
+        window.route = newRoute;
+        
+        return () => {
+            window.route = originalRoute;
+        };
+    }, []);
+
+    // Handle click outside to close menu
+    useEffect(() => {
+        const handleClickOutside = (event) => {
+            if (isMenuOpen && 
+                menuRef.current && 
+                !menuRef.current.contains(event.target) && 
+                !hamburgerRef.current.contains(event.target)) {
+                closeMenu();
+            }
+            
+            if (isSearchOpen && 
+                searchRef.current && 
+                !searchRef.current.contains(event.target)) {
+                setIsSearchOpen(false);
+                document.body.classList.remove('menu-open');
+            }
+        };
+
+        const handleEscapeKey = (event) => {
+            if (event.key === 'Escape') {
+                if (isMenuOpen) {
+                    closeMenu();
+                } else if (isSearchOpen) {
+                    setIsSearchOpen(false);
+                    document.body.classList.remove('menu-open');
+                }
+            }
+        };
+
+        const handleResize = () => {
+            if (window.innerWidth > 768) {
+                closeMenu();
+            }
+        };
+
+        if (isMenuOpen || isSearchOpen) {
+            document.addEventListener('mousedown', handleClickOutside);
+            document.addEventListener('keydown', handleEscapeKey);
+            window.addEventListener('resize', handleResize);
+        }
+
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+            document.removeEventListener('keydown', handleEscapeKey);
+            window.removeEventListener('resize', handleResize);
+        };
+    }, [isMenuOpen, isSearchOpen]);
+
+    // Focus management for accessibility
+    useEffect(() => {
+        if (isMenuOpen) {
+            const firstFocusable = menuRef.current?.querySelector('a, button');
+            firstFocusable?.focus();
+        }
+    }, [isMenuOpen]);
+
+    // Prevent body scroll when menu is open
+    useEffect(() => {
+        if (isMenuOpen || isSearchOpen) {
+            document.body.style.overflow = 'hidden';
+            document.body.style.position = 'fixed';
+            document.body.style.width = '100%';
+            document.body.style.height = '100%';
+        } else {
+            document.body.style.overflow = '';
+            document.body.style.position = '';
+            document.body.style.width = '';
+            document.body.style.height = '';
+        }
+
+        return () => {
+            document.body.style.overflow = '';
+            document.body.style.position = '';
+            document.body.style.width = '';
+            document.body.style.height = '';
+        };
+    }, [isMenuOpen, isSearchOpen]);
+
     return (
-        <header>
+        <header class={isMenuOpen ? 'scrolled' : ''}>
             <div class="container">
                 <div class="header-left">
-                    <Link href="/" class="logo">FreeStream</Link>
-                    <nav class={isMenuOpen ? 'active' : ''}>
-                        <ul onClick={() => setIsMenuOpen(false)}>
-                            <li><Link activeClassName="active" href="/movies">Movies</Link></li>
-                            <li><Link activeClassName="active" href="/tv">TV</Link></li>
+                    <Link href="/" class="logo" onClick={closeMenu}>FreeStream</Link>
+                    <nav ref={menuRef} class={isMenuOpen ? 'active' : ''} aria-hidden={!isMenuOpen}>
+                        <ul>
+                            <li><Link activeClassName="active" href="/movies" onClick={closeMenu}>Movies</Link></li>
+                            <li><Link activeClassName="active" href="/tv" onClick={closeMenu}>TV</Link></li>
                             {user ? (
                                 <>
-                                    <li><Link activeClassName="active" href="/favorites">Favorites</Link></li>
-                                    <li><Link activeClassName="active" href="/history">History</Link></li>
+                                    <li><Link activeClassName="active" href="/favorites" onClick={closeMenu}>Favorites</Link></li>
+                                    <li><Link activeClassName="active" href="/history" onClick={closeMenu}>History</Link></li>
                                 </>
                             ) : (
                                 <>
-                                    <li><a href="/login" style={{ color: '#999', fontSize: '0.9em' }}>Favorites (Login Required)</a></li>
-                                    <li><a href="/login" style={{ color: '#999', fontSize: '0.9em' }}>History (Login Required)</a></li>
+                                    <li><a href="/login" style={{ color: '#999', fontSize: '0.9em' }} onClick={closeMenu}>Favorites (Login Required)</a></li>
+                                    <li><a href="/login" style={{ color: '#999', fontSize: '0.9em' }} onClick={closeMenu}>History (Login Required)</a></li>
                                 </>
                             )}
                         </ul>
@@ -61,7 +187,7 @@ const Header = () => {
                 
                 {/* Mobile Search Overlay */}
                 {isSearchOpen && (
-                    <div class="mobile-search-overlay">
+                    <div ref={searchRef} class="mobile-search-overlay">
                         <form class="mobile-search-form" onSubmit={handleSearch}>
                             <input
                                 type="text"
@@ -79,6 +205,11 @@ const Header = () => {
                             </button>
                         </form>
                     </div>
+                )}
+                
+                {/* Backdrop for mobile menu */}
+                {isMenuOpen && (
+                    <div class="mobile-menu-backdrop" onClick={closeMenu}></div>
                 )}
                 
                 <div class="header-right">
@@ -110,13 +241,20 @@ const Header = () => {
                             </>
                         ) : (
                             <>
-                                <Link href="/login" class="auth-link">Login</Link>
-                                <Link href="/signup" class="auth-link">Sign Up</Link>
+                                <Link href="/login" class="auth-link" onClick={closeMenu}>Login</Link>
+                                <Link href="/signup" class="auth-link" onClick={closeMenu}>Sign Up</Link>
                             </>
                         )}
                     </div>
                 </div>
-                <button class="hamburger" onClick={toggleMenu} aria-label="Toggle menu">
+                <button 
+                    ref={hamburgerRef}
+                    class={`hamburger ${isMenuOpen ? 'active' : ''}`} 
+                    onClick={toggleMenu} 
+                    aria-label="Toggle menu"
+                    aria-expanded={isMenuOpen}
+                    aria-controls="mobile-menu"
+                >
                     <span class="bar"></span>
                     <span class="bar"></span>
                     <span class="bar"></span>
@@ -126,4 +264,4 @@ const Header = () => {
     );
 };
 
-export default Header; 
+export default Header;

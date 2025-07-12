@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useState, useEffect, useRef, useMemo } from 'preact/hooks';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'preact/hooks';
 import { route } from 'preact-router';
 import Helmet from 'preact-helmet';
 import { useStore } from '../store';
@@ -35,6 +35,7 @@ const Watch = (props) => {
     const [playerReady, setPlayerReady] = useState(false);
     const [progressToResume, setProgressToResume] = useState(0);
     const [currentEpisodePage, setCurrentEpisodePage] = useState(1);
+    const [initialPageSet, setInitialPageSet] = useState(false);
     const episodesPerPage = 6;
     const sourceUpdatedFromBackend = useRef(false); // Track if source change is from backend
     const previousEpisodeRef = useRef(null); // Track previous episode to detect navigation
@@ -86,6 +87,14 @@ const Watch = (props) => {
         // Fallback for when duration is missing: 5% if over 30s, otherwise 2%
         return movieProgress.progress_seconds > 30 ? 5 : 2;
     }, [type, movieProgress]);
+
+    // Calculate and set initial episode page based on current episode
+    const calculateInitialEpisodePage = useCallback((targetEpisode, totalEpisodes) => {
+        if (!targetEpisode || !totalEpisodes) return 1;
+        
+        const page = Math.ceil(targetEpisode / episodesPerPage);
+        return Math.max(1, Math.min(page, Math.ceil(totalEpisodes / episodesPerPage)));
+    }, [episodesPerPage]);
 
     // Create stable user ID reference to prevent unnecessary re-renders
     const userId = user?.id;
@@ -148,6 +157,9 @@ const Watch = (props) => {
         isAutoNavigating.current = false;
         lastPlayerEventNavigation.current = null;
         playerEventModeEnabled.current = false;
+        // Reset pagination state for new content
+        setCurrentEpisodePage(1);
+        setInitialPageSet(false);
         // Clear any pending navigation timeouts
         navigationTimeouts.current.forEach(timeout => clearTimeout(timeout));
         navigationTimeouts.current.clear();
@@ -267,9 +279,9 @@ const Watch = (props) => {
         loadUserSpecificData();
     }, [user, mediaDetails, id, type]); // Remove season and episode from dependencies to prevent re-running when user changes selection
 
-    // Reset pagination when season changes
+    // Reset pagination when season changes, but respect initial page setting
     useEffect(() => {
-        if (currentSeason !== null) {
+        if (currentSeason !== null && !initialPageSet) {
             setCurrentEpisodePage(1);
         }
     }, [currentSeason]);
@@ -295,6 +307,15 @@ const Watch = (props) => {
                 if (res.ok) {
                     const data = await res.json();
                     setSeasonDetails(data);
+                    
+                    // Calculate and set initial page based on current episode
+                    if (currentEpisode && data.episodes && !initialPageSet) {
+                        const page = Math.ceil(currentEpisode / episodesPerPage);
+                        const maxPage = Math.ceil(data.episodes.length / episodesPerPage);
+                        const initialPage = Math.max(1, Math.min(page, maxPage));
+                        setCurrentEpisodePage(initialPage);
+                        setInitialPageSet(true);
+                    }
                 } else {
                     setSeasonDetails(null);
                 }
@@ -305,7 +326,7 @@ const Watch = (props) => {
             }
         };
         fetchSeasonDetails();
-    }, [id, type, currentSeason]);
+    }, [id, type, currentSeason, currentEpisode, initialPageSet]);
 
     useEffect(() => {
         // Check if this is due to episode navigation

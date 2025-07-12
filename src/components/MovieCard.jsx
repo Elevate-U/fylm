@@ -34,13 +34,15 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete 
 
     const { user } = useAuth();
     const { addFavorite, removeFavorite, isFavorited, favoritesFetched } = useStore();
+    
+   
     const favorited = isFavorited(item.id, type, item.season_number, item.episode_number);
 
     const handleFavoriteClick = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (isFavorited(item.id, type, item.season_number, item.episode_number)) {
-             removeFavorite(item.id, type, item.season_number, item.episode_number);
+        if (favorited) {
+            removeFavorite(item.id, type, item.season_number, item.episode_number);
         } else {
             addFavorite({ ...item, type });
         }
@@ -91,9 +93,9 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete 
                             <h3 className="card-title">{seriesTitle}</h3>
                             {user && (
                                 <button
-                                    className={`favorite-btn ${isFavorited(item.id, type, item.season_number, item.episode_number) ? 'favorited' : ''}`}
+                                    className={`favorite-btn ${favorited ? 'favorited' : ''}`}
                                     onClick={handleFavoriteClick}
-                                    aria-label={isFavorited(item.id, type, item.season_number, item.episode_number) ? 'Remove from favorites' : 'Add to favorites'}
+                                    aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
                                     disabled={!favoritesFetched}
                                 >
                                     {favoritesFetched ? '♥︎' : '...'}
