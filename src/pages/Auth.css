@@ -231,7 +231,93 @@
   display: none;
 }
 
+.social-login-group {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.social-button {
+  width: 100%;
+  padding: 1rem 1.5rem;
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  font-weight: var(--font-weight-semibold);
+  cursor: pointer;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  border: 1px solid transparent;
+}
+
+.social-button:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--glass-shadow-hover);
+}
+
+.social-button.google {
+  background-color: #fff;
+  color: #333;
+  border-color: #ddd;
+}
+
+.social-button.google:hover {
+  background-color: #f7f7f7;
+  border-color: #ccc;
+}
+
+.social-button::before {
+  content: '';
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  background-size: contain;
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
+.social-button.google::before {
+  background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDQ4IDQ4Ij48cGF0aCBmaWxsPSIjRkZDNTEwIiBkPSJNMCA0NGMwIDIgMS43IDQgMy44IDRIMjRWMjRIM1EuNEMxLjcgMjQgMCAyMiAwIDIwVjBIMjR2MjRoMjB2MjBMMCA0NHoiLz48cGF0aCBmaWxsPSIjRjM3QzA5IiBkPSJNMCA0NGwxMSA2LjIgTDI0IDM2VjI0SDB2MjB6Ii8+PHBhdGggZmlsbD0iIzI3N0FDMSIgZD0iTTQ4IDQ0YzAgMi0xLjcgNC0zLjggNEgyNHYtNEg0OGwtMTYtMThMMjQgMHYyNGgyNHYyMHoiLz48cGF0aCBmaWxsPSIjMzNBQTUzIiBkPSJNMCAwYzAgMiAxLjcgNCAzLjggNEgyNHYtNEgwTC0xMS02LjJMMjQgMjRWMHYtMjRIMHYweiIvPjwvc3ZnPg==');
+}
+
 /* ===== ADDITIONAL AUTH FORM ELEMENTS ===== */
+
+.auth-options {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 1.5rem;
+}
+
+.password-input-container {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.password-toggle {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  font-size: 0.9rem;
+  font-weight: var(--font-weight-semibold);
+  padding: 0.5rem;
+  border-radius: var(--radius-sm);
+  transition: all 0.2s ease;
+  z-index: 2;
+}
+
+.password-toggle:hover {
+  color: var(--text-primary);
+  background: rgba(var(--brand-primary-rgb), 0.1);
+}
 
 .auth-divider {
   display: flex;
@@ -289,36 +375,60 @@
   text-decoration-color: var(--brand-primary);
 }
 
-.error-message {
-  background: linear-gradient(135deg, 
-    rgba(var(--error), 0.2) 0%, 
-    rgba(var(--error), 0.05) 100%);
-  backdrop-filter: var(--glass-blur);
-  border: 1px solid rgba(var(--error), 0.3);
-  border-radius: var(--radius-md);
-  padding: 1rem 1.5rem;
-  margin-bottom: 1.5rem;
-  color: #ffcccb;
-  font-weight: var(--font-weight-medium);
+.auth-links {
+  margin-top: 1.5rem;
   text-align: center;
-  box-shadow: 
-    var(--glass-shadow),
-    0 0 20px rgba(var(--error), 0.2);
+}
+
+.auth-links p {
+  color: var(--text-secondary);
+}
+
+.auth-links .auth-link {
+  color: var(--brand-primary);
+  font-weight: var(--font-weight-bold);
+}
+
+.auth-links .auth-link:hover {
+  color: var(--brand-accent);
+}
+
+.error-message {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: var(--error-color, #ef4444);
+  padding: 1rem;
+  border-radius: var(--radius-md);
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  text-align: center;
   animation: shake 0.5s ease-in-out;
+}
+
+.field-error {
+  color: var(--error-color, #ef4444);
+  font-size: 0.8rem;
+  margin-top: 0.5rem;
+  display: block;
+  font-weight: var(--font-weight-medium);
+}
+
+.input-field.error {
+  border-color: var(--error-color, #ef4444) !important;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.1) !important;
 }
 
 @keyframes shake {
   0%, 100% { transform: translateX(0); }
   25% { transform: translateX(-5px); }
-  75% { transform: translateX(5px); }
+  50% { transform: translateX(5px); }
+  75% { transform: translateX(-5px); }
 }
 
 .success-message {
-  background: linear-gradient(135deg, 
-    rgba(var(--success), 0.2) 0%, 
-    rgba(var(--success), 0.05) 100%);
+  background: rgba(16, 185, 129, 0.1);
   backdrop-filter: var(--glass-blur);
-  border: 1px solid rgba(var(--success), 0.3);
+  border: 1px solid rgba(16, 185, 129, 0.3);
   border-radius: var(--radius-md);
   padding: 1rem 1.5rem;
   margin-bottom: 1.5rem;
@@ -327,7 +437,7 @@
   text-align: center;
   box-shadow: 
     var(--glass-shadow),
-    0 0 20px rgba(var(--success), 0.2);
+    0 0 20px rgba(16, 185, 129, 0.2);
 }
 
 .loading-overlay {

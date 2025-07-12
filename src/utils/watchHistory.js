@@ -619,6 +619,7 @@ const getNextEpisode = async (seriesId, currentSeason, currentEpisode, mediaType
 };
 
 // Get last episode with actual meaningful progress (for resuming)
+// This implements the "Continue Watching" logic for a series.
 export const getLastWatchedEpisodeWithProgress = async (seriesId) => {
     try {
         const userId = await getCurrentUserId();
@@ -627,102 +628,92 @@ export const getLastWatchedEpisodeWithProgress = async (seriesId) => {
             return null;
         }
 
-        console.log(`🔍 Looking for last watched episode for series ${seriesId} from watch_history`);
+        console.log(`🔍 [CW] Looking for last watched episode for series ${seriesId}`);
 
-        // First, get all episodes from watch_history (episodes that were actually watched)
+        // 1. Get the single most RECENTLY watched episode from history. This is the most reliable signal.
         const { data: historyData, error: historyError } = await supabase
             .from('watch_history')
             .select('season_number, episode_number, watched_at, media_type')
             .eq('user_id', userId)
             .eq('media_id', seriesId)
-            .order('watched_at', { ascending: false });
+            .order('watched_at', { ascending: false })
+            .limit(1);
         
         if (historyError) {
-            console.error('Error fetching watch history:', historyError);
+            console.error('❌ [CW] Error fetching watch history:', historyError);
             return null;
         }
         
         if (!historyData || historyData.length === 0) {
-            console.log('📭 No episodes found in watch history');
+            console.log('📭 [CW] No episodes found in watch history for this series.');
             return null;
         }
 
-        console.log(`📊 Found ${historyData.length} episodes in watch history for series ${seriesId}`);
+        const lastWatched = historyData[0];
+        console.log(`📺 [CW] Most recent interaction: S${lastWatched.season_number}E${lastWatched.episode_number} (at ${lastWatched.watched_at})`);
         
-        // Sort episodes by season/episode progression to find the most advanced
-        const sortedEpisodes = historyData.sort((a, b) => {
-            if (a.season_number !== b.season_number) {
-                return b.season_number - a.season_number; // Higher season first
-            }
-            return b.episode_number - a.episode_number; // Higher episode first
-        });
-
-        // The most advanced episode from watch history
-        const mostAdvancedFromHistory = sortedEpisodes[0];
-        
-        console.log(`📺 Most advanced episode from history: S${mostAdvancedFromHistory.season_number}E${mostAdvancedFromHistory.episode_number} (watched: ${mostAdvancedFromHistory.watched_at})`);
-        
-        // Now check if this episode has progress data
+        // 2. Now check if this episode has progress data
         const { data: progressData, error: progressError } = await supabase
             .from('watch_progress')
-            .select('progress_seconds, duration_seconds, updated_at')
+            .select('progress_seconds, duration_seconds')
             .eq('user_id', userId)
             .eq('media_id', seriesId)
-            .eq('season_number', mostAdvancedFromHistory.season_number)
-            .eq('episode_number', mostAdvancedFromHistory.episode_number);
+            .eq('season_number', lastWatched.season_number)
+            .eq('episode_number', lastWatched.episode_number)
+            .limit(1);
 
         if (progressError) {
-            console.error('Error fetching progress data:', progressError);
-            // Return the episode anyway since it's in watch history
+            console.error('❌ [CW] Error fetching progress data:', progressError);
+            // Even if progress fails, we know this was the last touched episode.
             return { 
-                season: mostAdvancedFromHistory.season_number, 
-                episode: mostAdvancedFromHistory.episode_number 
+                season: lastWatched.season_number, 
+                episode: lastWatched.episode_number 
             };
         }
 
         const progress = progressData && progressData.length > 0 ? progressData[0] : null;
         
-        if (progress) {
-            console.log(`📊 Progress data found: ${progress.progress_seconds}/${progress.duration_seconds}s`);
-            
-            // Check if the episode was completed (>90% watched)
-            let isCompleted = false;
-            if (progress.duration_seconds > 0) {
-                const completionPercentage = progress.progress_seconds / progress.duration_seconds;
-                isCompleted = completionPercentage >= 0.90;
-                console.log(`📊 Completion: ${(completionPercentage * 100).toFixed(1)}% - ${isCompleted ? 'COMPLETED' : 'INCOMPLETE'}`);
-            }
+        if (progress && progress.duration_seconds > 0) {
+            // Improved completion logic: use both percentage and time left
+            const completionPercentage = progress.progress_seconds / progress.duration_seconds;
+            const timeLeft = progress.duration_seconds - progress.progress_seconds;
+            const minCompletionPercent = 0.90; // 90%
+            const minTimeLeftSeconds = 60;     // 1 minute left
+            const isCompleted = (completionPercentage >= minCompletionPercent && timeLeft <= minTimeLeftSeconds);
+
+            console.log(`📊 [CW] Progress: ${(completionPercentage * 100).toFixed(1)}%, Time left: ${timeLeft}s - ${isCompleted ? 'COMPLETED' : 'INCOMPLETE'}`);
             
             if (isCompleted) {
-                // Episode was completed, try to get next episode
-                console.log(`✅ Most advanced episode S${mostAdvancedFromHistory.season_number}E${mostAdvancedFromHistory.episode_number} was completed, finding next episode`);
-                const nextEpisode = await getNextEpisode(seriesId, mostAdvancedFromHistory.season_number, mostAdvancedFromHistory.episode_number, mostAdvancedFromHistory.media_type);
+                // Episode was completed, find the next one.
+                console.log(`✅ [CW] Episode S${lastWatched.season_number}E${lastWatched.episode_number} is completed. Finding next...`);
+                const nextEpisode = await getNextEpisode(seriesId, lastWatched.season_number, lastWatched.episode_number, lastWatched.media_type);
                 
                 if (nextEpisode) {
-                    console.log(`🎯 Next episode found: S${nextEpisode.season}E${nextEpisode.episode}`);
+                    console.log(`🎯 [CW] Next episode is S${nextEpisode.season}E${nextEpisode.episode}.`);
                     return nextEpisode;
                 } else {
-                    console.log('🏁 No next episode available, series may be completed. No "continue watching" will be triggered.');
-                    return null;
+                    console.log('🏁 [CW] Series finished. No "continue watching" target.');
+                    return null; // Series is finished
                 }
             } else {
-                // Episode was not completed, resume from where left off
-                console.log(`⏯️ Resuming incomplete episode S${mostAdvancedFromHistory.season_number}E${mostAdvancedFromHistory.episode_number}`);
+                // Episode is not completed, resume from here.
+                console.log(`⏯️ [CW] Resuming incomplete episode S${lastWatched.season_number}E${lastWatched.episode_number}.`);
                 return { 
-                    season: mostAdvancedFromHistory.season_number, 
-                    episode: mostAdvancedFromHistory.episode_number 
+                    season: lastWatched.season_number, 
+                    episode: lastWatched.episode_number 
                 };
             }
         } else {
-            // No progress data, but it's in watch history, so return it
-            console.log(`📝 No progress data, but episode is in watch history: S${mostAdvancedFromHistory.season_number}E${mostAdvancedFromHistory.episode_number}`);
+            // No progress data, or no duration.
+            // It's the last thing they interacted with, so suggest resuming it.
+            console.log(`📝 [CW] No meaningful progress found. Suggesting last touched episode: S${lastWatched.season_number}E${lastWatched.episode_number}`);
             return { 
-                season: mostAdvancedFromHistory.season_number, 
-                episode: mostAdvancedFromHistory.episode_number 
+                season: lastWatched.season_number, 
+                episode: lastWatched.episode_number 
             };
         }
     } catch (error) {
-        console.error('Error in getLastWatchedEpisodeWithProgress:', error);
+        console.error('❌ [CW] Unexpected error in getLastWatchedEpisodeWithProgress:', error);
         return null;
     }
 };

@@ -822,68 +822,7 @@
     font-weight: 700;
 }
 
-.next-episode-prompt {
-    position: fixed;
-    top: 50%;
-    left: 50%;
-    transform: translate(-50%, -50%);
-    background: var(--glass-bg);
-    backdrop-filter: var(--glass-blur-heavy);
-    border: var(--glass-border);
-    box-shadow: 
-        var(--glass-shadow-heavy),
-        0 0 50px rgba(0, 0, 0, 0.7);
-    border-radius: 20px;
-    padding: 2rem;
-    z-index: 1000;
-    max-width: 400px;
-    text-align: center;
-}
-
-.next-episode-content h3 {
-    margin: 0 0 1rem 0;
-    font-size: 1.3rem;
-    color: #fff;
-}
-
-.next-episode-content p {
-    margin: 0 0 1.5rem 0;
-    color: rgba(255, 255, 255, 0.8);
-}
-
-.next-episode-buttons {
-    display: flex;
-    gap: 1rem;
-    justify-content: center;
-}
-
-.next-episode-buttons .btn {
-    padding: 0.8rem 1.5rem;
-    border-radius: 12px;
-    border: var(--glass-border);
-    backdrop-filter: var(--glass-blur);
-    box-shadow: var(--glass-shadow);
-    cursor: pointer;
-    font-weight: 600;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.next-episode-buttons .btn-primary {
-    background: linear-gradient(135deg, 
-        rgba(var(--primary-rgb), 0.4) 0%, 
-        rgba(var(--primary-rgb), 0.2) 100%);
-    color: var(--primary);
-    border-color: var(--primary);
-}
-
-.next-episode-buttons .btn:hover {
-    transform: translateY(-2px);
-    box-shadow: 
-        var(--glass-shadow-hover),
-        0 0 20px rgba(var(--primary-rgb), 0.3);
-}
+/* Removed next-episode-prompt CSS - Videasy handles this automatically */
 
 .loading-state {
     display: flex;
@@ -1052,15 +991,7 @@
         gap: 1rem;
     }
 
-    .next-episode-prompt {
-        margin: 1rem;
-        max-width: calc(100vw - 2rem);
-        padding: 1.5rem;
-    }
-
-    .next-episode-buttons {
-        flex-direction: column;
-    }
+    /* Removed next-episode-prompt mobile CSS - Videasy handles this automatically */
 
     .movie-progress-container {
         bottom: 4px;

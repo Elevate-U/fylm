@@ -4,14 +4,21 @@ import preact from '@preact/preset-vite';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
-  const isVercel = !!process.env.VERCEL_ENV;
+  const isProduction = mode === 'production';
 
   return {
     plugins: [preact()],
+    resolve: {
+      alias: {
+        'react-dom/test-utils': 'preact/test-utils',
+        'react-dom': 'preact/compat',
+        react: 'preact/compat',
+      },
+    },
     server: {
-      port: 5173,
+      port: 3000,
       strictPort: true,
-      proxy: isVercel ? undefined : {
+      proxy: {
         '/api': {
           target: 'http://localhost:3001',
           changeOrigin: true,

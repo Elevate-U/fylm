@@ -1,5 +1,24 @@
-# Ignore the local development server file
-api/index.js
+# Node
+node_modules
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.env
+.env*.local
 
-# Ignore Node.js dependency directory
-node_modules 
+# Build output
+dist
+.vercel/output
+
+# Local development
+_local
+
+# Editor directories
+.vscode
+.idea
+
+# Git
+.git
+
+# Mac
+.DS_Store

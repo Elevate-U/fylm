@@ -8,6 +8,17 @@ export default function SignUp() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
 
+  const handleSocialLogin = async (provider) => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: provider,
+      });
+      if (error) throw error;
+    } catch (error) {
+      toast.error(error.error_description || error.message);
+    }
+  };
+
   const handleSignUp = async (e) => {
     e.preventDefault();
 
@@ -60,6 +71,27 @@ export default function SignUp() {
             </button>
           </div>
         </form>
+
+        <div className="auth-divider">
+          <span>OR</span>
+        </div>
+
+        <div className="social-login-group">
+          <button
+            type="button"
+            className="social-button google"
+            onClick={() => handleSocialLogin('google')}
+          >
+            Sign up with Google
+          </button>
+        </div>
+
+        <div className="auth-links">
+          <p>
+            Already have an account?
+            <a href="/login" className="auth-link"> Log in</a>
+          </p>
+        </div>
       </div>
     </div>
   );

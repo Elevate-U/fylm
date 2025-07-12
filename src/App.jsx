@@ -15,6 +15,8 @@ import Watch from './pages/Watch';
 import SearchPage from './pages/Search'; // Assuming we move search.jsx to pages/Search.jsx
 import Login from './pages/Login';
 import SignUp from './pages/SignUp';
+import ForgotPassword from './pages/ForgotPassword';
+import UpdatePassword from './pages/UpdatePassword';
 import ScrollToTop from './components/ScrollToTop';
 
 
@@ -37,6 +39,8 @@ const MainApp = () => {
                     <SearchPage path="/search" />
                     <Login path="/login" />
                     <SignUp path="/signup" />
+                    <ForgotPassword path="/forgot-password" />
+                    <UpdatePassword path="/update-password" />
                 </Router>
             </main>
             <Footer />

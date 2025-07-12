@@ -16,15 +16,14 @@ const Watch = (props) => {
     const [streamUrl, setStreamUrl] = useState('');
     const [loading, setLoading] = useState(true);
     const [isPlaying, setIsPlaying] = useState(false);
-    const [currentSeason, setCurrentSeason] = useState(1);
-    const [currentEpisode, setCurrentEpisode] = useState(1);
+    const [currentSeason, setCurrentSeason] = useState(null);
+    const [currentEpisode, setCurrentEpisode] = useState(null);
     const [currentSource, setCurrentSource] = useState('videasy');
     const [availableSources, setAvailableSources] = useState(['videasy', 'vidsrc', 'embedsu']);
     const [seasonDetails, setSeasonDetails] = useState(null);
     const [episodesLoading, setEpisodesLoading] = useState(false);
     const [isDubbed, setIsDubbed] = useState(false);
-    const [showNextEpisodePrompt, setShowNextEpisodePrompt] = useState(false);
-    const [nextEpisodeCountdown, setNextEpisodeCountdown] = useState(null);
+    // Removed showNextEpisodePrompt and nextEpisodeCountdown - Videasy handles this automatically
     const [streamError, setStreamError] = useState(null);
     const [isRetrying, setIsRetrying] = useState(false);
 
@@ -54,6 +53,27 @@ const Watch = (props) => {
     const { user } = useAuth(); // Get authentication state
 
     const { addFavorite, removeFavorite, isFavorited, setCurrentMediaItem } = useStore();
+
+    // Initialize season and episode from URL parameters immediately
+    useEffect(() => {
+        if (type === 'tv' || type === 'anime') {
+            const hasExplicitEpisode = season && episode && !isNaN(parseInt(season)) && !isNaN(parseInt(episode));
+            if (hasExplicitEpisode) {
+                const newSeason = parseInt(season, 10);
+                const newEpisode = parseInt(episode, 10);
+                setCurrentSeason(newSeason);
+                setCurrentEpisode(newEpisode);
+            } else {
+                // Default to season 1, episode 1 if no explicit values
+                setCurrentSeason(1);
+                setCurrentEpisode(1);
+            }
+        } else {
+            // For movies, set to null
+            setCurrentSeason(null);
+            setCurrentEpisode(null);
+        }
+    }, [type, season, episode]);
 
     // Calculate movie progress percentage with a memoized hook for efficiency
     const movieProgressPercent = useMemo(() => {
@@ -120,8 +140,7 @@ const Watch = (props) => {
         setQualities([]);
         setMediaDetails(null);
         setLoading(true);
-        setShowNextEpisodePrompt(false);
-        setNextEpisodeCountdown(null);
+        // Removed prompt reset - Videasy handles this automatically
         setSeriesWatchHistory([]);
         // Reset navigation tracking for new content
         userNavigatedRef.current = false;
@@ -180,32 +199,7 @@ const Watch = (props) => {
                 setVideos(videosData.results || []);
                 setRecommendations(recommendationsData.results || []);
                 
-                // Set initial season/episode for TV shows
-                if ((type === 'tv' || type === 'anime') && detailsData.seasons && detailsData.seasons.length > 0) {
-                    const hasExplicitEpisode = season && episode && !isNaN(parseInt(season)) && !isNaN(parseInt(episode));
-                    
-                    if (hasExplicitEpisode) {
-                        if (isAutoNavigating.current) {
-                            isAutoNavigating.current = false;
-                        } else {
-                            userNavigatedRef.current = true;
-                        }
-                        // Use batch update to prevent multiple re-renders
-                        const newSeason = parseInt(season, 10);
-                        const newEpisode = parseInt(episode, 10);
-                        if (newSeason !== currentSeason || newEpisode !== currentEpisode) {
-                            setCurrentSeason(newSeason);
-                            setCurrentEpisode(newEpisode);
-                        }
-                    } else {
-                        const firstSeason = detailsData.seasons.find(s => s.season_number > 0) || detailsData.seasons[0];
-                        // Only set if different to prevent unnecessary re-renders
-                        if (firstSeason.season_number !== currentSeason || currentEpisode !== 1) {
-                            setCurrentSeason(firstSeason.season_number);
-                            setCurrentEpisode(1);
-                        }
-                    }
-                }
+                // Season and episode initialization is now handled in a separate effect
             } catch (error) {
                 setMediaDetails(null);
                 setVideos([]);
@@ -236,7 +230,7 @@ const Watch = (props) => {
                     const hasExplicitEpisode = season && episode && !isNaN(parseInt(season)) && !isNaN(parseInt(episode));
                     
                     // Modified logic: Always try to get continue watching when no explicit episode in URL
-                    if (!hasExplicitEpisode && !hasLoadedResumeData.current) {
+                    if (!hasExplicitEpisode && !hasLoadedResumeData.current && currentSeason !== null && currentEpisode !== null) {
                         console.log('🎬 Checking for continue watching episode...');
                         const lastWatchedWithProgress = await getLastWatchedEpisodeWithProgress(id);
                         if (lastWatchedWithProgress && lastWatchedWithProgress.season && lastWatchedWithProgress.episode) {
@@ -275,7 +269,9 @@ const Watch = (props) => {
 
     // Reset pagination when season changes
     useEffect(() => {
-        setCurrentEpisodePage(1);
+        if (currentSeason !== null) {
+            setCurrentEpisodePage(1);
+        }
     }, [currentSeason]);
 
     // Pagination state is now completely independent
@@ -284,7 +280,7 @@ const Watch = (props) => {
 
     useEffect(() => {
         const fetchSeasonDetails = async () => {
-            if (type !== 'tv' && type !== 'anime' || !id || !currentSeason) return;
+            if (type !== 'tv' && type !== 'anime' || !id || !currentSeason || currentSeason === null) return;
             setEpisodesLoading(true);
             try {
                 // Use the existing TMDB proxy route to fetch season details with timeout
@@ -328,9 +324,13 @@ const Watch = (props) => {
 
         const fetchStreamUrl = async () => {
             if (!id || !type) return;
+            
+            // For TV shows and anime, wait until season and episode are set
+            if ((type === 'tv' || type === 'anime') && (currentSeason === null || currentEpisode === null)) {
+                return;
+            }
 
-            setShowNextEpisodePrompt(false);
-            setNextEpisodeCountdown(null);
+            // Removed prompt reset - Videasy handles this automatically
             setStreamError(null);
             setIsRetrying(false);
 
@@ -361,8 +361,17 @@ const Watch = (props) => {
                 }
             }
             
-            if (currentSource === 'videasy' && existingProgress > 30) {
-                url += `&progress=${Math.floor(existingProgress)}`;
+            // Add Videasy-specific parameters for enhanced functionality
+            if (currentSource === 'videasy') {
+                // Add progress for resume functionality  
+                if (existingProgress > 30) {
+                    url += `&progress=${Math.floor(existingProgress)}`;
+                }
+                
+                // For TV shows and anime, enable all Videasy features
+                if (type === 'tv' || type === 'anime') {
+                    url += `&nextEpisode=true&episodeSelector=true&autoplayNextEpisode=true`;
+                }
             }
 
             try {
@@ -379,6 +388,10 @@ const Watch = (props) => {
                 }
 
                 let finalStreamUrl = streamUrlData.url;
+
+                if (!finalStreamUrl) {
+                    throw new Error("The streaming service did not provide a valid URL. This content might not be available.");
+                }
                 
                 if (streamUrlData.isDirectSource) {
                     setStreamUrl(finalStreamUrl);
@@ -427,31 +440,7 @@ const Watch = (props) => {
         fetchStreamUrl();
     }, [id, type, currentSeason, currentEpisode, currentSource, isDubbed]); // Add back necessary dependencies but with smart prevention
 
-    const handleNextEpisode = () => {
-        if (!seasonDetails || !seasonDetails.episodes) return;
-        const currentEpisodeIndex = seasonDetails.episodes.findIndex(e => e.episode_number === currentEpisode);
-        if (currentEpisodeIndex !== -1 && currentEpisodeIndex < seasonDetails.episodes.length - 1) {
-            const nextEpisode = seasonDetails.episodes[currentEpisodeIndex + 1];
-            setCurrentEpisode(nextEpisode.episode_number);
-        }
-        setShowNextEpisodePrompt(false);
-        setNextEpisodeCountdown(null);
-    };
-
-    useEffect(() => {
-        if (showNextEpisodePrompt && nextEpisodeCountdown === null) {
-            setNextEpisodeCountdown(15); // Start countdown from 15 seconds
-        }
-
-        if (nextEpisodeCountdown > 0) {
-            const timer = setTimeout(() => {
-                setNextEpisodeCountdown(nextEpisodeCountdown - 1);
-            }, 1000);
-            return () => clearTimeout(timer);
-        } else if (nextEpisodeCountdown === 0) {
-            handleNextEpisode();
-        }
-    }, [showNextEpisodePrompt, nextEpisodeCountdown]);
+    // Removed handleNextEpisode and countdown logic - Videasy handles episode navigation automatically
 
     // Add immediate watch history entry when user navigates to watch page (throttled)
     useEffect(() => {
@@ -479,45 +468,49 @@ const Watch = (props) => {
                 
                 window.lastHistoryUpdate = { ...lastHistoryUpdate, [historyKey]: now };
             }
-        } else {
-            console.log('⚠️ Skipping watch history entry:', {
-                hasUser: !!user,
-                hasMediaDetails: !!mediaDetails
-            });
         }
     }, [user, mediaDetails, type, currentSeason, currentEpisode, id]);
 
     // Progress tracking for different streaming services
     useEffect(() => {
-        console.log('🔐 Progress tracking setup:', { 
-            hasUser: !!user, 
-            userId: user?.id, 
-            hasMediaDetails: !!mediaDetails 
-        });
+        if (user) {
+            console.log('🔐 Progress tracking setup:', { 
+                hasUser: true, 
+                userId: user.id, 
+                hasMediaDetails: !!mediaDetails 
+            });
+        }
         
         if (!user || !mediaDetails) {
-            console.log('⚠️ Progress tracking disabled - missing user or media details');
+            if (user && !mediaDetails) {
+                console.log('⚠️ Progress tracking disabled - media details not yet available');
+            }
             return;
         }
 
         const handleProgressUpdate = async (progressData, messageType) => {
             console.log(`📊 Progress update received via ${messageType}:`, progressData);
             
+            // Determine the season and episode to save progress for.
+            // Prioritize data from the event, then fall back to component state.
+            const seasonToSave = progressData.season || currentSeason;
+            const episodeToSave = progressData.episode || currentEpisode;
+
             if (progressData && progressData.progress >= 0 && progressData.duration > 0) {
                 const now = Date.now();
-                const progressKey = `${id}-${type}-${currentSeason}-${currentEpisode}`;
+                const progressKey = `${id}-${type}-${seasonToSave}-${episodeToSave}`;
                 const lastProgressSave = window.lastProgressSave || {};
                 
                 if (!lastProgressSave[progressKey] || now - lastProgressSave[progressKey] > 5000) {
                     console.log(`🎬 Attempting to save progress for ${type} ${id}:`, {
                         progress: progressData.progress,
                         duration: progressData.duration,
-                        season: currentSeason,
-                        episode: currentEpisode
+                        season: seasonToSave,
+                        episode: episodeToSave
                     });
                     
                     const saveResult = await saveWatchProgress(
-                        { ...mediaDetails, id: mediaDetails.id, type, season: currentSeason, episode: currentEpisode },
+                        { ...mediaDetails, id: mediaDetails.id, type, season: seasonToSave, episode: episodeToSave },
                         progressData.progress,
                         progressData.duration
                     );
@@ -526,36 +519,38 @@ const Watch = (props) => {
                         console.log('✅ Progress saved successfully');
                         window.lastProgressSave = { ...lastProgressSave, [progressKey]: now };
 
-                        // Update state in real-time
-                        if (type === 'movie') {
-                            setMovieProgress({
-                                progress_seconds: progressData.progress,
-                                duration_seconds: progressData.duration
-                            });
-                        } else if (type === 'tv' || type === 'anime') {
-                            setSeriesWatchHistory(prevHistory => {
-                                const historyCopy = [...prevHistory];
-                                const index = historyCopy.findIndex(
-                                    h => h.season_number === currentSeason && h.episode_number === currentEpisode
-                                );
-                        
-                                const newProgressData = {
-                                    media_id: parseInt(id, 10),
-                                    media_type: type,
-                                    season_number: currentSeason,
-                                    episode_number: currentEpisode,
+                        // Update state in real-time only if the progress applies to the currently viewed item
+                        if (seasonToSave === currentSeason && episodeToSave === currentEpisode) {
+                            if (type === 'movie') {
+                                setMovieProgress({
                                     progress_seconds: progressData.progress,
-                                    duration_seconds: progressData.duration,
-                                };
-                        
-                                if (index > -1) {
-                                    historyCopy[index] = { ...historyCopy[index], ...newProgressData };
-                                } else {
-                                    historyCopy.push(newProgressData);
-                                }
-                        
-                                return historyCopy;
-                            });
+                                    duration_seconds: progressData.duration
+                                });
+                            } else if (type === 'tv' || type === 'anime') {
+                                setSeriesWatchHistory(prevHistory => {
+                                    const historyCopy = [...prevHistory];
+                                    const index = historyCopy.findIndex(
+                                        h => h.season_number === seasonToSave && h.episode_number === episodeToSave
+                                    );
+                            
+                                    const newProgressData = {
+                                        media_id: parseInt(id, 10),
+                                        media_type: type,
+                                        season_number: seasonToSave,
+                                        episode_number: episodeToSave,
+                                        progress_seconds: progressData.progress,
+                                        duration_seconds: progressData.duration,
+                                    };
+                            
+                                    if (index > -1) {
+                                        historyCopy[index] = { ...historyCopy[index], ...newProgressData };
+                                    } else {
+                                        historyCopy.push(newProgressData);
+                                    }
+                            
+                                    return historyCopy;
+                                });
+                            }
                         }
                     } else {
                         console.error('❌ Failed to save progress');
@@ -567,10 +562,9 @@ const Watch = (props) => {
                     });
                 }
 
+                // Removed next episode prompt logic - Videasy handles autoplay automatically
                 const timeRemaining = progressData.duration - progressData.progress;
-                if (timeRemaining <= 15 && timeRemaining > 0 && !showNextEpisodePrompt && (type === 'tv' || type === 'anime')) {
-                    setShowNextEpisodePrompt(true);
-                }
+                // Videasy will handle next episode prompts automatically
             } else {
                 console.log('⚠️ Progress update ignored (insufficient data):', {
                     hasProgressData: !!progressData,
@@ -656,10 +650,9 @@ const Watch = (props) => {
                             console.error('❌ Failed to save direct video progress');
                         }
 
+                        // Removed next episode prompt logic - Videasy handles autoplay automatically
                         const timeRemaining = progressData.duration - progressData.progress;
-                        if (timeRemaining <= 15 && timeRemaining > 0 && !showNextEpisodePrompt && (type === 'tv' || type === 'anime')) {
-                            setShowNextEpisodePrompt(true);
-                        }
+                        // Videasy will handle next episode prompts automatically
                     }
                 }
             };
@@ -681,93 +674,114 @@ const Watch = (props) => {
                 }
 
                 try {
-                    let data;
-                    if (typeof event.data === 'string') {
-                        try {
-                            data = JSON.parse(event.data);
-                        } catch (e) {
-                            console.error('Error parsing player message:', e);
-                            return;
-                        }
-                    } else {
-                        data = event.data;
+                    // Attempt to parse the data if it's a string, otherwise use it directly
+                    const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data;
+
+                    // New: Efficient `PROGRESS_UPDATE` format from Videasy/other players
+                    if (data && data.type === 'PROGRESS_UPDATE' && data.data) {
+                        const progressData = {
+                            progress: data.data.progress?.watched,
+                            duration: data.data.progress?.duration,
+                            // Ensure season/episode from the message are used if available
+                            season: data.data.season || currentSeason,
+                            episode: data.data.episode || currentEpisode
+                        };
+                        handleProgressUpdate(progressData, 'PROGRESS_UPDATE');
+                        return; // Exit after handling
                     }
 
+                    // Deprecated: Legacy `MEDIA_DATA` format for backward compatibility
+                    if (data.type === 'MEDIA_DATA' && data.data) {
+                        console.warn("Legacy 'MEDIA_DATA' format detected. Player should be updated.");
+                        
+                        let mediaData = data.data;
+                        if (typeof mediaData === 'string') {
+                            try {
+                                mediaData = JSON.parse(mediaData);
+                            } catch (e) {
+                                console.error('Error parsing double-encoded MEDIA_DATA string:', e);
+                                return;
+                            }
+                        }
+
+                        // The data can be an object keyed by `tv-id`.
+                        const mediaKey = `${type}-${id}`;
+                        const media = mediaData[mediaKey];
+                        
+                        if (media && media.progress) {
+                            const normalizedProgress = {
+                                progress: media.progress.watched,
+                                duration: media.progress.duration,
+                                season: media.last_season_watched,
+                                episode: media.last_episode_watched,
+                            };
+                            handleProgressUpdate(normalizedProgress, 'MEDIA_DATA');
+                        }
+                        return; // Exit after handling
+                    }
+
+                    // Generic event handling for other player messages
                     if (data.type === 'PLAYER_EVENT' && data.data) {
                         if (data.data.event === 'timeupdate') {
                             const progressData = {
-                                progress: data.data.currentTime,
-                                duration: data.data.duration,
-                                mediaId: data.data.id,
-                                mediaType: data.data.mediaType,
-                                season: data.data.season,
-                                episode: data.data.episode,
+                                progress: data.data.time,
+                                duration: data.data.duration
                             };
-                            handleProgressUpdate(progressData, origin.hostname);
-                        } else if (data.data.event === 'ended') {
-                            handleMediaEnded();
-                        } else if (data.data.event === 'play') {
-                            setIsPlaying(true);
-                        } else if (data.data.event === 'pause') {
-                            setIsPlaying(false);
+                            if (progressData.progress && progressData.duration) {
+                                handleProgressUpdate(progressData, 'PLAYER_EVENT');
+                            }
+                        } else if (data.data.event === 'ended' && (type === 'tv' || type === 'anime')) {
+                            console.log('Player reported "ended" event - Videasy will handle next episode automatically.');
+                            // Removed handleNextEpisode() - Videasy handles this automatically
+                        } else if (data.data.event === 'player_ready') {
+                            console.log('Player is ready.');
+                            setPlayerReady(true);
                         }
-                    } else if (data.type === 'MEDIA_DATA') {
-                        // The player sends a large data object with all watch history
-                        // We can ignore this for now as we handle progress updates directly
-                    } else if (data.type === 'VIDEASY_EVENT' && data.event === 'player_ready') {
-                        setPlayerReady(true);
-                        console.log('🎉 Videasy Player is ready!');
-                        postPlayerMessage({ action: 'get_history' });
-                    } else if (data.type === 'request_seek' && data.time) {
-                        console.log(`Seeking to ${data.time}`);
-                        postPlayerMessage({ action: 'seek', time: data.time });
                     }
+
                 } catch (error) {
-                    console.error('Error handling message from player:', error);
+                    // This will catch JSON parsing errors or other exceptions
+                    console.error("Error processing message from player:", {
+                        origin: event.origin,
+                        data: event.data,
+                        error: error.message
+                    });
                 }
             };
-
+            
             window.addEventListener('message', messageListener);
-
-            // Fallback: periodically save progress for iframe sources if no messages are received
-            let fallbackInterval;
-            const startFallbackTracking = () => {
-                if (fallbackInterval) clearInterval(fallbackInterval);
-                
-                fallbackInterval = setInterval(() => {
-                    // For iframe sources, we can't directly access the video progress
-                    // But we can at least mark that the user is still watching
-                    if (user && mediaDetails && streamUrl) {
-                        const now = Date.now();
-                        const historyKey = `${id}-${type}-${currentSeason}-${currentEpisode}`;
-                        const lastHistoryUpdate = window.lastHistoryUpdate || {};
-                        
-                        // Only add fallback history if no recent updates (use same throttling as main history)
-                        if (!lastHistoryUpdate[historyKey] || now - lastHistoryUpdate[historyKey] > 30000) {
-                            // console.log('Fallback: Adding watch history entry due to no progress messages');
-                            addWatchHistoryEntry(
-                                { ...mediaDetails, id: mediaDetails.id, type, season: currentSeason, episode: currentEpisode }
-                            );
-                            window.lastHistoryUpdate = { ...lastHistoryUpdate, [historyKey]: now };
-                        }
-                    }
-                }, 60000); // Every 60 seconds instead of 30
-            };
-
-            // Start fallback tracking after 120 seconds if no messages received (increased from 60)
-            const fallbackTimeout = setTimeout(() => {
-                // console.log('No progress messages received, starting fallback tracking');
-                startFallbackTracking();
-            }, 120000);
+            
+            // Fallback for players that don't send `player_ready`
+            const readyTimeout = setTimeout(() => {
+                if (!playerReady) {
+                    console.log('Player ready timeout, starting fallback progress tracking.');
+                    startFallbackTracking();
+                }
+            }, 5000);
 
             return () => {
                 window.removeEventListener('message', messageListener);
-                if (fallbackInterval) clearInterval(fallbackInterval);
-                if (fallbackTimeout) clearTimeout(fallbackTimeout);
+                if (progressHandler) clearInterval(progressHandler);
+                clearTimeout(readyTimeout);
             };
         }
-    }, [streamUrl, isDirectSource, id, type, currentSeason, currentEpisode, mediaDetails, showNextEpisodePrompt, user]);
-    
+    }, [user, mediaDetails, isDirectSource, videoRef, currentSeason, currentEpisode, playerReady]);
+
+    const startFallbackTracking = () => {
+        // Fallback progress tracking if player doesn't post messages
+        // This is a failsafe and should ideally not be relied upon
+        const progressHandler = setInterval(() => {
+            if (document.hasFocus()) {
+                console.log('Fallback: Checking for progress...');
+                // You would need a way to get progress from the iframe if possible,
+                // but cross-origin restrictions make this very difficult.
+                // This is a placeholder for a potential future implementation.
+            }
+        }, 15000);
+
+        return () => clearInterval(progressHandler);
+    };
+
     if (loading) {
         return (
             <div class="loading-state">
@@ -911,11 +925,11 @@ const Watch = (props) => {
                             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
                             frameBorder="0"
                             allowFullScreen
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+                            allow="autoplay; picture-in-picture"
+                            sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts allow-top-navigation"
                             title="Video Player"
                             loading="eager"
                             referrerPolicy="no-referrer-when-downgrade"
-                            sandbox="allow-same-origin allow-scripts allow-popups allow-forms allow-pointer-lock allow-popups-to-escape-sandbox"
                             importance="high"
                             onLoad={() => {
                                 console.log('🎬 Player iframe loaded');
@@ -947,21 +961,7 @@ const Watch = (props) => {
                         ></iframe>
                     )
                 )}
-                {showNextEpisodePrompt && (
-                    <div class="next-episode-prompt">
-                        <div class="next-episode-content">
-                            <h3>Up Next</h3>
-                            <p>Playing next episode in {nextEpisodeCountdown}s...</p>
-                            <div class="next-episode-buttons">
-                                <button onClick={handleNextEpisode} class="btn btn-primary">Play Next</button>
-                                <button onClick={() => {
-                                    setShowNextEpisodePrompt(false);
-                                    setNextEpisodeCountdown(null);
-                                }} class="btn">Cancel</button>
-                            </div>
-                        </div>
-                    </div>
-                )}
+                {/* Removed next episode prompt UI - Videasy handles this automatically */}
             </div>
             <div class="container">
                 <div class="media-details-layout">
@@ -1083,7 +1083,7 @@ const Watch = (props) => {
                     )}
                 </div>
 
-                {(type === 'tv' || type === 'anime') && (
+                {(type === 'tv' || type === 'anime') && currentSeason !== null && currentEpisode !== null && (
                     <div class="episodes-container">
                         <h3>Episodes</h3>
                         {episodesLoading ? (

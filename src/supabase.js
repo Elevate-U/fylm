@@ -9,8 +9,17 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
+// Debug logging for production issues
+console.log('🔍 Supabase Configuration Check:');
+console.log('URL:', supabaseUrl ? `${supabaseUrl.substring(0, 20)}...` : 'MISSING');
+console.log('Anon Key:', supabaseAnonKey ? 'Present' : 'MISSING');
+
 if (!supabaseUrl || !supabaseAnonKey) {
-    console.error('Supabase URL or Anon Key is missing. Make sure to set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file.');
+    console.error('❌ Supabase URL or Anon Key is missing. Make sure to set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your .env file or Vercel environment variables.');
+    console.error('Current env vars:', {
+        VITE_SUPABASE_URL: !!supabaseUrl,
+        VITE_SUPABASE_ANON_KEY: !!supabaseAnonKey
+    });
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
@@ -21,44 +30,106 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         detectSessionInUrl: false,
         // Add timeout settings to prevent hanging requests
         storageKey: 'sb-auth-token',
-        flowType: 'pkce'
+        flowType: 'pkce',
+        // Debug mode for auth
+        debug: process.env.NODE_ENV === 'development'
     },
     db: {
         schema: 'public'
     },
     global: {
         headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'X-Client-Info': 'supabase-js-web'
         },
-        // Add request timeout
+        // Add request timeout with better error handling
         fetch: (url, options = {}) => {
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+            
             return fetch(url, {
                 ...options,
-                signal: AbortSignal.timeout(10000) // 10 second timeout
+                signal: controller.signal
+            }).finally(() => {
+                clearTimeout(timeoutId);
+            }).catch(error => {
+                console.error('🚨 Supabase request failed:', {
+                    url,
+                    error: error.message,
+                    stack: error.stack
+                });
+                throw error;
             });
         }
     }
-})
+});
 
-// Connection test utility
+// Enhanced connection test utility
 export const testSupabaseConnection = async () => {
     try {
-        console.log('Testing Supabase connection...');
+        console.log('🔄 Testing Supabase connection...');
+        
+        // Test basic connectivity
         const { data, error } = await supabase.from('watch_history').select('count').limit(1);
         if (error) {
-            console.error('Supabase connection test failed:', error);
+            console.error('❌ Supabase connection test failed:', error);
             return false;
         }
-        console.log('Supabase connection test successful');
+        
+        // Test auth endpoint
+        const { data: authData, error: authError } = await supabase.auth.getSession();
+        if (authError) {
+            console.error('❌ Auth endpoint test failed:', authError);
+            return false;
+        }
+        
+        console.log('✅ Supabase connection and auth endpoint tests successful');
         return true;
     } catch (error) {
-        console.error('Supabase connection test error:', error);
+        console.error('❌ Supabase connection test error:', error);
         return false;
     }
+};
+
+// Enhanced auth error handler
+export const handleAuthError = (error) => {
+    console.error('🚨 Authentication error:', error);
+    
+    // Common error types and suggested fixes
+    const errorSolutions = {
+        'Invalid API key': 'Check your VITE_SUPABASE_ANON_KEY environment variable',
+        'Invalid JWT': 'Your session may have expired. Try logging in again.',
+        'User not found': 'This email address is not registered.',
+        'Invalid login credentials': 'Check your email and password.',
+        'NetworkError': 'Check your internet connection and try again.',
+        'CORS error': 'Contact support - there may be a configuration issue.'
+    };
+    
+    const errorMessage = error.message || error.error_description || 'Unknown error';
+    const solution = Object.keys(errorSolutions).find(key => 
+        errorMessage.toLowerCase().includes(key.toLowerCase())
+    );
+    
+    if (solution) {
+        console.log('💡 Suggested fix:', errorSolutions[solution]);
+    }
+    
+    return {
+        message: errorMessage,
+        suggestion: solution ? errorSolutions[solution] : 'Please try again or contact support'
+    };
 };
 
 // Expose to window for debugging
 if (typeof window !== 'undefined') {
     window.supabase = supabase;
     window.testSupabaseConnection = testSupabaseConnection;
+    window.handleAuthError = handleAuthError;
+    
+    // Auto-test connection in development
+    if (process.env.NODE_ENV === 'development') {
+        setTimeout(() => {
+            testSupabaseConnection();
+        }, 1000);
+    }
 } 
