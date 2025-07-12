@@ -192,10 +192,7 @@ export const useStore = create(
         set({ favorites: favoritesWithDetails.filter(Boolean) });
       },
 
-      isFavorited: (mediaId, mediaType, seasonNumber = null, episodeNumber = null) => {
-        const key = `${mediaId}-${mediaType}-${seasonNumber || null}-${episodeNumber || null}`;
-        return get().favoritedMedia.has(key);
-      },
+
 
       addFavorite: async (mediaItem) => {
         const { data: { user } } = await supabase.auth.getUser();
@@ -250,17 +247,12 @@ export const useStore = create(
             });
         }
       },
-      removeFavorite: async (mediaId, seasonNumber = null, episodeNumber = null) => {
+      removeFavorite: async (mediaId, mediaType, seasonNumber = null, episodeNumber = null) => {
         const { data: { user } } = await supabase.auth.getUser();
         if (!user) return;
 
-        const mediaItem = get().favorites.find(item => 
-            item.id === mediaId && 
-            item.season_number === seasonNumber && 
-            item.episode_number === episodeNumber
-        );
-
-        const key = `${mediaId}-${mediaItem?.type || ''}-${seasonNumber || null}-${episodeNumber || null}`;
+       // Construct the key using the provided mediaType
+        const key = `${mediaId}-${mediaType}-${seasonNumber || null}-${episodeNumber || null}`;
 
         const originalFavorites = get().favorites;
         const originalFavoritedMedia = get().favoritedMedia;

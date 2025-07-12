@@ -39,8 +39,8 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete 
     const handleFavoriteClick = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        if (favorited) {
-            removeFavorite(item.id, item.season_number, item.episode_number);
+        if (isFavorited(item.id, type, item.season_number, item.episode_number)) {
+             removeFavorite(item.id, type, item.season_number, item.episode_number);
         } else {
             addFavorite({ ...item, type });
         }
@@ -91,9 +91,9 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete 
                             <h3 className="card-title">{seriesTitle}</h3>
                             {user && (
                                 <button
-                                    className={`favorite-btn ${favorited ? 'favorited' : ''}`}
+                                    className={`favorite-btn ${isFavorited(item.id, type, item.season_number, item.episode_number) ? 'favorited' : ''}`}
                                     onClick={handleFavoriteClick}
-                                    aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
+                                    aria-label={isFavorited(item.id, type, item.season_number, item.episode_number) ? 'Remove from favorites' : 'Add to favorites'}
                                     disabled={!favoritesFetched}
                                 >
                                     {favoritesFetched ? '♥︎' : '...'}

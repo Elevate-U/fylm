@@ -30,7 +30,10 @@ const Home = (props) => {
         fetchAiringTodayTv,
         continueWatching,
         continueWatchingFetched,
-        fetchContinueWatching
+        fetchContinueWatching,
+    fetchFavorites,
+    favoritesFetched,
+    isFavorited
     } = useStore();
     
     const { user } = useAuth(); // Add auth context
@@ -63,6 +66,12 @@ const Home = (props) => {
             fetchContinueWatching();
         }
     }, [user, continueWatchingFetched, fetchContinueWatching]);
+
+    useEffect(() => {
+        if (user && !favoritesFetched) {
+            fetchFavorites();
+        }
+    }, [user, favoritesFetched, fetchFavorites]);
 
     const renderSection = (title, items, media_type) => {
         // A loading placeholder can be shown here if you have a generic loading state
@@ -157,4 +166,4 @@ const Home = (props) => {
     );
 };
 
-export default Home; 
+export default Home;

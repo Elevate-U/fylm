@@ -345,37 +345,43 @@ export const saveWatchProgress = async (item, progress, durationInSeconds, force
     };
 
     // Attempt 1: Modern RPC with all params
-    console.log('💾 Saving watch progress (v2)...', progressData);
+    console.log('💾 Saving watch progress (v2) via RPC...', progressData);
     const { error: rpcErrorV2 } = await supabase.rpc('save_watch_progress', progressData);
 
     if (!rpcErrorV2) {
-        console.log('✅ Watch progress saved successfully via RPC (v2)');
+        console.log('✅ Watch progress saved successfully via RPC (v2). RPC Error object was:', rpcErrorV2);
         return true;
+    } else {
+        console.error(`❌ RPC (v2) failed. Error: ${rpcErrorV2.message}. Details:`, rpcErrorV2);
     }
 
     // Attempt 2: Legacy RPC without force_history_entry
-    console.warn(`⚠️ RPC (v2) failed, trying legacy (v1). Error: ${rpcErrorV2.message}`);
+    console.log('⚠️ RPC (v2) failed, trying legacy (v1) RPC...');
     const { p_force_history_entry, ...fallbackData } = progressData;
     const { error: rpcErrorV1 } = await supabase.rpc('save_watch_progress', fallbackData);
 
     if (!rpcErrorV1) {
         console.log('✅ Watch progress saved successfully via RPC (v1)');
         return true;
+    } else {
+        console.error(`❌ RPC (v1) also failed. Error: ${rpcErrorV1.message}. Details:`, rpcErrorV1);
     }
 
     // Attempt 3: Direct DB write fallback
-    console.warn(`⚠️ RPC (v1) also failed, attempting direct DB write. Error: ${rpcErrorV1.message}`);
+    console.log('⚠️ Both RPC methods failed, attempting direct DB write fallback...');
     try {
         const fallbackSuccess = await saveWatchProgressFallback(userId, item, progress, durationInSeconds, forceHistoryEntry);
         if (fallbackSuccess) {
-            // The fallback function already logs its own success
+            console.log('✅ Watch progress saved successfully via direct DB fallback');
             return true;
+        } else {
+            console.error('❌ Direct DB write fallback reported failure.');
         }
     } catch (fallbackError) {
         console.error('❌ Direct DB write fallback threw an exception:', fallbackError);
     }
     
-    console.error('❌ All methods to save progress failed.');
+    console.error('❌ All methods to save progress failed for media:', { item, progress, durationInSeconds });
     return false;
 };
 

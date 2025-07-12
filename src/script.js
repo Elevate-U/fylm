@@ -210,7 +210,31 @@ document.addEventListener('DOMContentLoaded', () => {
             this.elements.continueWatchingSection.classList.remove('hidden');
             const recentlyWatched = history.slice(0, 10); // Show up to 10
             
-            let gridHTML = recentlyWatched.map(item => createMovieCard(item, item.type)).join('');
+            let gridHTML = recentlyWatched.map(item => {
+                // For history items, the type is stored on the item itself
+                const cardHTML = createMovieCard(item, item.type);
+                const cardElement = document.createElement('div');
+                cardElement.innerHTML = cardHTML;
+                const infoDiv = cardElement.querySelector('.movie-info');
+                
+                // Add progress bar
+                let progress = 0;
+                if (item.type === 'movie' && item.progress) {
+                    progress = item.progress;
+                } else if (item.type === 'tv' && item.watchedEpisodes) {
+                    const totalEpisodes = Object.keys(item.watchedEpisodes).length;
+                    const completedEpisodes = Object.values(item.watchedEpisodes).filter(ep => ep.status === 'completed').length;
+                    if (totalEpisodes > 0) {
+                        progress = (completedEpisodes / totalEpisodes) * 100;
+                    }
+                }
+                
+                if (infoDiv && progress > 0) {
+                     infoDiv.innerHTML += `<div class="progress-bar-container"><div class="progress-bar" style="width: ${progress}%;"></div></div>`;
+                }
+                
+                return cardElement.innerHTML;
+            }).join('');
 
             this.elements.continueWatchingSection.innerHTML = `
                 <h2>Continue Watching</h2>
