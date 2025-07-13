@@ -43,7 +43,7 @@ const MainApp = () => {
 
     return (
         <div class="app">
-            <Toaster position="top-center" />
+            <Toaster position="top-right" />
             <Header />
             <main>
                 <Router history={createHashHistory()}>

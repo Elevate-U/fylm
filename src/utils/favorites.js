@@ -1,6 +1,7 @@
 import { supabase } from '../supabase';
 import { useStore } from '../store';
 import { route } from 'preact-router';
+import toast from '../components/Toast';
 
 /**
  * Adds a show to the user's favorites.
@@ -11,9 +12,9 @@ import { route } from 'preact-router';
 export const addFavoriteShow = async (show) => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) {
-    if (confirm('You need to log in to save favorites. Would you like to go to the login page?')) {
-      route('/login');
-    }
+    toast.error('You need to be logged in to save favorites.');
+    // Optionally, you could offer a button inside the toast to redirect to login
+    // For now, just showing the error is a good first step.
     return;
   }
 
@@ -34,7 +35,7 @@ export const addFavoriteShow = async (show) => {
   }));
 
   // Show a notification
-  alert(`'${show.name || show.title}' has been added to your Favorites.`);
+  toast.success(`'${show.name || show.title}' has been added to your Favorites.`);
   
   // Add to Supabase
   const { error } = await supabase.from('favorites').insert({
@@ -64,31 +65,33 @@ export const addFavoriteShow = async (show) => {
  * @returns {Promise<void>}
  */
 export const removeFavoriteShow = async (show) => {
-  if (confirm(`This will remove the entire show '${show.name || show.title}' and all its episodes from your Favorites. Do you wish to continue?`)) {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return;
 
-    const showId = show.id;
-    const { getState, setState } = useStore;
-    const favoriteKey = `${showId}-tv`;
+  const showId = show.id;
+  const { getState, setState } = useStore;
+  const favoriteKey = `${showId}-tv`;
 
-    const originalFavorites = getState().favorites;
-    const originalFavoritedMedia = getState().favoritedMedia;
+  const originalFavorites = getState().favorites;
+  const originalFavoritedMedia = getState().favoritedMedia;
 
-    // Optimistic update
-    setState((currentState) => ({
-      favorites: currentState.favorites.filter(fav => fav.id !== showId),
-      favoritedMedia: new Set([...currentState.favoritedMedia].filter(id => id !== favoriteKey)),
-    }));
+  // Optimistic update
+  setState((currentState) => ({
+    favorites: currentState.favorites.filter(fav => fav.id !== showId),
+    favoritedMedia: new Set([...currentState.favoritedMedia].filter(id => id !== favoriteKey)),
+  }));
 
-    // Remove from Supabase
-    const { error } = await supabase.from('favorites').delete().match({ user_id: user.id, media_id: showId, media_type: 'tv' });
+  // Show a notification
+  toast.error(`'${show.name || show.title}' has been removed from your Favorites.`);
 
-    if (error) {
-        console.error('Error removing favorite show:', error);
-        // Revert on error
-        setState({ favorites: originalFavorites, favoritedMedia: originalFavoritedMedia });
-    }
+  // Remove from Supabase
+  const { error } = await supabase.from('favorites').delete().match({ user_id: user.id, media_id: showId, media_type: 'tv' });
+
+  if (error) {
+      console.error('Error removing favorite show:', error);
+      // Revert on error
+      setState({ favorites: originalFavorites, favoritedMedia: originalFavoritedMedia });
+      toast.error(`Failed to remove '${show.name || show.title}' from favorites.`);
   }
 };
 

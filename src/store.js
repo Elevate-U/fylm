@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { supabase } from './supabase';
 import { persist } from 'zustand/middleware';
 import { getContinueWatching } from './utils/watchHistory';
+import toast from './components/Toast';
 
 
 const fetchAllPages = async (url, totalPages = 3) => {
@@ -182,6 +183,8 @@ export const useStore = create(
           favorites: [mediaItem, ...state.favorites],
           favoritedMedia: new Set(state.favoritedMedia).add(key)
         }));
+
+        toast.success(`"${mediaItem.title || mediaItem.name}" added to favorites!`);
       
         const { error } = await supabase.from('favorites').insert({
           user_id: user.id,
@@ -208,7 +211,8 @@ export const useStore = create(
         if (!user) return;
       
         const key = `${mediaId}-${mediaType}`;
-      
+        const mediaItem = get().favorites.find(item => item.id === mediaId && item.type === mediaType);
+
         // Optimistic update
         set((state) => {
           const newFavoritedMedia = new Set(state.favoritedMedia);
@@ -218,6 +222,10 @@ export const useStore = create(
             favorites: state.favorites.filter(item => !(item.id === mediaId && item.type === mediaType))
           };
         });
+
+        if (mediaItem) {
+            toast.error(`"${mediaItem.title || mediaItem.name}" removed from favorites.`);
+        }
       
         const { error } = await supabase.from('favorites').delete().match({
           user_id: user.id,

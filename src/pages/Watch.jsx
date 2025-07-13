@@ -982,8 +982,8 @@ const Watch = (props) => {
                                             <div class="details">
                         <div class="title-container">
                             <h1>{title || name}</h1>
-                            <button 
-                                onClick={handleFavoriteClick} 
+                            <button
+                                onClick={handleFavoriteClick}
                                 class={`favorite-btn ${favorited ? 'favorited' : ''}`}
                                 disabled={!favoritesFetched}
                             >
