@@ -6,6 +6,7 @@ import { useStore } from '../store';
 import MovieCard from '../components/MovieCard';
 import { getWatchProgressForMedia, saveWatchProgress, getSeriesHistory, getLastWatchedEpisode, getLastWatchedEpisodeWithProgress, addWatchHistoryEntry } from '../utils/watchHistory';
 import { useAuth } from '../context/Auth';
+import { addFavoriteShow, removeFavoriteShow, isShowFavorited } from '../utils/favorites';
 import './Watch.css';
 import { API_BASE_URL, IMAGE_BASE_URL, getProxiedImageUrl } from '../config';
 
@@ -54,7 +55,6 @@ const Watch = (props) => {
     const { user } = useAuth(); // Get authentication state
 
     const { setCurrentMediaItem, favoritesFetched } = useStore();
-    const { addFavoriteShow, removeFavoriteShow, isShowFavorited } = require('../utils/favorites');
 
     // Initialize season and episode from URL parameters immediately
     useEffect(() => {

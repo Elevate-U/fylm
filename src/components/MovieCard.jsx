@@ -98,7 +98,7 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete 
                                     aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
                                     disabled={!favoritesFetched}
                                 >
-                                    {favoritesFetched ? '♥︎' : '...'}
+                                    ♥︎
                                 </button>
                             )}
                         </div>

@@ -1,4 +1,5 @@
 import { h } from 'preact';
+import './Favorites.css';
 import Helmet from 'preact-helmet';
 import { useEffect, useState } from 'preact/hooks';
 import { useStore } from '../store';

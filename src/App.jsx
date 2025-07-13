@@ -9,16 +9,18 @@ import { useStore } from './store';
 
 import Header from './components/Header';
 import Footer from './components/Footer';
-import Home from './pages/Home';
-import Favorites from './pages/Favorites';
-import History from './pages/History';
-import Watch from './pages/Watch';
-import SearchPage from './pages/Search'; // Assuming we move search.jsx to pages/Search.jsx
-import Login from './pages/Login';
-import SignUp from './pages/SignUp';
-import ForgotPassword from './pages/ForgotPassword';
-import UpdatePassword from './pages/UpdatePassword';
 import ScrollToTop from './components/ScrollToTop';
+import asyncComponent from './components/asyncComponent';
+
+const AsyncHome = asyncComponent(() => import('./pages/Home'));
+const AsyncFavorites = asyncComponent(() => import('./pages/Favorites'));
+const AsyncHistory = asyncComponent(() => import('./pages/History'));
+const AsyncWatch = asyncComponent(() => import('./pages/Watch'));
+const AsyncSearchPage = asyncComponent(() => import('./pages/Search'));
+const AsyncLogin = asyncComponent(() => import('./pages/Login'));
+const AsyncSignUp = asyncComponent(() => import('./pages/SignUp'));
+const AsyncForgotPassword = asyncComponent(() => import('./pages/ForgotPassword'));
+const AsyncUpdatePassword = asyncComponent(() => import('./pages/UpdatePassword'));
 
 
 const MainApp = () => {
@@ -45,18 +47,18 @@ const MainApp = () => {
             <Header />
             <main>
                 <Router history={createHashHistory()}>
-                    <Home path="/" />
-                    <Home path="/movies" />
-                    <Home path="/tv" />
-                    {user ? <Favorites path="/favorites" /> : <Login path="/favorites" />}
-                    {user ? <History path="/history" /> : <Login path="/history" />}
-                    <Watch path="/watch/:type/:id" />
-                    <Watch path="/watch/:type/:id/season/:season/episode/:episode" />
-                    <SearchPage path="/search" />
-                    <Login path="/login" />
-                    <SignUp path="/signup" />
-                    <ForgotPassword path="/forgot-password" />
-                    <UpdatePassword path="/update-password" />
+                    <AsyncHome path="/" />
+                    <AsyncHome path="/movies" />
+                    <AsyncHome path="/tv" />
+                    {user ? <AsyncFavorites path="/favorites" /> : <AsyncLogin path="/favorites" />}
+                    {user ? <AsyncHistory path="/history" /> : <AsyncLogin path="/history" />}
+                    <AsyncWatch path="/watch/:type/:id" />
+                    <AsyncWatch path="/watch/:type/:id/season/:season/episode/:episode" />
+                    <AsyncSearchPage path="/search" />
+                    <AsyncLogin path="/login" />
+                    <AsyncSignUp path="/signup" />
+                    <AsyncForgotPassword path="/forgot-password" />
+                    <AsyncUpdatePassword path="/update-password" />
                 </Router>
             </main>
             <Footer />

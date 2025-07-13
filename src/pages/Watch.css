@@ -1028,3 +1028,39 @@
         font-size: 0.85rem;
     }
 } 
+.movie-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 1.5rem;
+    padding: 1rem 0;
+}
+
+.movie-grid::-webkit-scrollbar {
+    display: none;
+}
+
+@media (min-width: 768px) {
+    .movie-grid {
+        grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+    }
+}
+
+@media (min-width: 1200px) {
+    .movie-grid {
+        grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    }
+}
+
+@media (max-width: 768px) {
+    .movie-grid {
+        gap: var(--spacing-md);
+        padding: var(--spacing-md) 0;
+    }
+}
+
+@media (max-width: 480px) {
+    .movie-grid {
+        gap: var(--spacing-sm);
+        padding: var(--spacing-sm) 0;
+    }
+}

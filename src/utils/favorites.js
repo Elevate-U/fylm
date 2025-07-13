@@ -1,4 +1,4 @@
-import { supabase } from './supabase';
+import { supabase } from '../supabase';
 import { useStore } from '../store';
 import { route } from 'preact-router';
 

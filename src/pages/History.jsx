@@ -1,4 +1,5 @@
 import { h } from 'preact';
+import './History.css';
 import Helmet from 'preact-helmet';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 // Import getWatchHistory instead of getContinueWatching for actual watch history
