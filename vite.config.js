@@ -43,7 +43,6 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: {
             'react-vendor': ['react', 'react-dom', 'preact/compat'],
-            'router-vendor': ['react-router-dom'],
           },
         },
       },
