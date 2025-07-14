@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { supabase } from '../supabase';
 import toast from '../components/Toast';
-import './auth.css';
+import './Auth.css';
 
 export default function SignUp() {
   const [loading, setLoading] = useState(false);
@@ -24,12 +24,56 @@ export default function SignUp() {
 
     try {
       setLoading(true);
-      const { error } = await supabase.auth.signUp({
+      // Try to sign up
+      const { data, error: signUpError } = await supabase.auth.signUp({
         email: email,
         password: password,
       });
-      if (error) throw error;
-      toast.success('Check your email for the confirmation link!');
+      // If a user object is returned, try to log in immediately
+      if (data && data.user) {
+        const { error: loginError } = await supabase.auth.signInWithPassword({
+          email: email,
+          password: password,
+        });
+        if (!loginError) {
+          toast.success('Logged in successfully!');
+          window.location.href = '/';
+          return;
+        } else {
+          // User is unconfirmed or password is wrong, show confirmation message
+          toast.success('Check your email for the confirmation link!');
+          return;
+        }
+      }
+      // If error, check if it's because the user already exists
+      if (
+        signUpError &&
+        signUpError.message &&
+        (signUpError.message.toLowerCase().includes('user already registered') ||
+         signUpError.message.toLowerCase().includes('already registered') ||
+         signUpError.message.toLowerCase().includes('already exists'))
+      ) {
+        // Try to log in with the provided password
+        const { error: loginError } = await supabase.auth.signInWithPassword({
+          email: email,
+          password: password,
+        });
+        if (!loginError) {
+          toast.success('Logged in successfully!');
+          window.location.href = '/';
+          return;
+        } else {
+          toast.error('You have already signed up with this email. Please log in.');
+          setTimeout(() => {
+            window.location.href = '/login';
+          }, 1500);
+          return;
+        }
+      }
+      // Other errors
+      if (signUpError) {
+        toast.error(signUpError.error_description || signUpError.message);
+      }
     } catch (error) {
       toast.error(error.error_description || error.message);
     } finally {

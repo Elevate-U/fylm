@@ -350,6 +350,8 @@ header nav a::after {
   display: flex;
   align-items: center;
   gap: var(--spacing-sm);
+  flex-wrap: nowrap;
+  overflow: hidden;
 }
 
 .auth-link,
@@ -421,7 +423,25 @@ header nav a::after {
   gap: var(--spacing-sm);
 }
 
-/* Mobile Responsive Design */
+/* Dynamic responsive behavior - show hamburger when content overflows */
+@media (max-width: 860px) {
+  .hamburger {
+    display: flex;
+  }
+  
+  .desktop-only {
+    display: none;
+  }
+  
+  .mobile-only {
+    display: flex;
+  }
+  
+  header nav {
+    display: none;
+  }
+}
+
 @media (max-width: 768px) {
   header .container {
     padding: 0 var(--spacing-lg); /* Increased padding for less cramped feel */
@@ -457,18 +477,6 @@ header nav a::after {
     font-size: var(--font-size-lg);
     padding: var(--spacing-md) var(--spacing-xl);
     border-radius: var(--radius-lg);
-  }
-
-  .hamburger {
-    display: flex;
-  }
-
-  .desktop-only {
-    display: none;
-  }
-
-  .mobile-only {
-    display: flex;
   }
 
   .header-right {
@@ -556,7 +564,14 @@ header nav a::after {
     height: 44px;
     padding: var(--spacing-sm);
   }
-} 
+}
+
+/* Ensure auth links stay visible until hamburger appears */
+@media (min-width: 901px) {
+  .auth-links {
+    display: flex !important;
+  }
+}
 .header-right .profile-link {
     display: flex;
     align-items: center;

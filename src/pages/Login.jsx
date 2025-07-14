@@ -154,8 +154,7 @@ export default function Login() {
 
         <div className="social-login-group">
           <button
-            type="button"
-            className="social-button google"
+            type="button" className="social-button google"
             onClick={() => handleSocialLogin('google')}
           >
             Sign in with Google
