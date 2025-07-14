@@ -64,7 +64,7 @@ export default function UpdatePassword() {
   return (
     <div className="auth-container">
       <div className="auth-form">
-        <h1 className="header">Update Password</h1>
+        <h1 className="auth-header">Update Password</h1>
         <p className="description">Enter a new password for your account.</p>
         
         {error && <div className="error-message">{error}</div>}

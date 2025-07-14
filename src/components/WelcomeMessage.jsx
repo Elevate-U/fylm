@@ -3,7 +3,7 @@ import { useAuth } from '../context/Auth';
 import './WelcomeMessage.css';
 
 const WelcomeMessage = () => {
-    const { user } = useAuth();
+    const { user, profile } = useAuth();
     
     if (!user) return null;
 
@@ -15,8 +15,9 @@ const WelcomeMessage = () => {
     };
 
     const getFirstName = () => {
-        if (user.user_metadata?.full_name) {
-            return user.user_metadata.full_name.split(' ')[0];
+        const name = profile?.full_name || user.user_metadata?.full_name;
+        if (name) {
+            return name.split(' ')[0];
         }
         return user.email.split('@')[0];
     };

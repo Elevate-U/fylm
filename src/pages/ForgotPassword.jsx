@@ -29,7 +29,7 @@ export default function ForgotPassword() {
   return (
     <div className="auth-container">
       <div className="auth-form">
-        <h1 className="header">Forgot Password</h1>
+        <h1 className="auth-header">Forgot Password</h1>
         <p className="description">
           Enter your email and we'll send you a link to reset your password.
         </p>

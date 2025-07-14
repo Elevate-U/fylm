@@ -10,19 +10,17 @@ import { useStore } from './store';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
-import asyncComponent from './components/asyncComponent';
 
-const AsyncHome = asyncComponent(() => import('./pages/Home'));
-const AsyncFavorites = asyncComponent(() => import('./pages/Favorites'));
-const AsyncHistory = asyncComponent(() => import('./pages/History'));
-const AsyncWatch = asyncComponent(() => import('./pages/Watch'));
-const AsyncSearchPage = asyncComponent(() => import('./pages/Search'));
-const AsyncLogin = asyncComponent(() => import('./pages/Login'));
-const AsyncSignUp = asyncComponent(() => import('./pages/SignUp'));
-const AsyncForgotPassword = asyncComponent(() => import('./pages/ForgotPassword'));
-const AsyncUpdatePassword = asyncComponent(() => import('./pages/UpdatePassword'));
-const AsyncProfile = asyncComponent(() => import('./pages/Profile'));
-
+// Import pages directly instead of asyncComponent
+import Home from './pages/Home';
+import Favorites from './pages/Favorites';
+import History from './pages/History';
+import Watch from './pages/Watch';
+import SearchPage from './pages/Search';
+import Login from './pages/Login';
+import SignUp from './pages/SignUp';
+import ForgotPassword from './pages/ForgotPassword';
+import UpdatePassword from './pages/UpdatePassword';
 
 const MainApp = () => {
     const { user } = useAuth();
@@ -32,11 +30,18 @@ const MainApp = () => {
     const continueWatchingFetched = useStore((state) => state.continueWatchingFetched);
 
     useEffect(() => {
+        console.log('🔄 MainApp useEffect triggered');
+        console.log('👤 User:', user);
+        console.log('📊 Favorites fetched:', favoritesFetched);
+        console.log('📊 Continue watching fetched:', continueWatchingFetched);
+        
         if (user) {
             if (!favoritesFetched) {
+                console.log('🔄 Fetching favorites...');
                 fetchFavorites();
             }
             if (!continueWatchingFetched) {
+                console.log('🔄 Fetching continue watching...');
                 fetchContinueWatching();
             }
         }
@@ -48,19 +53,18 @@ const MainApp = () => {
             <Header />
             <main>
                 <Router history={createHashHistory()}>
-                    <AsyncHome path="/" />
-                    <AsyncHome path="/movies" />
-                    <AsyncHome path="/tv" />
-                    {user ? <AsyncFavorites path="/favorites" /> : <AsyncLogin path="/favorites" />}
-                    {user ? <AsyncHistory path="/history" /> : <AsyncLogin path="/history" />}
-                    <AsyncWatch path="/watch/:type/:id" />
-                    <AsyncWatch path="/watch/:type/:id/season/:season/episode/:episode" />
-                    <AsyncSearchPage path="/search" />
-                    <AsyncLogin path="/login" />
-                    <AsyncSignUp path="/signup" />
-                    <AsyncForgotPassword path="/forgot-password" />
-                    <AsyncUpdatePassword path="/update-password" />
-                    {user ? <AsyncProfile path="/profile" /> : <AsyncLogin path="/profile" />}
+                    <Home path="/" />
+                    <Home path="/movies" />
+                    <Home path="/tv" />
+                    {user ? <Favorites path="/favorites" /> : <Login path="/favorites" />}
+                    {user ? <History path="/history" /> : <Login path="/history" />}
+                    <Watch path="/watch/:type/:id" />
+                    <Watch path="/watch/:type/:id/season/:season/episode/:episode" />
+                    <SearchPage path="/search" />
+                    <Login path="/login" />
+                    <SignUp path="/signup" />
+                    <ForgotPassword path="/forgot-password" />
+                    <UpdatePassword path="/update-password" />
                 </Router>
             </main>
             <Footer />
@@ -71,6 +75,7 @@ const MainApp = () => {
 
 const App = () => {
     useEffect(() => {
+        console.log('🚀 App initialized');
         initializeTheme();
     }, []);
 
@@ -81,4 +86,4 @@ const App = () => {
     );
 };
 
-export default App; 
+export default App;

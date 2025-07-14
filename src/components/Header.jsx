@@ -3,13 +3,15 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import { Link, route } from 'preact-router';
 import { useAuth } from '../context/Auth';
 import ThemeToggle from './ThemeToggle';
+import { getProxiedImageUrl } from '../config';
+import defaultAvatar from '../assets/default-avatar.png';
 import './Header.css';
 
 const Header = () => {
     const [query, setQuery] = useState('');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
-    const { user, signOut } = useAuth();
+    const { user, profile, signOut } = useAuth();
     const menuRef = useRef(null);
     const hamburgerRef = useRef(null);
     const searchRef = useRef(null);
@@ -141,23 +143,30 @@ const Header = () => {
 
     // Prevent body scroll when menu is open
     useEffect(() => {
+        const originalStyle = {
+            overflow: document.body.style.overflow,
+            position: document.body.style.position,
+            width: document.body.style.width,
+            height: document.body.style.height,
+        };
+
         if (isMenuOpen || isSearchOpen) {
             document.body.style.overflow = 'hidden';
             document.body.style.position = 'fixed';
             document.body.style.width = '100%';
             document.body.style.height = '100%';
         } else {
-            document.body.style.overflow = '';
-            document.body.style.position = '';
-            document.body.style.width = '';
-            document.body.style.height = '';
+            document.body.style.overflow = originalStyle.overflow;
+            document.body.style.position = originalStyle.position;
+            document.body.style.width = originalStyle.width;
+            document.body.style.height = originalStyle.height;
         }
 
         return () => {
-            document.body.style.overflow = '';
-            document.body.style.position = '';
-            document.body.style.width = '';
-            document.body.style.height = '';
+            document.body.style.overflow = originalStyle.overflow;
+            document.body.style.position = originalStyle.position;
+            document.body.style.width = originalStyle.width;
+            document.body.style.height = originalStyle.height;
         };
     }, [isMenuOpen, isSearchOpen]);
 
@@ -174,6 +183,7 @@ const Header = () => {
                                 <>
                                     <li><Link activeClassName="active" href="/favorites" onClick={closeMenu}>Favorites</Link></li>
                                     <li><Link activeClassName="active" href="/history" onClick={closeMenu}>History</Link></li>
+                                    
                                 </>
                             ) : (
                                 <>
@@ -236,7 +246,13 @@ const Header = () => {
                     <div class="auth-links">
                         {user ? (
                             <>
-                                <span class="user-email">{user.email}</span>
+                                <Link href="/profile" class="profile-link" onClick={closeMenu}>
+                                    <img
+                                        src={profile?.avatar_url ? getProxiedImageUrl(profile.avatar_url) : (user.user_metadata?.avatar_url ? getProxiedImageUrl(user.user_metadata.avatar_url) : defaultAvatar)}
+                                        alt="Profile"
+                                        class="profile-avatar"
+                                    />
+                                </Link>
                                 <button onClick={handleLogout} class="auth-button">Logout</button>
                             </>
                         ) : (

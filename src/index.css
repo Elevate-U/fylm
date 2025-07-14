@@ -217,7 +217,7 @@ body {
 main {
   flex: 1;
   width: 100%;
-  padding-top: 73px; /* Account for fixed header height */
+  padding-top: 50px; /* Account for fixed header height */
 }
 
 @media (max-width: 768px) {

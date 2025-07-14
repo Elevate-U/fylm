@@ -557,3 +557,21 @@ header nav a::after {
     padding: var(--spacing-sm);
   }
 } 
+.header-right .profile-link {
+    display: flex;
+    align-items: center;
+    margin-right: 1rem;
+}
+
+.profile-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid var(--border-color);
+    transition: border-color 0.3s;
+}
+
+.profile-avatar:hover {
+    border-color: var(--brand-primary);
+}

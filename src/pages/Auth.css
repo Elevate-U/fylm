@@ -4,11 +4,11 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  min-height: 100vh;
+  min-height: calc(100vh - var(--header-height, 50px));
   background: var(--bg-primary);
   position: relative;
   overflow: hidden;
-  padding: 2rem;
+  padding: 2rem 1rem;
 }
 
 .auth-container::before {
@@ -87,7 +87,7 @@
   transform: translateY(-5px);
 }
 
-.header {
+.auth-header {
   font-size: 2.2rem;
   font-weight: var(--font-weight-extrabold);
   background: var(--glass-text-gradient);
@@ -280,7 +280,7 @@
 }
 
 .social-button.google::before {
-  background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDQ4IDQ4Ij48cGF0aCBmaWxsPSIjRkZDNTEwIiBkPSJNMCA0NGMwIDIgMS43IDQgMy44IDRIMjRWMjRIM1EuNEMxLjcgMjQgMCAyMiAwIDIwVjBIMjR2MjRoMjB2MjBMMCA0NHoiLz48cGF0aCBmaWxsPSIjRjM3QzA5IiBkPSJNMCA0NGwxMSA2LjIgTDI0IDM2VjI0SDB2MjB6Ii8+PHBhdGggZmlsbD0iIzI3N0FDMSIgZD0iTTQ4IDQ0YzAgMi0xLjcgNC0zLjggNEgyNHYtNEg0OGwtMTYtMThMMjQgMHYyNGgyNHYyMHoiLz48cGF0aCBmaWxsPSIjMzNBQTUzIiBkPSJNMCAwYzAgMiAxLjcgNCAzLjggNEgyNHYtNEgwTC0xMS02LjJMMjQgMjRWMHYtMjRIMHYweiIvPjwvc3ZnPg==');
+  background-image: url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDQ4IDQ4Ij48cGF0aCBmaWxsPSIjRkZDNTEwIiBkPSJNMCA0NGMwIDIgMS43IDQgMy44IDRIMjRWMjRIM1EuNEMxLjcgMjQgMCAyMiAwIDIwVjBIMjR2MjRoMjB2MjBMMCA0NHoiLz48cGF0aCBmaWxsPSIjRjM3QzA5IiBkPSJNMCA0NGwxMSA2LjIgTDI0IDM2VjI0SDB2MjB6Ii8+PHBhdGggZmlsbD0iIzI3N0FDMSIgZD0iTTQ4IDQ0YzAgMi0xLjcgNC0zLjggNEgyNHYtNEg0OGwtMTYtMThMMjQgMHYyNGgyNHYyMHoiLz48cGF0aCBmaWxsPSIjMzNBQTUzIiBkPSJNMCAwaGMwIDIgMS43IDQgMy44IDRIMjR2LTRIMFYtMjRIMHYweiIvPjwvc3ZnPg==');
 }
 
 /* ===== ADDITIONAL AUTH FORM ELEMENTS ===== */
@@ -465,129 +465,3 @@
 }
 
 .loading-overlay .spinner {
-  width: 40px;
-  height: 40px;
-  border: 3px solid var(--glass-border);
-  border-top-color: var(--brand-primary);
-  border-radius: var(--radius-full);
-  animation: spin 1s linear infinite;
-  margin-bottom: 1rem;
-}
-
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
-
-.loading-overlay p {
-  color: var(--text-secondary);
-  font-weight: var(--font-weight-medium);
-  margin: 0;
-}
-
-.checkbox-group {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  margin: 1.5rem 0;
-  cursor: pointer;
-  padding: 0.5rem;
-  border-radius: var(--radius-md);
-  transition: all 0.3s ease;
-}
-
-.checkbox-group:hover {
-  background: var(--glass-bg-hover);
-}
-
-.checkbox-group input[type="checkbox"] {
-  appearance: none;
-  width: 20px;
-  height: 20px;
-  border: 2px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  background: var(--glass-bg), var(--glass-highlight);
-  backdrop-filter: var(--glass-blur);
-  position: relative;
-  cursor: pointer;
-  transition: all 0.3s ease;
-}
-
-.checkbox-group input[type="checkbox"]:checked {
-  background: var(--brand-primary);
-  border-color: var(--brand-primary);
-}
-
-.checkbox-group input[type="checkbox"]:checked::before {
-  content: '✓';
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  color: white;
-  font-size: 12px;
-  font-weight: bold;
-}
-
-.checkbox-group label {
-  color: var(--text-secondary);
-  font-size: 0.9rem;
-  font-weight: var(--font-weight-medium);
-  cursor: pointer;
-  user-select: none;
-}
-
-@media (max-width: 768px) {
-  .auth-container {
-    padding: 1rem;
-  }
-
-  .auth-form {
-    padding: 2rem;
-    max-width: 400px;
-  }
-
-  .header {
-    font-size: 1.8rem;
-  }
-
-  .description {
-    font-size: 1rem;
-  }
-
-  .input-field {
-    padding: 1rem;
-  }
-
-  .button {
-    padding: 1rem 1.5rem;
-  }
-
-  .input-group label {
-    font-size: 0.85rem;
-  }
-}
-
-@media (max-width: 480px) {
-  .auth-form {
-    padding: 1.5rem;
-    max-width: 350px;
-  }
-
-  .header {
-    font-size: 1.6rem;
-  }
-
-  .input-field {
-    padding: 0.8rem 1rem;
-  }
-
-  .button {
-    padding: 0.8rem 1rem;
-    font-size: 0.9rem;
-  }
-
-  .auth-container::after {
-    width: 400px;
-    height: 400px;
-  }
-} 

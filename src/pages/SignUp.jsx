@@ -1,7 +1,7 @@
 import { useState } from 'preact/hooks';
 import { supabase } from '../supabase';
 import toast from '../components/Toast';
-import './Auth.css';
+import './auth.css';
 
 export default function SignUp() {
   const [loading, setLoading] = useState(false);
@@ -39,8 +39,9 @@ export default function SignUp() {
 
   return (
     <div className="auth-container">
+      
       <div className="auth-form">
-        <h1 className="header">Create an account</h1>
+        <h1 className="auth-header">Create an account</h1>
         <p className="description">Sign up for a new account.</p>
         <form onSubmit={handleSignUp}>
           <div className="input-group">

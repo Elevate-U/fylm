@@ -29,17 +29,17 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
         persistSession: true,
         detectSessionInUrl: false,
         // Add timeout settings to prevent hanging requests
-        storageKey: 'sb-auth-token',
+        storageKey: 'supabase.auth.token',
         flowType: 'pkce',
         // Debug mode for auth
-        debug: process.env.NODE_ENV === 'development'
+        debug: import.meta.env.MODE === 'development'
     },
     db: {
         schema: 'public'
     },
     global: {
         headers: {
-            'Content-Type': 'application/json',
+            //'Content-Type': 'application/json',
             'X-Client-Info': 'supabase-js-web'
         },
         // Add request timeout with better error handling
@@ -127,7 +127,7 @@ if (typeof window !== 'undefined') {
     window.handleAuthError = handleAuthError;
     
     // Auto-test connection in development
-    if (process.env.NODE_ENV === 'development') {
+    if (import.meta.env.MODE === 'development') {
         setTimeout(() => {
             testSupabaseConnection();
         }, 1000);

@@ -79,7 +79,7 @@ export default function Login() {
   return (
     <div className="auth-container">
       <div className="auth-form">
-        <h1 className="header">Login</h1>
+        <h1 className="auth-header">Login</h1>
         <p className="description">Sign in to your account.</p>
         
         {errors.general && (

@@ -1,5 +1,5 @@
 import { createContext } from 'preact';
-import { useState, useEffect, useContext } from 'preact/hooks';
+import { useState, useEffect, useContext, useCallback } from 'preact/hooks';
 import { supabase } from '../supabase';
 
 const AuthContext = createContext();
@@ -7,34 +7,114 @@ const AuthContext = createContext();
 export function AuthProvider({ children }) {
   const [session, setSession] = useState(null);
   const [user, setUser] = useState(null);
+  const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const fetchProfile = useCallback(async (user) => {
+    if (!user) {
+      setProfile(null);
+      return;
+    }
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      if (error && error.code !== 'PGRST116') { // Ignore 'not found' errors
+        throw error;
+      }
+      setProfile(data);
+    } catch (error) {
+      console.error('Error fetching profile:', error);
+    }
+  }, []);
+
+  const refreshProfile = useCallback(async () => {
+    if (user) {
+      // First, refresh the auth session to get the latest user metadata
+      await supabase.auth.refreshSession();
+      // Then, fetch the profile from the database
+      await fetchProfile(user);
+    }
+  }, [user, fetchProfile]);
+
   useEffect(() => {
-    const getSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      setSession(session);
-      setUser(session?.user ?? null);
-      setLoading(false);
+    let isMounted = true;
+
+    const getSessionAndProfile = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        if (isMounted) {
+          setSession(session);
+          const currentUser = session?.user ?? null;
+          setUser(currentUser);
+          if (currentUser) {
+            await fetchProfile(currentUser);
+          }
+          setLoading(false);
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+        if (isMounted) setLoading(false);
+      }
     };
 
-    getSession();
+    getSessionAndProfile();
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      async (_event, session) => {
         setSession(session);
-        setUser(session?.user ?? null);
+        const currentUser = session?.user ?? null;
+        setUser(currentUser);
+        if (currentUser) {
+          await fetchProfile(currentUser);
+        } else {
+          setProfile(null);
+        }
       }
     );
 
     return () => {
       authListener.subscription.unsubscribe();
+      isMounted = false;
     };
-  }, []);
+  }, [fetchProfile]);
+
+  const updateUser = async (updates) => {
+    try {
+      const { data, error } = await supabase.auth.updateUser(updates);
+      if (error) throw error;
+      // The onAuthStateChange listener will handle updating user and profile state
+      return { data, error: null };
+    } catch (error) {
+      console.error('Error updating user:', error);
+      return { data: null, error };
+    }
+  };
+
+  const signOut = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Error during sign out:', error);
+      }
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+    } catch (err) {
+      console.error('Unexpected error during sign out:', err);
+    }
+  };
 
   const value = {
     session,
     user,
-    signOut: () => supabase.auth.signOut(),
+    profile,
+    refreshProfile,
+    updateUser, // Expose the updateUser function
+    signOut,
   };
 
   return (
@@ -46,4 +126,4 @@ export function AuthProvider({ children }) {
 
 export function useAuth() {
   return useContext(AuthContext);
-} 
+}
