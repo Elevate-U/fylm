@@ -1,6 +1,7 @@
 import { createContext } from 'preact';
 import { useState, useEffect, useContext, useCallback } from 'preact/hooks';
 import { supabase } from '../supabase';
+import { clearAuthCache } from '../utils/watchHistory';
 
 const AuthContext = createContext();
 
@@ -103,6 +104,8 @@ export function AuthProvider({ children }) {
       setSession(null);
       setUser(null);
       setProfile(null);
+      // Clear the auth cache in watchHistory to prevent stale data
+      clearAuthCache();
     } catch (err) {
       console.error('Unexpected error during sign out:', err);
     }

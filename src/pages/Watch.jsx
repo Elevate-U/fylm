@@ -27,6 +27,8 @@ const Watch = (props) => {
     // Removed showNextEpisodePrompt and nextEpisodeCountdown - Videasy handles this automatically
     const [streamError, setStreamError] = useState(null);
     const [isRetrying, setIsRetrying] = useState(false);
+    const [streamTimeoutError, setStreamTimeoutError] = useState(false);
+    const streamTimeoutRef = useRef();
 
     const [isDirectSource, setIsDirectSource] = useState(false);
     const [qualities, setQualities] = useState([]);
@@ -453,13 +455,6 @@ const Watch = (props) => {
                     errorMessage = "Unable to load video stream. This might be due to leaving and returning to the browser.";
                 }
                 
-                // Prevent debugger from opening in production
-                if (process.env.NODE_ENV === 'production') {
-                    console.log('Video stream error:', error.message);
-                } else {
-                    console.error('Video stream error:', error);
-                }
-                
                 setStreamError({ message: errorMessage, canRetry });
                 setStreamUrl('');
                 setIsDirectSource(false);
@@ -587,7 +582,7 @@ const Watch = (props) => {
                 } else {
                     console.log('⏭️ Progress save skipped (too recent):', {
                         timeSinceLastSave: now - lastProgressSave[progressKey],
-                        threshold: 5000
+                        threshold: 1200
                     });
                 }
 
@@ -811,11 +806,27 @@ const Watch = (props) => {
         return () => clearInterval(progressHandler);
     };
 
+    useEffect(() => {
+        // Reset timeout error when streamUrl or error changes
+        setStreamTimeoutError(false);
+        if (!streamUrl && !streamError) {
+            streamTimeoutRef.current = setTimeout(() => {
+                setStreamTimeoutError(true);
+                console.log('Stream timeout error');
+            }, 10000); // 10 seconds
+        }
+        return () => {
+            if (streamTimeoutRef.current) clearTimeout(streamTimeoutRef.current);
+        };
+    }, [streamUrl, streamError, currentSeason, currentEpisode, currentSource]);
+
     if (loading) {
         return (
             <div class="loading-state">
                 <div class="loading-spinner"></div>
                 <p>Loading media details...</p>
+                <p>If your video doesnt load refresh the page or pick a new server.</p>
+                
             </div>
         );
     }
@@ -843,7 +854,7 @@ const Watch = (props) => {
         );
     }
     
-    const { title, name, overview, vote_average, release_date, first_air_date, runtime, number_of_seasons, genres, poster_path } = mediaDetails;
+    const { title, name, overview, vote_average, release_date, first_air_date, last_air_date, runtime, number_of_seasons, genres, poster_path, status } = mediaDetails;
     
     // For TV episodes, check if this specific episode is favorited
     const favorited = isShowFavorited(mediaDetails.id);
@@ -911,9 +922,25 @@ const Watch = (props) => {
                         )}
                     </div>
                 )}
-                {!streamUrl && !streamError && (
+                {!streamUrl && !streamError && !streamTimeoutError && (
                     <div class="stream-loading">
-                        <p>Loading video stream...</p>
+                        <p>Loading video stream... </p>
+                        <p>If your video doesnt load refresh the page or pick a new server.</p>
+                    </div>
+                )}
+                {/* PATCH: Show error if stream never loads */}
+                {!streamUrl && !streamError && streamTimeoutError && (
+                    <div class="stream-error-message">
+                        <p>Sorry, this episode failed to load. Please refresh the page.</p>
+                        <div class="error-actions">
+                            <button 
+                                onClick={() => window.location.reload()} 
+                                class="btn retry-btn"
+                            >
+                                Refresh
+                            </button>
+                            <p>Or try selecting a different source from the list below if refreshing doesn't work.</p>
+                        </div>
                     </div>
                 )}
                 {isDirectSource ? (
@@ -1008,7 +1035,28 @@ const Watch = (props) => {
                         </div>
                         <div class="meta">
                             <span class="rating">★ {mediaDetails.vote_average ? mediaDetails.vote_average.toFixed(1) : 'N/A'}</span>
-                            {year && <span>{year}</span>}
+                            {(type === 'tv' || type === 'anime') && first_air_date && (
+                                <span style={{ marginLeft: 8 }}>
+                                    {(() => {
+                                        const startYear = first_air_date ? new Date(first_air_date).getFullYear() : null;
+                                        let endYear = null;
+                                        if (last_air_date) {
+                                            endYear = new Date(last_air_date).getFullYear();
+                                        } else if (status && status.toLowerCase() === 'ended') {
+                                            endYear = startYear;
+                                        }
+                                        if (startYear && endYear && startYear === endYear) {
+                                            return `${startYear}`;
+                                        } else if (startYear && endYear && endYear !== startYear) {
+                                            return `${startYear} - ${endYear}`;
+                                        } else if (startYear) {
+                                            return `${startYear} -`;
+                                        }
+                                        return '';
+                                    })()}
+                                </span>
+                            )}
+                            
                             {runtime && <span>{runtime} min</span>}
                             {number_of_seasons && <span>{number_of_seasons} Seasons</span>}
                         </div>
@@ -1140,7 +1188,21 @@ const Watch = (props) => {
                                                         )}
                                                     </div>
                                                     <div class="episode-card-content">
-                                                        <h4>{episode.name}</h4>
+                                                        <h4>
+                                                            {episode.name}
+                                                            {episode.air_date && (
+                                                                <span style={{ color: '#aaa', fontWeight: 400, fontSize: '0.95em', marginLeft: 8 }}>
+                                                                    {'• '}
+                                                                    {(() => {
+                                                                        const d = new Date(episode.air_date);
+                                                                        if (!isNaN(d)) {
+                                                                            return d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+                                                                        }
+                                                                        return null;
+                                                                    })()}
+                                                                </span>
+                                                            )}
+                                                        </h4>
                                                         <p class="episode-overview">{episode.overview}</p>
                                                     </div>
                                                 </div>

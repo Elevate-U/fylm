@@ -1,15 +1,27 @@
 import { supabase } from '../supabase';
 import { API_BASE_URL } from '../config';
 
+// Cache user session to reduce auth overhead
+let cachedUserId = null;
+let lastAuthCheck = 0;
+const AUTH_CACHE_DURATION = 30000; // 30 seconds
+
 const getCurrentUserId = async () => {
-    const maxRetries = 2;
+    const now = Date.now();
+    
+    // Return cached user ID if it's still valid
+    if (cachedUserId && (now - lastAuthCheck) < AUTH_CACHE_DURATION) {
+        return cachedUserId;
+    }
+    
+    const maxRetries = 3;
     let retryCount = 0;
     
     while (retryCount < maxRetries) {
         try {
-            // Add timeout to prevent hanging auth requests
-            const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Auth timeout')), 5000)
+            // Increase timeout to match Supabase client timeout (15 seconds)
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error('Auth timeout')), 15000)
             );
             
             const authPromise = supabase.auth.getSession();
@@ -22,12 +34,21 @@ const getCurrentUserId = async () => {
                 if (error.message && error.message.includes('NetworkError') && retryCount < maxRetries - 1) {
                     retryCount++;
                     console.log(`Retrying auth session (attempt ${retryCount + 1}/${maxRetries})`);
-                    await new Promise(resolve => setTimeout(resolve, 500 * retryCount));
+                    await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
                     continue;
                 }
+                
+                // Clear cache on error
+                cachedUserId = null;
+                lastAuthCheck = 0;
                 return null;
             }
-            return session?.user?.id || null;
+            
+            // Update cache
+            cachedUserId = session?.user?.id || null;
+            lastAuthCheck = now;
+            
+            return cachedUserId;
         } catch (error) {
             console.error('Error in getCurrentUserId:', error);
             
@@ -35,16 +56,27 @@ const getCurrentUserId = async () => {
             if ((error.message && (error.message.includes('NetworkError') || error.message.includes('timeout'))) && retryCount < maxRetries - 1) {
                 retryCount++;
                 console.log(`Retrying auth due to network error (attempt ${retryCount + 1}/${maxRetries})`);
-                await new Promise(resolve => setTimeout(resolve, 500 * retryCount));
+                await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
                 continue;
             }
             
+            // Clear cache on error
+            cachedUserId = null;
+            lastAuthCheck = 0;
             return null;
         }
     }
     
     console.error('Failed to get user session after all retry attempts');
+    cachedUserId = null;
+    lastAuthCheck = 0;
     return null;
+};
+
+// Function to clear auth cache when user logs out
+export const clearAuthCache = () => {
+    cachedUserId = null;
+    lastAuthCheck = 0;
 };
 
 export const getWatchHistory = async () => {
@@ -345,11 +377,11 @@ export const saveWatchProgress = async (item, progress, durationInSeconds, force
     };
 
     // Attempt 1: Modern RPC with all params
-    console.log('💾 Saving watch progress (v2) via RPC...', progressData);
+    console.log('💾 Saving watch progress via RPC...', progressData);
     const { error: rpcErrorV2 } = await supabase.rpc('save_watch_progress', progressData);
 
     if (!rpcErrorV2) {
-        console.log('✅ Watch progress saved successfully via RPC (v2). RPC Error object was:', rpcErrorV2);
+        console.log('✅ Watch progress saved successfully via RPC. RPC Error object was:', rpcErrorV2);
         return true;
     } else {
         console.error(`❌ RPC (v2) failed. Error: ${rpcErrorV2.message}. Details:`, rpcErrorV2);
