@@ -6,6 +6,7 @@ import { AuthProvider, useAuth } from './context/Auth';
 import { Toaster } from './components/Toast';
 import { initializeTheme } from './utils/themeUtils';
 import { useStore } from './store';
+import { setupErrorHandler } from './utils/errorHandler';
 
 import Header from './components/Header';
 import Footer from './components/Footer';
@@ -72,6 +73,7 @@ const MainApp = () => {
 const App = () => {
     useEffect(() => {
         initializeTheme();
+        setupErrorHandler();
     }, []);
 
     return (

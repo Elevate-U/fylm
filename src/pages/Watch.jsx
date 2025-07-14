@@ -453,6 +453,13 @@ const Watch = (props) => {
                     errorMessage = "Unable to load video stream. This might be due to leaving and returning to the browser.";
                 }
                 
+                // Prevent debugger from opening in production
+                if (process.env.NODE_ENV === 'production') {
+                    console.log('Video stream error:', error.message);
+                } else {
+                    console.error('Video stream error:', error);
+                }
+                
                 setStreamError({ message: errorMessage, canRetry });
                 setStreamUrl('');
                 setIsDirectSource(false);
