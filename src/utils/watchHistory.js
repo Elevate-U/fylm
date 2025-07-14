@@ -34,7 +34,7 @@ const getCurrentUserId = async () => {
                 if (error.message && error.message.includes('NetworkError') && retryCount < maxRetries - 1) {
                     retryCount++;
                     console.log(`Retrying auth session (attempt ${retryCount + 1}/${maxRetries})`);
-                    await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
+                    await new Promise(resolve => setTimeout(resolve, 3000 * retryCount));
                     continue;
                 }
                 
