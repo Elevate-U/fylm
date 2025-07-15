@@ -29,7 +29,10 @@ const SearchPage = (props) => {
       const data = await res.json();
       if (data && data.results) {
         const validResults = data.results.filter(item => (item.media_type === 'movie' || item.media_type === 'tv') && item.poster_path);
-        setResults(validResults);
+        const uniqueResults = validResults.filter((item, index, self) =>
+            index === self.findIndex((t) => t.id === item.id && t.media_type === item.media_type)
+        );
+        setResults(uniqueResults);
       }
     } catch (error) {
       console.error("Error performing search:", error);

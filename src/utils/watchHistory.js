@@ -14,63 +14,29 @@ const getCurrentUserId = async () => {
         return cachedUserId;
     }
     
-    const maxRetries = 3;
-    let retryCount = 0;
-    
-    while (retryCount < maxRetries) {
-        try {
-            // Increase timeout to match Supabase client timeout (15 seconds)
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error('Auth timeout')), 15000)
-            );
-            
-            const authPromise = supabase.auth.getSession();
-            const { data: { session }, error } = await Promise.race([authPromise, timeoutPromise]);
-            
-            if (error) {
-                console.error('Error getting current session:', error);
-                
-                // Retry on network errors
-                if (error.message && error.message.includes('NetworkError') && retryCount < maxRetries - 1) {
-                    retryCount++;
-                    console.log(`Retrying auth session (attempt ${retryCount + 1}/${maxRetries})`);
-                    await new Promise(resolve => setTimeout(resolve, 3000 * retryCount));
-                    continue;
-                }
-                
-                // Clear cache on error
-                cachedUserId = null;
-                lastAuthCheck = 0;
-                return null;
-            }
-            
-            // Update cache
-            cachedUserId = session?.user?.id || null;
-            lastAuthCheck = now;
-            
-            return cachedUserId;
-        } catch (error) {
-            console.error('Error in getCurrentUserId:', error);
-            
-            // Retry on network or timeout errors
-            if ((error.message && (error.message.includes('NetworkError') || error.message.includes('timeout'))) && retryCount < maxRetries - 1) {
-                retryCount++;
-                console.log(`Retrying auth due to network error (attempt ${retryCount + 1}/${maxRetries})`);
-                await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
-                continue;
-            }
-            
-            // Clear cache on error
+    try {
+        const { data: { session }, error } = await supabase.auth.getSession();
+        
+        if (error) {
+            console.error('Error getting current session:', error);
             cachedUserId = null;
             lastAuthCheck = 0;
             return null;
         }
+        
+        // Update cache
+        cachedUserId = session?.user?.id || null;
+        lastAuthCheck = now;
+        
+        return cachedUserId;
+    } catch (error) {
+        console.error('Exception in getCurrentUserId:', error);
+        
+        // Clear cache on error
+        cachedUserId = null;
+        lastAuthCheck = 0;
+        return null;
     }
-    
-    console.error('Failed to get user session after all retry attempts');
-    cachedUserId = null;
-    lastAuthCheck = 0;
-    return null;
 };
 
 // Function to clear auth cache when user logs out
@@ -80,61 +46,29 @@ export const clearAuthCache = () => {
 };
 
 export const getWatchHistory = async () => {
-    const maxRetries = 3;
-    let retryCount = 0;
-    
-    while (retryCount < maxRetries) {
-        try {
-            const userId = await getCurrentUserId();
-            if (!userId) {
-                console.log('No authenticated user, returning empty watch history');
-                return [];
-            }
-
-            // Add timeout to prevent hanging requests
-            const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Request timeout')), 10000)
-            );
-            
-            const queryPromise = supabase
-                .from('watch_history')
-                .select('*')
-                .eq('user_id', userId)
-                .order('watched_at', { ascending: false });
-
-            const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
-
-            if (error) {
-                console.error('Error fetching watch history:', error);
-                
-                // Check if it's a network error that we should retry
-                if (error.message && error.message.includes('NetworkError') && retryCount < maxRetries - 1) {
-                    retryCount++;
-                    console.log(`Retrying watch history fetch (attempt ${retryCount + 1}/${maxRetries})`);
-                    await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)); // Exponential backoff
-                    continue;
-                }
-                return [];
-            }
-            return data || [];
-            
-        } catch (error) {
-            console.error('Error in getWatchHistory:', error);
-            
-            // Check if it's a network or timeout error that we should retry
-            if ((error.message && (error.message.includes('NetworkError') || error.message.includes('timeout'))) && retryCount < maxRetries - 1) {
-                retryCount++;
-                console.log(`Retrying watch history fetch due to network error (attempt ${retryCount + 1}/${maxRetries})`);
-                await new Promise(resolve => setTimeout(resolve, 1000 * retryCount)); // Exponential backoff
-                continue;
-            }
-            
+    try {
+        const userId = await getCurrentUserId();
+        if (!userId) {
+            console.log('No authenticated user, returning empty watch history');
             return [];
         }
+
+        const { data, error } = await supabase
+            .from('watch_history')
+            .select('*')
+            .eq('user_id', userId)
+            .order('watched_at', { ascending: false });
+
+        if (error) {
+            console.error('Error fetching watch history:', error);
+            return [];
+        }
+        return data || [];
+        
+    } catch (error) {
+        console.error('Exception in getWatchHistory:', error);
+        return [];
     }
-    
-    console.error('Failed to fetch watch history after all retry attempts');
-    return [];
 };
 
 export const getWatchProgressForMedia = async (mediaId, mediaType, season, episode) => {
@@ -153,7 +87,11 @@ export const getWatchProgressForMedia = async (mediaId, mediaType, season, episo
             .eq('media_type', mediaType);
         
         if (mediaType !== 'movie') {
-            query = query.eq('season_number', season).eq('episode_number', episode);
+            query = query[
+                season == null ? 'is' : 'eq'
+            ]('season_number', season == null ? null : season)[
+                episode == null ? 'is' : 'eq'
+            ]('episode_number', episode == null ? null : episode);
         }
 
         const { data, error } = await query;
@@ -249,9 +187,11 @@ export const getContinueWatching = async () => {
                         .eq('media_type', entry.media_type);
                     
                     if (entry.media_type !== 'movie') {
-                        progressQuery = progressQuery
-                            .eq('season_number', entry.season_number)
-                            .eq('episode_number', entry.episode_number);
+                        progressQuery = progressQuery[
+                            entry.season_number == null ? 'is' : 'eq'
+                        ]('season_number', entry.season_number == null ? null : entry.season_number)[
+                            entry.episode_number == null ? 'is' : 'eq'
+                        ]('episode_number', entry.episode_number == null ? null : entry.episode_number);
                     }
 
                     const { data: progressData, error: progressError } = await progressQuery;
@@ -321,7 +261,11 @@ export const getContinueWatching = async () => {
         const detailedItems = await Promise.all(
             validEntries.map(async (entry) => {
                 try {
-                    const response = await fetch(`${API_BASE_URL}/tmdb/${entry.media_type}/${entry.media_id}`);
+                    // Handle both simple numeric IDs and the new text format 'tmdb:ID:null:null'
+                    const mediaIdParts = String(entry.media_id).split(':');
+                    const numericMediaId = mediaIdParts.length > 1 ? mediaIdParts[1] : entry.media_id;
+
+                    const response = await fetch(`${API_BASE_URL}/tmdb/${entry.media_type}/${numericMediaId}`);
                     if (response.ok) {
                         const details = await response.json();
                         return { 
@@ -367,7 +311,7 @@ export const saveWatchProgress = async (item, progress, durationInSeconds, force
     }
 
     const progressData = {
-        p_media_id: item.id,
+        p_media_id: String(item.id), // Ensure media_id is passed as a string
         p_media_type: item.type,
         p_season_number: item.season || null,
         p_episode_number: item.episode || null,
@@ -378,89 +322,62 @@ export const saveWatchProgress = async (item, progress, durationInSeconds, force
 
     // Attempt 1: Modern RPC with all params
     console.log('💾 Saving watch progress via RPC...', progressData);
-    const { error: rpcErrorV2 } = await supabase.rpc('save_watch_progress', progressData);
+    const { error: rpcError } = await supabase.rpc('save_watch_progress', progressData);
 
-    if (!rpcErrorV2) {
-        console.log('✅ Watch progress saved successfully via RPC. RPC Error object was:', rpcErrorV2);
-        return true;
-    } else {
-        console.error(`❌ RPC (v2) failed. Error: ${rpcErrorV2.message}. Details:`, rpcErrorV2);
+    if (rpcError) {
+        console.error(`❌ RPC failed. Error: ${rpcError.message}. Details:`, rpcError);
+        // We can add a fallback here if needed, but the new DB constraints should prevent most errors.
+        return false;
     }
 
-    // Attempt 2: Legacy RPC without force_history_entry
-    console.log('⚠️ RPC (v2) failed, trying legacy (v1) RPC...');
-    const { p_force_history_entry, ...fallbackData } = progressData;
-    const { error: rpcErrorV1 } = await supabase.rpc('save_watch_progress', fallbackData);
-
-    if (!rpcErrorV1) {
-        console.log('✅ Watch progress saved successfully via RPC (v1)');
-        return true;
-    } else {
-        console.error(`❌ RPC (v1) also failed. Error: ${rpcErrorV1.message}. Details:`, rpcErrorV1);
-    }
-
-    // Attempt 3: Direct DB write fallback
-    console.log('⚠️ Both RPC methods failed, attempting direct DB write fallback...');
-    try {
-        const fallbackSuccess = await saveWatchProgressFallback(userId, item, progress, durationInSeconds, forceHistoryEntry);
-        if (fallbackSuccess) {
-            console.log('✅ Watch progress saved successfully via direct DB fallback');
-            return true;
-        } else {
-            console.error('❌ Direct DB write fallback reported failure.');
-        }
-    } catch (fallbackError) {
-        console.error('❌ Direct DB write fallback threw an exception:', fallbackError);
-    }
-    
-    console.error('❌ All methods to save progress failed for media:', { item, progress, durationInSeconds });
-    return false;
+    console.log('✅ Watch progress saved successfully via RPC.');
+    return true;
 };
 
-// Fallback function for direct database operations
+// Fallback function for direct database operations (DEPRECATED, but kept for safety)
 const saveWatchProgressFallback = async (userId, item, progress, durationInSeconds, forceHistoryEntry) => {
+    console.warn('⚠️ The saveWatchProgressFallback function is deprecated and should not be actively used.');
+    // The new database triggers handle this logic, so this fallback is mostly redundant.
+    // It's kept as a safety net in case the RPC fails for unexpected reasons.
     try {
         console.log('🔄 Using direct database fallback for watch progress');
-        
-        // Insert/update watch progress directly
+        const nowIso = new Date().toISOString();
+        const upsertData = {
+            user_id: userId,
+            media_id: item.id,
+            media_type: item.type,
+            season_number: item.season || null,
+            episode_number: item.episode || null,
+            progress_seconds: progress > 0 ? Math.ceil(progress) : 0,
+            duration_seconds: durationInSeconds ? Math.round(durationInSeconds) : null,
+            updated_at: nowIso
+        };
+
         const { error: progressError } = await supabase
             .from('watch_progress')
-            .upsert({
-                user_id: userId,
-                media_id: item.id,
-                media_type: item.type,
-                season_number: item.season || null,
-                episode_number: item.episode || null,
-                progress_seconds: progress > 0 ? Math.ceil(progress) : 0,
-                duration_seconds: durationInSeconds ? Math.round(durationInSeconds) : null,
-                updated_at: new Date().toISOString()
-            }, {
-                onConflict: 'user_id,media_id,media_type,season_number,episode_number'
-            });
+            .upsert(upsertData);
 
         if (progressError) {
-            console.error('❌ Direct progress insert error:', progressError);
+            console.error('❌ Direct progress upsert error:', progressError);
             return false;
         }
 
         // Add to watch history if progress is significant or forced
         if (forceHistoryEntry || progress > 60) {
+            const historyData = {
+                user_id: userId,
+                media_id: item.id,
+                media_type: item.type,
+                season_number: item.season || null,
+                episode_number: item.episode || null,
+                watched_at: nowIso
+            };
             const { error: historyError } = await supabase
                 .from('watch_history')
-                .upsert({
-                    user_id: userId,
-                    media_id: item.id,
-                    media_type: item.type,
-                    season_number: item.season || null,
-                    episode_number: item.episode || null,
-                    watched_at: new Date().toISOString()
-                }, {
-                    onConflict: 'user_id,media_id,media_type,season_number,episode_number'
-                });
-            
+                .upsert(historyData);
+
             if (historyError) {
-                console.error('❌ Direct history insert error:', historyError);
-                // Don't fail completely if history fails, progress was saved
+                console.error('❌ Direct history upsert error:', historyError);
             }
         }
 
@@ -471,6 +388,12 @@ const saveWatchProgressFallback = async (userId, item, progress, durationInSecon
         console.error('❌ Direct database fallback failed:', error);
         return false;
     }
+};
+
+// Helper to compare ISO timestamps, returns true if newTS is newer than oldTS
+const isNewerTimestamp = (newTS, oldTS) => {
+    if (!oldTS) return true;
+    return new Date(newTS).getTime() > new Date(oldTS).getTime();
 };
 
 // New function to add watch history entry without affecting existing progress
@@ -486,31 +409,23 @@ export const addWatchHistoryEntry = async (item) => {
             return;
         }
 
-        // console.log('Adding watch history entry only (no progress override):', {
-        //     mediaId: item.id,
-        //     mediaType: item.type,
-        //     season: item.season,
-        //     episode: item.episode
-        // });
-
         // Only add to watch history, don't touch watch progress
-        const { error: historyError } = await supabase
+        const nowIso = new Date().toISOString();
+        const upsertData = {
+            user_id: userId,
+            media_id: item.id,
+            media_type: item.type,
+            season_number: item.season || null,
+            episode_number: item.episode || null,
+            watched_at: nowIso
+        };
+
+        const { error } = await supabase
             .from('watch_history')
-            .upsert({
-                user_id: userId,
-                media_id: item.id,
-                media_type: item.type,
-                season_number: item.season || null,
-                episode_number: item.episode || null,
-                watched_at: new Date().toISOString()
-            }, {
-                onConflict: 'user_id,media_id,media_type,season_number,episode_number'
-            });
-        
-        if (historyError) {
-            console.error('Error adding watch history entry:', historyError);
-        } else {
-            // console.log('Watch history entry added successfully');
+            .upsert(upsertData);
+
+        if (error) {
+            console.error('Error adding watch history entry:', error);
         }
 
     } catch (error) {
@@ -696,8 +611,8 @@ export const getLastWatchedEpisodeWithProgress = async (seriesId) => {
             .select('progress_seconds, duration_seconds')
             .eq('user_id', userId)
             .eq('media_id', seriesId)
-            .eq('season_number', lastWatched.season_number)
-            .eq('episode_number', lastWatched.episode_number)
+            .eq('season_number', lastWatched.season_number == null ? null : lastWatched.season_number)
+            .eq('episode_number', lastWatched.episode_number == null ? null : lastWatched.episode_number)
             .limit(1);
 
         if (progressError) {
@@ -780,10 +695,14 @@ export const getProgressForHistoryItems = async (historyItems) => {
                 if (item.media_type === 'tv') {
                     // Only add season/episode filters if they exist and are not null
                     if (item.season_number != null) {
-                        query = query.eq('season_number', item.season_number);
+                        query = query[
+                            item.season_number == null ? 'is' : 'eq'
+                        ]('season_number', item.season_number == null ? null : item.season_number);
                     }
                     if (item.episode_number != null) {
-                        query = query.eq('episode_number', item.episode_number);
+                        query = query[
+                            item.episode_number == null ? 'is' : 'eq'
+                        ]('episode_number', item.episode_number == null ? null : item.episode_number);
                     }
                 }
 
@@ -815,7 +734,6 @@ export const getProgressForHistoryItems = async (historyItems) => {
         return {};
     }
 };
-
 // Get watch history with progress data in a single query
 export const getWatchHistoryWithProgress = async () => {
     const maxRetries = 3;

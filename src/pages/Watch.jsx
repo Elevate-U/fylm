@@ -52,6 +52,9 @@ const Watch = (props) => {
     const lastRouteChange = useRef(0); // Debounce route changes to prevent loops
     const routeChangeDebounceTime = 1000; // 1 second debounce for route changes
     const ignoredLegacyNavigation = useRef(null); // Track ignored legacy navigation to prevent log spam
+    const lastHistoryUpdateRef = useRef({});
+    const lastProgressSaveRef = useRef({});
+    const lastProgressSaveTime = useRef(0); // For throttling
 
     const { id, type, season, episode } = props.matches;
     const { user } = useAuth(); // Get authentication state
@@ -102,7 +105,6 @@ const Watch = (props) => {
     // Create stable user ID reference to prevent unnecessary re-renders
     const userId = user?.id;
     const userIdRef = useRef(userId);
-    const lastProgressSaveTime = useRef(0); // For throttling
     
     // Update ref when userId changes but don't trigger re-renders
     useEffect(() => {
@@ -347,7 +349,7 @@ const Watch = (props) => {
         }
 
         const fetchStreamUrl = async () => {
-            if (!id || !type) return;
+            if (!id || !type || !mediaDetails) return;
             
             // For TV shows and anime, wait until season and episode are set
             if ((type === 'tv' || type === 'anime') && (currentSeason === null || currentEpisode === null)) {
@@ -462,7 +464,7 @@ const Watch = (props) => {
         };
 
         fetchStreamUrl();
-    }, [id, type, currentSeason, currentEpisode, currentSource, isDubbed]); // Add back necessary dependencies but with smart prevention
+    }, [id, type, currentSeason, currentEpisode, currentSource, isDubbed, mediaDetails]); // Add mediaDetails as a dependency
 
     // Removed handleNextEpisode and countdown logic - Videasy handles episode navigation automatically
 
@@ -471,7 +473,7 @@ const Watch = (props) => {
         if (user && mediaDetails) {
             const historyKey = `${id}-${type}-${currentSeason}-${currentEpisode}`;
             const now = Date.now();
-            const lastHistoryUpdate = window.lastHistoryUpdate || {};
+            const lastHistoryUpdate = lastHistoryUpdateRef.current;
             
             if (!lastHistoryUpdate[historyKey] || now - lastHistoryUpdate[historyKey] > 5000) {
                 console.log('📝 Adding immediate watch history entry:', {
@@ -490,7 +492,7 @@ const Watch = (props) => {
                     console.error('❌ Failed to add watch history entry:', error);
                 });
                 
-                window.lastHistoryUpdate = { ...lastHistoryUpdate, [historyKey]: now };
+                lastHistoryUpdate[historyKey] = now;
             }
         }
     }, [user, mediaDetails, type, currentSeason, currentEpisode, id]);
@@ -512,8 +514,16 @@ const Watch = (props) => {
             return;
         }
 
+        // This function will be called by the message event listener
         const handleProgressUpdate = async (progressData, messageType) => {
-            console.log(`📊 Progress update received via ${messageType}:`, progressData);
+            // Throttle progress saving to prevent excessive writes
+            const now = Date.now();
+            if (now - lastProgressSaveTime.current < 1000) { // 1-second throttle
+                return;
+            }
+            lastProgressSaveTime.current = now;
+
+            console.log(`📊 Progress update received via ${messageType}: `, progressData);
             
             // Determine the season and episode to save progress for.
             // Prioritize data from the event, then fall back to component state.
@@ -523,7 +533,7 @@ const Watch = (props) => {
             if (progressData && progressData.progress >= 0 && progressData.duration > 0) {
                 const now = Date.now();
                 const progressKey = `${id}-${type}-${seasonToSave}-${episodeToSave}`;
-                const lastProgressSave = window.lastProgressSave || {};
+                const lastProgressSave = lastProgressSaveRef.current;
                 
                 if (!lastProgressSave[progressKey] || now - lastProgressSave[progressKey] > 5000) {
                     console.log(`🎬 Attempting to save progress for ${type} ${id}:`, {
@@ -541,7 +551,7 @@ const Watch = (props) => {
                     
                     if (saveResult) {
                         console.log('✅ Progress saved successfully');
-                        window.lastProgressSave = { ...lastProgressSave, [progressKey]: now };
+                        lastProgressSave[progressKey] = now;
 
                         // Update state in real-time only if the progress applies to the currently viewed item
                         if (seasonToSave === currentSeason && episodeToSave === currentEpisode) {
@@ -618,7 +628,7 @@ const Watch = (props) => {
                 if (videoElement.currentTime > 0) {
                     const now = Date.now();
                     const progressKey = `${id}-${type}-${currentSeason}-${currentEpisode}`;
-                    const lastProgressSave = window.lastProgressSave || {};
+                    const lastProgressSave = lastProgressSaveRef.current;
                     
                     if (!lastProgressSave[progressKey] || now - lastProgressSave[progressKey] > 5000) {
                         const progressData = {
@@ -637,7 +647,7 @@ const Watch = (props) => {
                         
                         if (saveResult) {
                             console.log('✅ Direct video progress saved successfully');
-                            window.lastProgressSave = { ...lastProgressSave, [progressKey]: now };
+                            lastProgressSave[progressKey] = now;
 
                             // Update state in real-time
                             if (type === 'movie') {
@@ -813,7 +823,7 @@ const Watch = (props) => {
             streamTimeoutRef.current = setTimeout(() => {
                 setStreamTimeoutError(true);
                 console.log('Stream timeout error');
-            }, 10000); // 10 seconds
+            }, 25000); // 25 seconds
         }
         return () => {
             if (streamTimeoutRef.current) clearTimeout(streamTimeoutRef.current);

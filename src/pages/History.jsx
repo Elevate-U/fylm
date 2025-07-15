@@ -82,49 +82,58 @@ const History = () => {
                 itemsWithProgress: historyData.filter(item => item.progress_seconds > 0).length
             });
 
-            // Fetch TMDB details for each history item with retry logic
-            const detailedHistory = await Promise.allSettled(
-                historyData.map(async (item) => {
+            // --- BATCHING LOGIC START ---
+            const batchSize = 10; // Process 10 items at a time
+            let detailedHistory = [];
+
+            for (let i = 0; i < historyData.length; i += batchSize) {
+                const batch = historyData.slice(i, i + batchSize);
+                const batchPromises = batch.map(async (item) => {
                     try {
-                        const response = await fetchWithRetry(`${API_BASE_URL}/tmdb/${item.media_type}/${item.media_id}`);
+                        const numericId = item.media_id.split(':')[1];
+                        if (!numericId) {
+                            // This case should ideally not happen if data is clean
+                            console.warn(`Skipping item with invalid media_id: ${item.media_id}`);
+                            return null; // Skip this item
+                        }
+
+                        const response = await fetchWithRetry(`${API_BASE_URL}/tmdb/${item.media_type}/${numericId}`);
                         const details = await response.json();
-                        
-                        // Create result object with TMDB details and watch history info (including progress)
+
                         const result = {
                             ...details,
-                            id: details.id, // TMDB ID
-                            watch_id: `${item.user_id}-${item.media_id}-${item.media_type}-${item.season_number || 0}-${item.episode_number || 0}`, // Unique key for deletion
+                            id: details.id,
+                            watch_id: `${item.user_id}-${item.media_id}-${item.media_type}-${item.season_number || 0}-${item.episode_number || 0}`,
                             type: item.media_type,
                             media_type: item.media_type,
-                            media_id: item.media_id, // Database media_id for reference
+                            media_id: item.media_id,
                             season_number: item.season_number,
                             episode_number: item.episode_number,
                             watched_at: item.watched_at,
-                            // Include progress data directly in the item
                             progress_seconds: item.progress_seconds,
                             duration_seconds: item.duration_seconds
                         };
 
-                        // If it's a TV show episode, fetch episode-specific details
                         if (item.media_type === 'tv' && item.season_number && item.episode_number) {
                             try {
-                                const episodeResponse = await fetchWithRetry(`${API_BASE_URL}/tmdb/tv/${item.media_id}/season/${item.season_number}/episode/${item.episode_number}`);
+                                const episodeResponse = await fetchWithRetry(`${API_BASE_URL}/tmdb/tv/${numericId}/season/${item.season_number}/episode/${item.episode_number}`);
                                 const episodeDetails = await episodeResponse.json();
-                                return { 
+                                return {
                                     ...result,
                                     episode_name: episodeDetails.name,
                                     still_path: episodeDetails.still_path,
                                     episode_overview: episodeDetails.overview
                                 };
                             } catch (episodeError) {
-                                console.error('Error fetching episode details:', episodeError);
+                                console.error(`Error fetching episode details for ${numericId}:`, episodeError);
+                                // Return the main result even if episode details fail
+                                return result;
                             }
                         }
-                        
+
                         return result;
                     } catch (error) {
                         console.error(`Error fetching details for ${item.media_type} ${item.media_id}:`, error);
-                        // Return a placeholder item instead of null so we don't lose the history entry
                         return {
                             id: item.media_id,
                             watch_id: `${item.user_id}-${item.media_id}-${item.media_type}-${item.season_number || 0}-${item.episode_number || 0}`,
@@ -137,22 +146,31 @@ const History = () => {
                             title: item.media_type === 'tv' ? 'Unknown TV Show' : 'Unknown Movie',
                             name: item.media_type === 'tv' ? 'Unknown TV Show' : undefined,
                             poster_path: null,
-                            overview: 'Details could not be loaded',
+                            overview: 'Details could not be loaded.',
                             _failed_to_load: true,
-                            // Include progress data even for failed items
                             progress_seconds: item.progress_seconds,
                             duration_seconds: item.duration_seconds
                         };
                     }
-                })
-            );
-            
-            // Extract successful results and filter out rejected promises
-            const successfulResults = detailedHistory
+                });
+
+                const batchResults = await Promise.allSettled(batchPromises);
+                detailedHistory = detailedHistory.concat(batchResults);
+                
+                // Optional: Update state after each batch to show progress
+                const successfulResults = detailedHistory
+                    .filter(result => result.status === 'fulfilled' && result.value)
+                    .map(result => result.value);
+                setHistory(successfulResults);
+            }
+            // --- BATCHING LOGIC END ---
+
+            // Final state update with all results
+            const finalSuccessfulResults = detailedHistory
                 .filter(result => result.status === 'fulfilled' && result.value)
                 .map(result => result.value);
             
-            setHistory(successfulResults);
+            setHistory(finalSuccessfulResults);
         } catch (error) {
             console.error('Error fetching watch history:', error);
             setError('Failed to load watch history. Please try again.');
@@ -164,7 +182,7 @@ const History = () => {
 
     useEffect(() => {
         fetchHistory();
-    }, [fetchHistory]);
+    }, [fetchHistory, user]);
 
     const handleDelete = async (itemToDelete) => {
         // Optimistically remove the item from the UI using the unique watch_id

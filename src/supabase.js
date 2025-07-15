@@ -120,47 +120,6 @@ export const handleAuthError = (error) => {
     };
 };
 
-// --- Background session refresh utility ---
-let refreshIntervalId = null;
-const REFRESH_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
-
-export const startBackgroundSessionRefresh = () => {
-    // Clear any existing interval
-    if (refreshIntervalId) clearInterval(refreshIntervalId);
-
-    // Helper to refresh session if user is logged in
-    const refreshIfLoggedIn = async () => {
-        try {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session && session.user) {
-                await supabase.auth.refreshSession();
-                // Optionally: console.log('🔄 Session refreshed');
-            }
-        } catch (e) {
-            // Optionally: console.warn('Session refresh failed', e);
-        }
-    };
-
-    // Set up periodic refresh
-    refreshIntervalId = setInterval(refreshIfLoggedIn, REFRESH_INTERVAL_MS);
-
-    // Refresh on tab focus/visibilitychange
-    const onVisibilityOrFocus = () => {
-        if (document.visibilityState === 'visible') {
-            refreshIfLoggedIn();
-        }
-    };
-    window.addEventListener('visibilitychange', onVisibilityOrFocus);
-    window.addEventListener('focus', onVisibilityOrFocus);
-
-    // Clean up on unload
-    window.addEventListener('beforeunload', () => {
-        if (refreshIntervalId) clearInterval(refreshIntervalId);
-        window.removeEventListener('visibilitychange', onVisibilityOrFocus);
-        window.removeEventListener('focus', onVisibilityOrFocus);
-    });
-};
-
 // Expose to window for debugging
 if (typeof window !== 'undefined') {
     window.supabase = supabase;

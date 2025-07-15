@@ -78,11 +78,16 @@ const Home = (props) => {
         if (!items || items.length === 0) {
             return null;
         }
+        
+        const uniqueItems = items.filter((item, index, self) =>
+            index === self.findIndex((t) => t.id === item.id)
+        );
+
         return (
             <section class="home-section">
                 <h2>{title}</h2>
                 <div class="scrolling-row">
-                    {items.map(item => (
+                    {uniqueItems.map(item => (
                         <MovieCard 
                             key={`${title}-${item.id}`} 
                             item={item} 
