@@ -16,33 +16,29 @@ const getAvatarUrl = (profile, user) => {
 };
 
 const Profile = () => {
-  const { user, profile, refreshProfile } = useAuth();
-  const [fullName, setFullName] = useState(profile?.full_name || '');
-  const [avatarUrl, setAvatarUrl] = useState(getAvatarUrl(profile, user));
+  const { user, profile, updateUser } = useAuth();
+  // Initialize fullName from profile or user, which are now reliable
+  const [fullName, setFullName] = useState(profile?.full_name || user?.user_metadata?.full_name || '');
+  const [avatarUrl, setAvatarUrl] = useState(() => getAvatarUrl(profile, user));
   const [avatarFile, setAvatarFile] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [initializing, setInitializing] = useState(true);
+  const [saveState, setSaveState] = useState('Save Changes');
   const fileInputRef = useRef();
 
+  // This effect now primarily syncs the avatar URL when the profile changes.
+  // The full name input is controlled directly and updated via context.
   useEffect(() => {
-    if (profile) {
+    setAvatarUrl(getAvatarUrl(profile, user));
+    // Also, ensure fullName is in sync if the profile object itself is replaced
+    if (profile?.full_name !== fullName) {
       setFullName(profile.full_name || '');
-      setAvatarUrl(getAvatarUrl(profile, user));
-      setInitializing(false);
-    } else if (user) {
-      setFullName(user.user_metadata?.full_name || '');
-      setAvatarUrl(getAvatarUrl(null, user));
-      setInitializing(false);
     }
   }, [profile, user]);
 
   if (!user) {
     return <div className="profile-container"><div className="profile-form"><h2>Not logged in</h2></div></div>;
   }
-  if (initializing) {
-    return <div className="profile-container"><div className="profile-form"><h2>Loading profile...</h2></div></div>;
-  }
-
+  
   const handleNameChange = (e) => setFullName(e.target.value);
 
   const handleAvatarChange = (e) => {
@@ -65,6 +61,7 @@ const Profile = () => {
   const handleSave = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setSaveState('Saving...');
 
     try {
       let newAvatarUrl = null;
@@ -99,21 +96,23 @@ const Profile = () => {
       };
 
       // 3. Update the user's auth metadata.
-      // A trigger in Supabase should handle syncing this to the 'profiles' table.
-      const { data: { user: updatedUser }, error: userError } = await supabase.auth.updateUser(userUpdateData);
+      // This will now use the improved updateUser from AuthContext.
+      const { error: userError } = await updateUser(userUpdateData);
 
       if (userError) throw userError;
 
-      // 4. Refresh local profile state to reflect changes immediately.
-      await refreshProfile();
-
+      // 4. State is now handled by the AuthContext, no need to refresh here.
       toast.success('Profile updated successfully!');
+      setSaveState('Saved!');
       
-      // No longer redirecting, user can see the successful change and then navigate.
+      setTimeout(() => {
+        setSaveState('Save Changes');
+      }, 2000);
 
     } catch (err) {
       console.error("Profile update failed:", err);
       toast.error(err.message || 'An error occurred while updating your profile.');
+      setSaveState('Save Changes');
     } finally {
       setLoading(false);
     }
@@ -166,7 +165,7 @@ const Profile = () => {
               />
             </div>
             <button className="button" type="submit" disabled={loading} style={{ marginTop: 16 }}>
-              {loading ? 'Saving...' : 'Save Changes'}
+              {saveState}
             </button>
           </form>
         </div>

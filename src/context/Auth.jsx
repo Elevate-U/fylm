@@ -66,6 +66,16 @@ export function AuthProvider({ children }) {
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
+        // When a user is updated, the updateUser function handles the profile refresh.
+        // Re-fetching here can cause a race condition where we get stale data from the db
+        // trigger before it's updated.
+        if (_event === 'USER_UPDATED') {
+          setSession(session);
+          setUser(session?.user ?? null);
+          // Trust that the calling function has updated the profile state already
+          return;
+        }
+
         setSession(session);
         const currentUser = session?.user ?? null;
         setUser(currentUser);
@@ -85,10 +95,53 @@ export function AuthProvider({ children }) {
 
   const updateUser = async (updates) => {
     try {
-      const { data, error } = await supabase.auth.updateUser(updates);
-      if (error) throw error;
-      // The onAuthStateChange listener will handle updating user and profile state
-      return { data, error: null };
+      // 1. Update auth user metadata
+      const { data: authData, error: authError } = await supabase.auth.updateUser(updates);
+      if (authError) throw authError;
+
+      const user = authData.user;
+      if (!user) {
+        // This case should ideally not be reached if authError is handled
+        return { data: null, error: new Error("User update failed.") };
+      }
+      
+      const profileUpdate = {};
+      if (updates.data.full_name) {
+        profileUpdate.full_name = updates.data.full_name;
+      }
+      if (updates.data.avatar_url) {
+        profileUpdate.avatar_url = updates.data.avatar_url;
+      }
+
+      // 2. Update the public profile table.
+      if (Object.keys(profileUpdate).length > 0) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update(profileUpdate)
+          .eq('id', user.id);
+
+        if (profileError) {
+          // Log the profile error but don't block the user update from succeeding
+          console.error('Error updating profile table:', profileError);
+        }
+      }
+      
+      // 3. Update local state with fresh data for immediate UI consistency.
+      // This avoids race conditions with backend triggers.
+      setUser(user);
+      const { data: newProfile, error: fetchError } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single();
+      
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        console.error('Error re-fetching profile after update:', fetchError);
+      } else {
+        setProfile(newProfile);
+      }
+
+      return { data: authData, error: null };
     } catch (error) {
       console.error('Error updating user:', error);
       return { data: null, error };

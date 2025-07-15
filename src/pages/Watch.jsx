@@ -39,7 +39,7 @@ const Watch = (props) => {
     const [progressToResume, setProgressToResume] = useState(0);
     const [currentEpisodePage, setCurrentEpisodePage] = useState(1);
     const [initialPageSet, setInitialPageSet] = useState(false);
-    const episodesPerPage = 6;
+    const episodesPerPage = 10;
     const sourceUpdatedFromBackend = useRef(false); // Track if source change is from backend
     const previousEpisodeRef = useRef(null); // Track previous episode to detect navigation
     const userNavigatedRef = useRef(false); // Track if user manually navigated to prevent auto-override
@@ -785,21 +785,31 @@ const Watch = (props) => {
             
             window.addEventListener('message', messageListener);
             
-            // Fallback for players that don't send `player_ready`
-            const readyTimeout = setTimeout(() => {
-                if (!playerReady) {
-                    console.log('Player ready timeout, starting fallback progress tracking.');
-                    startFallbackTracking();
-                }
-            }, 5000);
+            // Fallback for players that don't send `player_ready` has been moved
+            // to a dedicated useEffect hook that depends on streamUrl.
 
             return () => {
                 window.removeEventListener('message', messageListener);
                 if (progressHandler) clearInterval(progressHandler);
-                clearTimeout(readyTimeout);
             };
         }
-    }, [user, mediaDetails, isDirectSource, videoRef, currentSeason, currentEpisode, playerReady]);
+    }, [user, mediaDetails, isDirectSource, videoRef, currentSeason, currentEpisode]);
+
+    // This effect specifically handles the player ready timeout logic.
+    // It only runs when a stream URL for an iframe is present.
+    useEffect(() => {
+        if (streamUrl && !isDirectSource && !playerReady) {
+            const readyTimeout = setTimeout(() => {
+                // Re-check playerReady state inside timeout to avoid race conditions
+                if (!playerReady) {
+                    console.warn('Player ready timeout, starting fallback progress tracking.');
+                    startFallbackTracking();
+                }
+            }, 10000); // Increased timeout to 10 seconds for better reliability
+
+            return () => clearTimeout(readyTimeout);
+        }
+    }, [streamUrl, isDirectSource, playerReady]);
 
     const startFallbackTracking = () => {
         // Fallback progress tracking if player doesn't post messages
