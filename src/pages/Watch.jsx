@@ -56,6 +56,7 @@ const Watch = (props) => {
     const lastHistoryUpdateRef = useRef({});
     const lastProgressSaveRef = useRef({});
     const lastProgressSaveTime = useRef(0); // For throttling
+    const isSavingProgressRef = useRef({}); // New ref to track in-flight requests
 
     const { id, type, season, episode } = props.matches;
     const { user } = useAuth(); // Get authentication state
@@ -557,64 +558,83 @@ const Watch = (props) => {
                 const progressKey = `${id}-${type}-${seasonToSave}-${episodeToSave}`;
                 const lastProgressSave = lastProgressSaveRef.current;
                 
-                if (!lastProgressSave[progressKey] || now - lastProgressSave[progressKey] > 5000) {
-                    console.log(`🎬 Attempting to save progress for ${type} ${id}:`, {
-                        progress: progressData.progress,
-                        duration: progressData.duration,
-                        season: seasonToSave,
-                        episode: episodeToSave
-                    });
-                    
-                    const saveResult = await saveWatchProgress(
-                        { ...mediaDetails, id: mediaDetails.id, type, season: seasonToSave, episode: episodeToSave },
-                        progressData.progress,
-                        progressData.duration
-                    );
-                    
-                    if (saveResult) {
-                        console.log('✅ Progress saved successfully');
-                        lastProgressSave[progressKey] = now;
+                // **MODIFIED LOGIC**
+                // Check if a save is already in progress for this item
+                if (isSavingProgressRef.current[progressKey]) {
+                    console.log(`⏭️ Progress save skipped (already in progress for ${progressKey})`);
+                    return;
+                }
 
-                        // Update state in real-time only if the progress applies to the currently viewed item
-                        if (seasonToSave === currentSeason && episodeToSave === currentEpisode) {
-                            if (type === 'movie') {
-                                setMovieProgress({
-                                    progress_seconds: progressData.progress,
-                                    duration_seconds: progressData.duration
-                                });
-                            } else if (type === 'tv' || type === 'anime') {
-                                setSeriesWatchHistory(prevHistory => {
-                                    const historyCopy = [...prevHistory];
-                                    const index = historyCopy.findIndex(
-                                        h => h.season_number === seasonToSave && h.episode_number === episodeToSave
-                                    );
-                            
-                                    const newProgressData = {
-                                        media_id: parseInt(id, 10),
-                                        media_type: type,
-                                        season_number: seasonToSave,
-                                        episode_number: episodeToSave,
+                if (!lastProgressSave[progressKey] || now - lastProgressSave[progressKey] > 5000) {
+                    // Set saving flag immediately
+                    isSavingProgressRef.current[progressKey] = true;
+
+                    try {
+                        console.log(`🎬 Attempting to save progress for ${type} ${id}:`, {
+                            progress: progressData.progress,
+                            duration: progressData.duration,
+                            season: seasonToSave,
+                            episode: episodeToSave
+                        });
+                        
+                        const saveResult = await saveWatchProgress(
+                            user?.id,
+                            { ...mediaDetails, id: mediaDetails.id, type, season: seasonToSave, episode: episodeToSave },
+                            progressData.progress,
+                            progressData.duration
+                        );
+                        
+                        if (saveResult) {
+                            console.log('✅ Progress saved successfully');
+                            // Update the last save time *after* a successful save
+                            lastProgressSaveRef.current[progressKey] = now;
+
+                            // Update state in real-time only if the progress applies to the currently viewed item
+                            if (seasonToSave === currentSeason && episodeToSave === currentEpisode) {
+                                if (type === 'movie') {
+                                    setMovieProgress({
                                         progress_seconds: progressData.progress,
-                                        duration_seconds: progressData.duration,
-                                    };
-                            
-                                    if (index > -1) {
-                                        historyCopy[index] = { ...historyCopy[index], ...newProgressData };
-                                    } else {
-                                        historyCopy.push(newProgressData);
-                                    }
-                            
-                                    return historyCopy;
-                                });
+                                        duration_seconds: progressData.duration
+                                    });
+                                } else if (type === 'tv' || type === 'anime') {
+                                    setSeriesWatchHistory(prevHistory => {
+                                        const historyCopy = [...prevHistory];
+                                        const index = historyCopy.findIndex(
+                                            h => h.season_number === seasonToSave && h.episode_number === episodeToSave
+                                        );
+                                
+                                        const newProgressData = {
+                                            media_id: parseInt(id, 10),
+                                            media_type: type,
+                                            season_number: seasonToSave,
+                                            episode_number: episodeToSave,
+                                            progress_seconds: progressData.progress,
+                                            duration_seconds: progressData.duration,
+                                        };
+                                
+                                        if (index > -1) {
+                                            historyCopy[index] = { ...historyCopy[index], ...newProgressData };
+                                        } else {
+                                            historyCopy.push(newProgressData);
+                                        }
+                                
+                                        return historyCopy;
+                                    });
+                                }
                             }
+                        } else {
+                            console.error('❌ Failed to save progress');
                         }
-                    } else {
-                        console.error('❌ Failed to save progress');
+                    } catch (error) {
+                        console.error('❌ An unexpected error occurred while saving progress:', error);
+                    } finally {
+                        // Unset saving flag regardless of success or failure
+                        isSavingProgressRef.current[progressKey] = false;
                     }
                 } else {
                     console.log('⏭️ Progress save skipped (too recent):', {
-                        timeSinceLastSave: now - lastProgressSave[progressKey],
-                        threshold: 1200
+                        timeSinceLastSave: now - (lastProgressSave[progressKey] || 0),
+                        threshold: 5000
                     });
                 }
 
@@ -662,6 +682,7 @@ const Watch = (props) => {
                         console.log(`🎬 Direct video - saving progress:`, progressData);
                         
                         const saveResult = await saveWatchProgress(
+                            user?.id,
                             { ...mediaDetails, id: mediaDetails.id, type, season: currentSeason, episode: currentEpisode },
                             progressData.progress,
                             progressData.duration
@@ -748,8 +769,7 @@ const Watch = (props) => {
 
                     // Deprecated: Legacy `MEDIA_DATA` format for backward compatibility
                     if (data.type === 'MEDIA_DATA' && data.data) {
-                        console.warn("Legacy 'MEDIA_DATA' format detected. Player should be updated.");
-                        
+                    
                         let mediaData = data.data;
                         if (typeof mediaData === 'string') {
                             try {
@@ -862,6 +882,65 @@ const Watch = (props) => {
         };
     }, [streamUrl, streamError, currentSeason, currentEpisode, currentSource]);
 
+    // Auto Picture-in-Picture on tab change
+    useEffect(() => {
+        const handleVisibilityChange = async () => {
+            if (!document.pictureInPictureEnabled) {
+                return; // PiP not supported
+            }
+
+            const videoElement = videoRef.current;
+
+            if (document.visibilityState === 'hidden') {
+                if (isDirectSource && videoElement && !videoElement.paused) {
+                    if (document.pictureInPictureElement !== videoElement) {
+                        try {
+                            await videoElement.requestPictureInPicture();
+                        } catch (error) {
+                            console.error('Failed to enter PiP mode for direct video:', error);
+                        }
+                    }
+                } else if (!isDirectSource && streamUrl) {
+                    const iframe = document.querySelector('iframe');
+                    if (iframe && iframe.contentWindow) {
+                        // This is a speculative attempt to ask the iframe to enter PiP.
+                        // The player inside the iframe must be programmed to handle this message.
+                        iframe.contentWindow.postMessage({ type: 'REQUEST_PIP' }, '*');
+                        console.log('Attempted to request Picture-in-Picture from iframe.');
+                    }
+                }
+            } else if (document.visibilityState === 'visible') {
+                // By not exiting PiP automatically, we give the user control.
+                // The user can keep the video in PiP even when returning to the tab.
+                /*
+                if (document.pictureInPictureElement) {
+                    if (isDirectSource && videoElement && document.pictureInPictureElement === videoElement) {
+                         try {
+                            await document.exitPictureInPicture();
+                        } catch (error) {
+                            console.error('Failed to exit PiP mode:', error);
+                        }
+                    }
+                    // For iframes, we don't automatically exit PiP,
+                    // as the user might want to keep it while navigating the main page.
+                    // The PiP window has its own close button.
+                }
+                */
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            // Also, if the component unmounts and we are in PiP, we should exit.
+            // Do not exit PiP on unmount to allow for navigation
+            // if (isDirectSource && videoRef.current && document.pictureInPictureElement === videoRef.current) {
+            //     document.exitPictureInPicture().catch(e => console.error("Could not exit PiP on unmount", e));
+            // }
+        };
+    }, [isDirectSource, streamUrl]);
+
     if (loading) {
         return (
             <div class="loading-state">
@@ -914,7 +993,7 @@ const Watch = (props) => {
     return (
         <div>
             <Helmet>
-                <title>{title || name} - FreeStream</title>
+                <title>{title || name} - Fovi</title>
             </Helmet>
             <div class="player-container">
                 {!streamUrl && streamError && (

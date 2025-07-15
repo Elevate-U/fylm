@@ -90,7 +90,8 @@ const History = () => {
                 const batch = historyData.slice(i, i + batchSize);
                 const batchPromises = batch.map(async (item) => {
                     try {
-                        const numericId = item.media_id.split(':')[1];
+                        // FIX: The media_id is now normalized in the database and does not need to be split.
+                        const numericId = item.media_id; 
                         if (!numericId) {
                             // This case should ideally not happen if data is clean
                             console.warn(`Skipping item with invalid media_id: ${item.media_id}`);
@@ -217,7 +218,7 @@ const History = () => {
         return (
             <div class="container">
                 <Helmet>
-                    <title>Watch History - FreeStream</title>
+                    <title>Watch History - Fovi</title>
                 </Helmet>
                 <h1>Watch History</h1>
                 <div class="error-message">
@@ -231,7 +232,7 @@ const History = () => {
     return (
         <div class="container">
             <Helmet>
-                <title>Watch History - FreeStream</title>
+                <title>Watch History - Fovi</title>
             </Helmet>
             <h1>Watch History</h1>
             {history.length > 0 ? (

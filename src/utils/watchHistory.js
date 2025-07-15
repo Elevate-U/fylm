@@ -1,48 +1,48 @@
 import { supabase } from '../supabase';
 import { API_BASE_URL } from '../config';
 
-// Cache user session to reduce auth overhead
-let cachedUserId = null;
-let lastAuthCheck = 0;
-const AUTH_CACHE_DURATION = 30000; // 30 seconds
+// Cache user session to reduce auth overhead - THIS CACHE IS PROBLEMATIC
+// let cachedUserId = null;
+// let lastAuthCheck = 0;
+// const AUTH_CACHE_DURATION = 30000; // 30 seconds
 
 const getCurrentUserId = async () => {
-    const now = Date.now();
+    // const now = Date.now();
     
     // Return cached user ID if it's still valid
-    if (cachedUserId && (now - lastAuthCheck) < AUTH_CACHE_DURATION) {
-        return cachedUserId;
-    }
+    // if (cachedUserId && (now - lastAuthCheck) < AUTH_CACHE_DURATION) {
+    //     return cachedUserId;
+    // }
     
     try {
         const { data: { session }, error } = await supabase.auth.getSession();
         
         if (error) {
             console.error('Error getting current session:', error);
-            cachedUserId = null;
-            lastAuthCheck = 0;
+            // cachedUserId = null;
+            // lastAuthCheck = 0;
             return null;
         }
         
         // Update cache
-        cachedUserId = session?.user?.id || null;
-        lastAuthCheck = now;
+        // cachedUserId = session?.user?.id || null;
+        // lastAuthCheck = now;
         
-        return cachedUserId;
+        return session?.user?.id || null;
     } catch (error) {
         console.error('Exception in getCurrentUserId:', error);
         
         // Clear cache on error
-        cachedUserId = null;
-        lastAuthCheck = 0;
+        // cachedUserId = null;
+        // lastAuthCheck = 0;
         return null;
     }
 };
 
 // Function to clear auth cache when user logs out
 export const clearAuthCache = () => {
-    cachedUserId = null;
-    lastAuthCheck = 0;
+    // cachedUserId = null;
+    // lastAuthCheck = 0;
 };
 
 // Re-implement getWatchHistory to use the more efficient RPC call
@@ -135,19 +135,25 @@ export const getContinueWatching = async () => {
 
         console.log(`📊 Found ${allHistory.length} total entries.`);
 
-        // 2. Group by series/movie to find the most recent entry for each.
-        const mediaMap = new Map();
-        for (const entry of allHistory) {
-            if (!mediaMap.has(entry.media_id) || new Date(entry.watched_at) > new Date(mediaMap.get(entry.media_id).watched_at)) {
-                mediaMap.set(entry.media_id, entry);
+        // 2. Group all history entries by their composite key (media_id + media_type).
+        const groupedByMedia = allHistory.reduce((acc, entry) => {
+            if (entry.media_id && entry.media_type) {
+                const compositeKey = `${entry.media_type}-${entry.media_id}`;
+                acc[compositeKey] = acc[compositeKey] || [];
+                acc[compositeKey].push(entry);
             }
-        }
-        
-        // The most recent entry for each media is now in the map.
-        const latestEntries = Array.from(mediaMap.values());
+            return acc;
+        }, {});
+
+        // 3. For each group, find the single most recently watched episode.
+        const latestEntries = Object.values(groupedByMedia).map(group => {
+            // Sort by watched_at date descending to find the most recent.
+            return group.sort((a, b) => new Date(b.watched_at) - new Date(a.watched_at))[0];
+        }).filter(Boolean); // Filter out any potential empty groups
+
         console.log(`🗺️ Found ${latestEntries.length} unique media items.`);
 
-        // 3. Process these latest entries to determine if they are "continuable".
+        // 4. Process these latest entries to determine if they are "continuable".
         const continueWatchingItems = await Promise.all(
             latestEntries.map(async (entry) => {
                 // An item is "continuable" if it's not finished.
@@ -184,22 +190,20 @@ export const getContinueWatching = async () => {
             })
         );
         
-        // 4. Filter out nulls (completed items with no next episode).
+        // 5. Filter out nulls (completed items with no next episode).
         const validItems = continueWatchingItems.filter(Boolean);
         
-        // 5. Sort by `watched_at` to show the most recently watched items first.
+        // 6. Sort by `watched_at` to show the most recently watched items first.
         validItems.sort((a, b) => new Date(b.watched_at) - new Date(a.watched_at));
         
         console.log(`📺 Found ${validItems.length} valid continue watching entries`);
 
-        // 6. Fetch TMDB details for the final list.
+        // 7. Fetch TMDB details for the final list.
         const detailedItems = await Promise.all(
             validItems.map(async (entry) => {
                 try {
-                    const mediaIdParts = String(entry.media_id).split(':');
-                    const numericMediaId = mediaIdParts.length > 1 ? mediaIdParts[1] : entry.media_id;
-
-                    const response = await fetch(`${API_BASE_URL}/tmdb/${entry.media_type}/${numericMediaId}`);
+                    // The media_id is now normalized in the database, so no parsing is needed.
+                    const response = await fetch(`${API_BASE_URL}/tmdb/${entry.media_type}/${entry.media_id}`);
                     if (response.ok) {
                         const details = await response.json();
                         return { 
@@ -232,10 +236,9 @@ export const getContinueWatching = async () => {
     }
 };
 
-export const saveWatchProgress = async (item, progress, durationInSeconds, forceHistoryEntry = false) => {
-    const userId = await getCurrentUserId();
+export const saveWatchProgress = async (userId, item, progress, durationInSeconds, forceHistoryEntry = false) => {
     if (!userId) {
-        console.error('❌ Cannot save watch progress: No authenticated user');
+        console.error('❌ Cannot save watch progress: No authenticated user ID provided');
         return false;
     }
 
@@ -249,13 +252,14 @@ export const saveWatchProgress = async (item, progress, durationInSeconds, force
         p_media_type: item.type,
         p_season_number: item.season || null,
         p_episode_number: item.episode || null,
-        p_progress_seconds: progress > 0 ? Math.ceil(progress) : 0,
+        // CRITICAL FIX: Round the values to integers to match the database function signature.
+        p_progress_seconds: Math.round(progress),
         p_duration_seconds: durationInSeconds ? Math.round(durationInSeconds) : null,
         p_force_history_entry: forceHistoryEntry
     };
 
+    console.log('🎬 Saving progress with RPC:', progressData);
     // Attempt 1: Modern RPC with all params
-    console.log('💾 Saving watch progress via RPC...', progressData);
     const { error: rpcError } = await supabase.rpc('save_watch_progress', progressData);
 
     if (rpcError) {

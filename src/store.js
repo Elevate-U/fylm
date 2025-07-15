@@ -245,7 +245,7 @@ export const useStore = create(
       }
     }),
     {
-        name: 'freestream-storage', // name of the item in the storage (must be unique)
+        name: 'Fovi-storage', // name of the item in the storage (must be unique)
         storage: localStorage, // Updated from deprecated getStorage
         partialize: (state) => ({ 
             favorites: state.favorites,

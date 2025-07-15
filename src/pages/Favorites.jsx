@@ -13,7 +13,7 @@ const Favorites = () => {
     const [progressData, setProgressData] = useState({});
 
     useEffect(() => {
-        document.title = 'My Favorites - FreeStream';
+        document.title = 'My Favorites - Fovi';
     }, []);
 
     // Fetch progress data when favorites change
@@ -46,7 +46,7 @@ const Favorites = () => {
     return (
         <div class="container">
             <Helmet>
-                <title>My Favorites - FreeStream</title>
+                <title>My Favorites - Fovi</title>
             </Helmet>
             <h1>My Favorites</h1>
             {favorites.length > 0 ? (

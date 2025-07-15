@@ -6,7 +6,7 @@ const Footer = () => (
     <footer class="app-footer">
         <div class="footer-content">
             <div class="footer-brand">
-                <Link href="/" class="logo">FreeStream</Link>
+                <Link href="/" class="logo">Fovi</Link>
                 <p>Your gateway to unlimited entertainment. Built with passion.</p>
             </div>
             <div class="footer-links">
@@ -36,7 +36,7 @@ const Footer = () => (
             </div>
         </div>
         <div class="footer-bottom">
-            <p>&copy; 2024 FreeStream. All Rights Reserved. Not a real streaming service.</p>
+            <p>&copy; 2024 Fovi. All Rights Reserved. Not a real streaming service.</p>
             <div class="footer-socials">
                 <a href="#" aria-label="Github"><i class="fab fa-github"></i></a>
                 <a href="#" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
