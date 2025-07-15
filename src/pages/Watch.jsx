@@ -4,7 +4,7 @@ import { route } from 'preact-router';
 import Helmet from 'preact-helmet';
 import { useStore } from '../store';
 import MovieCard from '../components/MovieCard';
-import { getWatchProgressForMedia, saveWatchProgress, getSeriesHistory, getLastWatchedEpisode, getLastWatchedEpisodeWithProgress, addWatchHistoryEntry } from '../utils/watchHistory';
+import { getWatchProgressForMedia, saveWatchProgress, getSeriesHistory, getLastWatchedEpisode, getLastWatchedEpisodeWithProgress } from '../utils/watchHistory';
 import { useAuth } from '../context/Auth';
 import { addFavoriteShow, removeFavoriteShow, isShowFavorited } from '../utils/favorites';
 import './Watch.css';
@@ -29,6 +29,7 @@ const Watch = (props) => {
     const [isRetrying, setIsRetrying] = useState(false);
     const [streamTimeoutError, setStreamTimeoutError] = useState(false);
     const streamTimeoutRef = useRef();
+    const [anilistId, setAnilistId] = useState(null);
 
     const [isDirectSource, setIsDirectSource] = useState(false);
     const [qualities, setQualities] = useState([]);
@@ -215,6 +216,20 @@ const Watch = (props) => {
                 setMediaDetails(detailsData);
                 setVideos(videosData.results || []);
                 setRecommendations(recommendationsData.results || []);
+
+                if (type === 'anime' && detailsData.id) {
+                    try {
+                        const anilistResponse = await fetch(`${API_BASE_URL}/anilist/from-tmdb/${detailsData.id}`);
+                        if (anilistResponse.ok) {
+                            const anilistData = await anilistResponse.json();
+                            if (anilistData.id) {
+                                setAnilistId(anilistData.id);
+                            }
+                        }
+                    } catch (error) {
+                        console.error('Error fetching AniList ID:', error);
+                    }
+                }
                 
                 // Season and episode initialization is now handled in a separate effect
             } catch (error) {
@@ -350,9 +365,17 @@ const Watch = (props) => {
 
         const fetchStreamUrl = async () => {
             if (!id || !type || !mediaDetails) return;
+
+            const mediaId = type === 'anime' ? anilistId : id;
+            if (!mediaId) {
+                if (type === 'anime') console.log("Waiting for AniList ID...");
+                return;
+            }
+
+            const isAnimeMovie = type === 'anime' && mediaDetails && (!mediaDetails.seasons || mediaDetails.seasons.length === 0);
             
-            // For TV shows and anime, wait until season and episode are set
-            if ((type === 'tv' || type === 'anime') && (currentSeason === null || currentEpisode === null)) {
+            // For TV shows and anime SHOWS, wait until season and episode are set
+            if ((type === 'tv' || (type === 'anime' && !isAnimeMovie)) && (currentSeason === null || currentEpisode === null)) {
                 return;
             }
 
@@ -379,12 +402,14 @@ const Watch = (props) => {
                 setProgressToResume(0);
             }
 
-            let url = `${API_BASE_URL}/stream-url?type=${type}&id=${id}&source=${currentSource}`;
-            if (type === 'tv' || type === 'anime') {
+            let url = `${API_BASE_URL}/stream-url?type=${type}&id=${mediaId}&source=${currentSource}`;
+            
+            if (type === 'tv' || (type === 'anime' && !isAnimeMovie)) {
                 url += `&season=${currentSeason}&episode=${currentEpisode}`;
-                if (type === 'anime') {
-                    url += `&dub=${isDubbed}`;
-                }
+            }
+            
+            if (type === 'anime' && isDubbed) {
+                url += `&dub=true`;
             }
             
             // Add Videasy-specific parameters for enhanced functionality
@@ -464,11 +489,14 @@ const Watch = (props) => {
         };
 
         fetchStreamUrl();
-    }, [id, type, currentSeason, currentEpisode, currentSource, isDubbed, mediaDetails]); // Add mediaDetails as a dependency
+    }, [id, type, currentSeason, currentEpisode, currentSource, isDubbed, mediaDetails, anilistId]); // Add mediaDetails as a dependency
 
     // Removed handleNextEpisode and countdown logic - Videasy handles episode navigation automatically
 
     // Add immediate watch history entry when user navigates to watch page (throttled)
+    // This useEffect hook has been removed as it was causing logic conflicts.
+    // The saveWatchProgress function in the database now handles all history updates.
+    /*
     useEffect(() => {
         if (user && mediaDetails) {
             const historyKey = `${id}-${type}-${currentSeason}-${currentEpisode}`;
@@ -496,6 +524,7 @@ const Watch = (props) => {
             }
         }
     }, [user, mediaDetails, type, currentSeason, currentEpisode, id]);
+    */
 
     // Progress tracking for different streaming services
     useEffect(() => {
@@ -516,13 +545,6 @@ const Watch = (props) => {
 
         // This function will be called by the message event listener
         const handleProgressUpdate = async (progressData, messageType) => {
-            // Throttle progress saving to prevent excessive writes
-            const now = Date.now();
-            if (now - lastProgressSaveTime.current < 1000) { // 1-second throttle
-                return;
-            }
-            lastProgressSaveTime.current = now;
-
             console.log(`📊 Progress update received via ${messageType}: `, progressData);
             
             // Determine the season and episode to save progress for.

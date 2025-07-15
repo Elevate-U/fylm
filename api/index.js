@@ -9,6 +9,33 @@ dotenv.config();
 
 const app = express();
 
+// --- Source Configuration ---
+const SOURCES_CONFIG = {
+    'videasy': {
+        baseUrl: 'https://player.videasy.net',
+        movie: (id) => `/movie/${id}`,
+        tv: (id, s, e) => `/tv/${id}/${s}/${e}`,
+        anime: (id, s, e) => `/anime/${id}/${e}`, // Videasy uses just the episode for anime shows
+        animeMovie: (id) => `/movie/${id}` // Videasy treats anime movies as regular movies
+    },
+    'vidsrc': {
+        baseUrl: 'https://vidsrc.xyz',
+        movie: (id, imdbId) => `/embed/movie?${imdbId ? `imdb=${imdbId}` : `tmdb=${id}`}`,
+        tv: (id, s, e, imdbId) => `/embed/tv?${imdbId ? `imdb=${imdbId}` : `tmdb=${id}`}&season=${s}&episode=${e}`,
+        anime: (id, s, e, imdbId) => `/embed/tv?${imdbId ? `imdb=${imdbId}` : `tmdb=${id}`}&season=${s}&episode=${e}`, // Vidsrc treats anime as TV shows
+        animeMovie: (id, imdbId) => `/embed/movie?${imdbId ? `imdb=${imdbId}` : `tmdb=${id}`}`
+    },
+    'embedsu': {
+        baseUrl: 'https://embed.su',
+        movie: (id) => `/embed/movie?tmdb=${id}`,
+        tv: (id, s, e) => `/embed/tv?tmdb=${id}&s=${s}&e=${e}`,
+        anime: (id, s, e) => `/embed/tv?tmdb=${id}&s=${s}&e=${e}`, // Embedsu also treats anime as TV shows
+        animeMovie: (id) => `/embed/movie?tmdb=${id}`
+    }
+};
+const AVAILABLE_SOURCES = Object.keys(SOURCES_CONFIG);
+
+
 // --- Environment Variable Checks ---
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
 if (!TMDB_API_KEY) {
@@ -20,8 +47,9 @@ if (!TMDB_API_KEY) {
     console.log("✅ TMDB API key loaded successfully");
 }
 
-const STREAMING_PROVIDER_URL = process.env.STREAMING_PROVIDER_URL || 'https://player.videasy.net';
-console.log(`✅ Streaming provider URL set to: ${STREAMING_PROVIDER_URL}`);
+// This is now handled by SOURCES_CONFIG, so it can be removed.
+// const STREAMING_PROVIDER_URL = process.env.STREAMING_PROVIDER_URL || 'https://player.videasy.net';
+// console.log(`✅ Streaming provider URL set to: ${STREAMING_PROVIDER_URL}`);
 
 
 // --- Middleware ---
@@ -119,68 +147,98 @@ app.get('/stream-url', async (req, res) => {
             return res.status(400).json({ error: true, message: 'Missing "type" or "id" parameter.' });
         }
 
-        let finalUrl;
-        const baseUrl = STREAMING_PROVIDER_URL.endsWith('/') ? STREAMING_PROVIDER_URL.slice(0, -1) : STREAMING_PROVIDER_URL;
+        const currentSource = source && AVAILABLE_SOURCES.includes(source) ? source : 'videasy';
+        const sourceConfig = SOURCES_CONFIG[currentSource];
+        
+        let path;
+        let imdbId = null;
+
+        // For vidsrc, try to get IMDb ID for better compatibility
+        if (currentSource === 'vidsrc' && TMDB_API_KEY) {
+            try {
+                // Construct the correct TMDB API URL
+                const externalIdsUrl = `https://api.themoviedb.org/3/${type}/${id}/external_ids?api_key=${TMDB_API_KEY}`;
+                const tmdbRes = await fetch(externalIdsUrl);
+                
+                if (tmdbRes.ok) {
+                    const externalIds = await tmdbRes.json();
+                    if (externalIds.imdb_id) {
+                        imdbId = externalIds.imdb_id;
+                        console.log(`[Stream URL] Found IMDb ID for vidsrc: ${imdbId}`);
+                    }
+                }
+            } catch (err) {
+                console.error(`[Stream URL] Failed to fetch IMDb ID for ${type}/${id}:`, err.message);
+            }
+        }
 
         switch (type) {
             case 'movie':
-                finalUrl = `${baseUrl}/movie/${id}`;
+                path = sourceConfig.movie(id, imdbId);
                 break;
             case 'tv':
                 if (!season || !episode) {
                     return res.status(400).json({ error: true, message: 'Missing "season" or "episode" for TV shows.' });
                 }
-                finalUrl = `${baseUrl}/tv/${id}/${season}/${episode}`;
+                path = sourceConfig.tv(id, season, episode, imdbId);
                 break;
             case 'anime':
-                 if (!episode) {
-                    return res.status(400).json({ error: true, message: 'Missing "episode" for anime.' });
-                }
-                finalUrl = `${baseUrl}/anime/${id}/${episode}`;
-                if (dub === 'true') {
-                    finalUrl += '?dub=true';
+                if (season && episode) { // This indicates an anime series with episodes
+                    path = sourceConfig.anime(id, season, episode, imdbId);
+                } else { // This indicates an anime movie
+                    path = sourceConfig.animeMovie(id, imdbId);
                 }
                 break;
             default:
                 return res.status(400).json({ error: true, message: `Unsupported type: "${type}"` });
         }
 
-        // Add Videasy-specific parameters for enhanced features
+        let finalUrl = sourceConfig.baseUrl + path;
+
+        // --- Handle Query Parameters ---
         const params = new URLSearchParams();
-        
-        // Add existing dub parameter for anime if it wasn't already added
-        if (type === 'anime' && dub === 'true' && !finalUrl.includes('?dub=true')) {
+
+        // Generic parameters (like 'dub' for anime) can be added here
+        if (type === 'anime' && dub === 'true') {
             params.append('dub', 'true');
         }
-        
-        // Add progress parameter for resume functionality
-        if (progress && parseInt(progress) > 0) {
-            params.append('progress', parseInt(progress));
+
+        // Videasy-specific parameters for enhanced features
+        if (currentSource === 'videasy') {
+            if (progress && parseInt(progress) > 0) {
+                params.append('progress', parseInt(progress));
+            }
+            if ((type === 'tv' || type === 'anime') && nextEpisode === 'true') {
+                params.append('nextEpisode', 'true');
+            }
+            if ((type === 'tv' || type === 'anime') && episodeSelector === 'true') {
+                params.append('episodeSelector', 'true');
+            }
+            if ((type === 'tv' || type === 'anime') && autoplayNextEpisode === 'true') {
+                params.append('autoplayNextEpisode', 'true');
+            }
         }
         
-        // Add next episode button for TV shows and anime
-        if ((type === 'tv' || type === 'anime') && nextEpisode === 'true') {
-            params.append('nextEpisode', 'true');
-        }
-        
-        // Add episode selector for TV shows and anime
-        if ((type === 'tv' || type === 'anime') && episodeSelector === 'true') {
-            params.append('episodeSelector', 'true');
-        }
-        
-        // Add autoplay next episode for TV shows and anime
-        if ((type === 'tv' || type === 'anime') && autoplayNextEpisode === 'true') {
-            params.append('autoplayNextEpisode', 'true');
+        // Example of other source-specific params
+        if (currentSource === 'vidsrc' && autoplayNextEpisode === 'true') {
+            params.append('autoplay', '1');
         }
 
-        // Append parameters to URL
+
+        // Append parameters to URL if any exist
         if (params.toString()) {
             const separator = finalUrl.includes('?') ? '&' : '?';
             finalUrl += separator + params.toString();
         }
 
-        console.log(`[Stream URL] Generated for ${type} ID ${id}: ${finalUrl}`);
-        res.status(200).json({ url: finalUrl });
+        console.log(`[Stream URL] Generated for ${type} ID ${id} (source: ${currentSource}): ${finalUrl}`);
+        
+        res.status(200).json({
+            url: finalUrl,
+            currentSource,
+            availableSources: AVAILABLE_SOURCES,
+            isDirectSource: false // All these sources use iframes
+        });
 
     } catch (error) {
         console.error('[Stream URL] Error generating stream URL:', error);

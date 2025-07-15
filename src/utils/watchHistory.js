@@ -45,6 +45,7 @@ export const clearAuthCache = () => {
     lastAuthCheck = 0;
 };
 
+// Re-implement getWatchHistory to use the more efficient RPC call
 export const getWatchHistory = async () => {
     try {
         const userId = await getCurrentUserId();
@@ -53,18 +54,17 @@ export const getWatchHistory = async () => {
             return [];
         }
 
-        const { data, error } = await supabase
-            .from('watch_history')
-            .select('*')
-            .eq('user_id', userId)
-            .order('watched_at', { ascending: false });
+        console.log('🔄 Fetching combined watch history and progress via RPC...');
+        const { data, error } = await supabase.rpc('get_watch_history_with_progress');
 
         if (error) {
-            console.error('Error fetching watch history:', error);
+            console.error('Error fetching watch history with progress:', error);
             return [];
         }
+
+        console.log(`✅ Successfully fetched ${data.length} items via RPC.`);
         return data || [];
-        
+
     } catch (error) {
         console.error('Exception in getWatchHistory:', error);
         return [];
@@ -109,6 +109,7 @@ export const getWatchProgressForMedia = async (mediaId, mediaType, season, episo
     }
 };
 
+// Refactored getContinueWatching to be simpler and more efficient
 export const getContinueWatching = async () => {
     try {
         const userId = await getCurrentUserId();
@@ -117,151 +118,84 @@ export const getContinueWatching = async () => {
             return [];
         }
 
-        console.log('🔍 Fetching continue watching from watch_history...');
+        console.log('🔍 Fetching continue watching data via RPC...');
 
-        // Get all watch history entries, grouped by media_id to find the most advanced episode for each series
-        const { data: historyData, error: historyError } = await supabase
-            .from('watch_history')
-            .select('media_id, media_type, season_number, episode_number, watched_at')
-            .eq('user_id', userId)
-            .order('watched_at', { ascending: false });
+        // 1. Fetch all history and progress data in one go.
+        const { data: allHistory, error: rpcError } = await supabase.rpc('get_watch_history_with_progress');
 
-        if (historyError) {
-            console.error('Error fetching watch history for continue watching:', historyError);
+        if (rpcError) {
+            console.error('Error fetching combined history and progress:', rpcError);
             return [];
         }
 
-        if (!historyData || historyData.length === 0) {
-            console.log('📭 No watch history found');
+        if (!allHistory || allHistory.length === 0) {
+            console.log('📭 No watch history found.');
             return [];
         }
 
-        console.log(`📊 Found ${historyData.length} watch history entries`);
+        console.log(`📊 Found ${allHistory.length} total entries.`);
 
-        // Group by media_id and find the most advanced episode for each series/movie
+        // 2. Group by series/movie to find the most recent entry for each.
         const mediaMap = new Map();
-        
-        historyData.forEach(entry => {
-            const mediaKey = entry.media_id;
-            
-            if (!mediaMap.has(mediaKey)) {
-                mediaMap.set(mediaKey, []);
+        for (const entry of allHistory) {
+            if (!mediaMap.has(entry.media_id) || new Date(entry.watched_at) > new Date(mediaMap.get(entry.media_id).watched_at)) {
+                mediaMap.set(entry.media_id, entry);
             }
-            mediaMap.get(mediaKey).push(entry);
-        });
-
-        // For each media, find the most advanced episode
-        const continueWatchingEntries = [];
-        
-        for (const [mediaId, entries] of mediaMap) {
-            // Sort entries by season and episode to find the most advanced
-            const sortedEntries = entries.sort((a, b) => {
-                // For movies, just use the most recent
-                if (a.media_type === 'movie') {
-                    return new Date(b.watched_at) - new Date(a.watched_at);
-                }
-                
-                // For TV shows, sort by season/episode progression
-                if (a.season_number !== b.season_number) {
-                    return (b.season_number || 0) - (a.season_number || 0);
-                }
-                return (b.episode_number || 0) - (a.episode_number || 0);
-            });
-
-            const mostAdvanced = sortedEntries[0];
-            console.log(`📺 Most advanced for media ${mediaId}: S${mostAdvanced.season_number}E${mostAdvanced.episode_number} (${mostAdvanced.media_type})`);
-            
-            continueWatchingEntries.push(mostAdvanced);
         }
+        
+        // The most recent entry for each media is now in the map.
+        const latestEntries = Array.from(mediaMap.values());
+        console.log(`🗺️ Found ${latestEntries.length} unique media items.`);
 
-        // Now get progress data for these entries to determine if they should be shown
-        const continueWatchingWithProgress = await Promise.all(
-            continueWatchingEntries.map(async (entry) => {
-                try {
-                    // Get progress data for this specific entry
-                    let progressQuery = supabase
-                        .from('watch_progress')
-                        .select('progress_seconds, duration_seconds, updated_at')
-                        .eq('user_id', userId)
-                        .eq('media_id', entry.media_id)
-                        .eq('media_type', entry.media_type);
+        // 3. Process these latest entries to determine if they are "continuable".
+        const continueWatchingItems = await Promise.all(
+            latestEntries.map(async (entry) => {
+                // An item is "continuable" if it's not finished.
+                const { progress_seconds, duration_seconds } = entry;
+                
+                if (progress_seconds && duration_seconds > 0) {
+                    const completion = progress_seconds / duration_seconds;
                     
-                    if (entry.media_type !== 'movie') {
-                        progressQuery = progressQuery[
-                            entry.season_number == null ? 'is' : 'eq'
-                        ]('season_number', entry.season_number == null ? null : entry.season_number)[
-                            entry.episode_number == null ? 'is' : 'eq'
-                        ]('episode_number', entry.episode_number == null ? null : entry.episode_number);
-                    }
-
-                    const { data: progressData, error: progressError } = await progressQuery;
-                    
-                    if (progressError) {
-                        console.error(`Error fetching progress for ${entry.media_id}:`, progressError);
-                        return null;
-                    }
-
-                    const progress = progressData && progressData.length > 0 ? progressData[0] : null;
-                    
-                    // Only include in continue watching if:
-                    // 1. There's meaningful progress (>30 seconds) OR
-                    // 2. It's a recent watch (within last 7 days) even without progress
-                    const hasProgress = progress && progress.progress_seconds > 30;
-                    const isRecentWatch = new Date(entry.watched_at) > new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-                    
-                    if (hasProgress || isRecentWatch) {
-                        // If there's progress, check if it's not fully completed (less than 90%)
-                        if (progress && progress.duration_seconds > 0) {
-                            const completionPercentage = progress.progress_seconds / progress.duration_seconds;
-                            if (completionPercentage >= 0.90) {
-                                // Episode is completed, check for next episode
-                                if (entry.media_type !== 'movie') {
-                                    const nextEpisode = await getNextEpisode(entry.media_id, entry.season_number, entry.episode_number, entry.media_type);
-                                    if (nextEpisode) {
-                                        console.log(`✅ Episode completed, suggesting next: S${nextEpisode.season}E${nextEpisode.episode}`);
-                                        return {
-                                            ...entry,
-                                            season_number: nextEpisode.season,
-                                            episode_number: nextEpisode.episode,
-                                            progress_seconds: 0, // Start from beginning of next episode
-                                            duration_seconds: null,
-                                            updated_at: progress.updated_at
-                                        };
-                                    }
-                                }
-                                // If no next episode or it's a movie, don't include in continue watching
-                                return null;
+                    if (completion >= 0.9) { // Consider items >= 90% complete as finished
+                        // If it's a TV show, check if there is a next episode.
+                        if (entry.media_type !== 'movie') {
+                            const nextEpisode = await getNextEpisode(entry.media_id, entry.season_number, entry.episode_number, entry.media_type);
+                            if (nextEpisode) {
+                                console.log(`✅ Episode S${entry.season_number}E${entry.episode_number} completed, suggesting next: S${nextEpisode.season}E${nextEpisode.episode}`);
+                                // Return an object for the *next* episode, with progress reset.
+                                return {
+                                    ...entry,
+                                    season_number: nextEpisode.season,
+                                    episode_number: nextEpisode.episode,
+                                    progress_seconds: 0,
+                                    duration_seconds: null,
+                                    // Use the original watched_at to maintain order, but this will be sorted by updated_at later
+                                };
                             }
                         }
-                        
-                        return {
-                            ...entry,
-                            progress_seconds: progress?.progress_seconds || 0,
-                            duration_seconds: progress?.duration_seconds || null,
-                            updated_at: progress?.updated_at || entry.watched_at
-                        };
+                        // If it's a finished movie or the last episode of a series, exclude it.
+                        return null;
                     }
-                    
-                    return null;
-                } catch (error) {
-                    console.error(`Error processing continue watching entry for ${entry.media_id}:`, error);
-                    return null;
                 }
+                
+                // If the item has progress but is not finished, it's a candidate.
+                // Include items with little or no progress, as the user might have just started.
+                return entry;
             })
         );
+        
+        // 4. Filter out nulls (completed items with no next episode).
+        const validItems = continueWatchingItems.filter(Boolean);
+        
+        // 5. Sort by `watched_at` to show the most recently watched items first.
+        validItems.sort((a, b) => new Date(b.watched_at) - new Date(a.watched_at));
+        
+        console.log(`📺 Found ${validItems.length} valid continue watching entries`);
 
-        // Filter out null entries and sort by most recently updated
-        const validEntries = continueWatchingWithProgress
-            .filter(Boolean)
-            .sort((a, b) => new Date(b.updated_at) - new Date(a.updated_at));
-
-        console.log(`📺 Found ${validEntries.length} valid continue watching entries`);
-
-        // Fetch TMDB details for these entries
+        // 6. Fetch TMDB details for the final list.
         const detailedItems = await Promise.all(
-            validEntries.map(async (entry) => {
+            validItems.map(async (entry) => {
                 try {
-                    // Handle both simple numeric IDs and the new text format 'tmdb:ID:null:null'
                     const mediaIdParts = String(entry.media_id).split(':');
                     const numericMediaId = mediaIdParts.length > 1 ? mediaIdParts[1] : entry.media_id;
 
@@ -275,7 +209,7 @@ export const getContinueWatching = async () => {
                             duration_seconds: entry.duration_seconds,
                             season_number: entry.season_number,
                             episode_number: entry.episode_number,
-                            updated_at: entry.updated_at,
+                            updated_at: entry.watched_at, // Use watched_at for sorting consistency
                             media_id: entry.media_id
                         };
                     }
@@ -458,25 +392,30 @@ export const deleteWatchItem = async (item) => {
     }
 };
 
+// Refactored to use the main RPC call and filter client-side for efficiency
 export const getSeriesHistory = async (seriesId) => {
     try {
         const userId = await getCurrentUserId();
         if (!userId) {
             return [];
         }
-
-        const { data, error } = await supabase
-            .from('watch_progress')
-            .select('media_id, media_type, season_number, episode_number, progress_seconds, duration_seconds')
-            .eq('user_id', userId)
-            .eq('media_id', seriesId);
         
+        // Use the main RPC function to get all data at once
+        const { data, error } = await supabase.rpc('get_watch_history_with_progress');
+
         if (error) {
-            console.error('Error fetching series history:', error);
+            console.error('Error fetching series history via RPC:', error);
             return [];
         }
         
-        return data || []; // Return the array of progress objects directly
+        if (!data) {
+            return [];
+        }
+
+        // Filter for the specific series on the client side
+        const seriesData = data.filter(item => item.media_id === seriesId);
+        return seriesData;
+
     } catch (error) {
         console.error('Error in getSeriesHistory:', error);
         return [];
@@ -571,7 +510,6 @@ const getNextEpisode = async (seriesId, currentSeason, currentEpisode, mediaType
     }
 };
 
-// Get last episode with actual meaningful progress (for resuming)
 // This implements the "Continue Watching" logic for a series.
 export const getLastWatchedEpisodeWithProgress = async (seriesId) => {
     try {
@@ -583,58 +521,26 @@ export const getLastWatchedEpisodeWithProgress = async (seriesId) => {
 
         console.log(`🔍 [CW] Looking for last watched episode for series ${seriesId}`);
 
-        // 1. Get the single most RECENTLY watched episode from history. This is the most reliable signal.
-        const { data: historyData, error: historyError } = await supabase
-            .from('watch_history')
-            .select('season_number, episode_number, watched_at, media_type')
-            .eq('user_id', userId)
-            .eq('media_id', seriesId)
-            .order('watched_at', { ascending: false })
-            .limit(1);
+        // 1. Get all history for this series using the refactored getSeriesHistory
+        const seriesHistory = await getSeriesHistory(seriesId);
         
-        if (historyError) {
-            console.error('❌ [CW] Error fetching watch history:', historyError);
-            return null;
-        }
-        
-        if (!historyData || historyData.length === 0) {
+        if (!seriesHistory || seriesHistory.length === 0) {
             console.log('📭 [CW] No episodes found in watch history for this series.');
             return null;
         }
 
-        const lastWatched = historyData[0];
+        // History is already sorted by watched_at DESC from the RPC call. The first item is the most recent.
+        const lastWatched = seriesHistory[0];
         console.log(`📺 [CW] Most recent interaction: S${lastWatched.season_number}E${lastWatched.episode_number} (at ${lastWatched.watched_at})`);
         
-        // 2. Now check if this episode has progress data
-        const { data: progressData, error: progressError } = await supabase
-            .from('watch_progress')
-            .select('progress_seconds, duration_seconds')
-            .eq('user_id', userId)
-            .eq('media_id', seriesId)
-            .eq('season_number', lastWatched.season_number == null ? null : lastWatched.season_number)
-            .eq('episode_number', lastWatched.episode_number == null ? null : lastWatched.episode_number)
-            .limit(1);
-
-        if (progressError) {
-            console.error('❌ [CW] Error fetching progress data:', progressError);
-            // Even if progress fails, we know this was the last touched episode.
-            return { 
-                season: lastWatched.season_number, 
-                episode: lastWatched.episode_number 
-            };
-        }
-
-        const progress = progressData && progressData.length > 0 ? progressData[0] : null;
+        // 2. Check if this episode is completed.
+        const { progress_seconds, duration_seconds } = lastWatched;
         
-        if (progress && progress.duration_seconds > 0) {
-            // Improved completion logic: use both percentage and time left
-            const completionPercentage = progress.progress_seconds / progress.duration_seconds;
-            const timeLeft = progress.duration_seconds - progress.progress_seconds;
-            const minCompletionPercent = 0.90; // 90%
-            const minTimeLeftSeconds = 60;     // 1 minute left
-            const isCompleted = (completionPercentage >= minCompletionPercent && timeLeft <= minTimeLeftSeconds);
+        if (progress_seconds && duration_seconds > 0) {
+            const completionPercentage = progress_seconds / duration_seconds;
+            const isCompleted = completionPercentage >= 0.9; // 90% considered complete
 
-            console.log(`📊 [CW] Progress: ${(completionPercentage * 100).toFixed(1)}%, Time left: ${timeLeft}s - ${isCompleted ? 'COMPLETED' : 'INCOMPLETE'}`);
+            console.log(`📊 [CW] Progress: ${(completionPercentage * 100).toFixed(1)}% - ${isCompleted ? 'COMPLETED' : 'INCOMPLETE'}`);
             
             if (isCompleted) {
                 // Episode was completed, find the next one.
@@ -678,6 +584,10 @@ export const getProgressForHistoryItems = async (historyItems) => {
         if (!userId || !historyItems || historyItems.length === 0) {
             return {};
         }
+
+        // With the new getWatchHistoryWithProgress, this function might become redundant.
+        // For now, keeping it but logging a warning if used.
+        console.warn("`getProgressForHistoryItems` is likely redundant and could be removed if all history fetching uses the new RPC function.");
 
         // Create a query to get all progress data for the history items
         const progressMap = {};
@@ -735,103 +645,33 @@ export const getProgressForHistoryItems = async (historyItems) => {
     }
 };
 // Get watch history with progress data in a single query
+// This function is now the primary way to get history data.
 export const getWatchHistoryWithProgress = async () => {
-    const maxRetries = 3;
-    let retryCount = 0;
-    
-    while (retryCount < maxRetries) {
-        try {
-            const userId = await getCurrentUserId();
-            if (!userId) {
-                console.log('No authenticated user, returning empty watch history with progress');
-                return [];
-            }
-
-            console.log('🔄 Fetching combined watch history and progress data...');
-
-            // Fetch watch history and progress data separately but efficiently
-            const [historyResult, progressResult] = await Promise.all([
-                supabase
-                    .from('watch_history')
-                    .select('*')
-                    .eq('user_id', userId)
-                    .order('watched_at', { ascending: false }),
-                supabase
-                    .from('watch_progress')
-                    .select('media_id, media_type, season_number, episode_number, progress_seconds, duration_seconds')
-                    .eq('user_id', userId)
-            ]);
-
-            if (historyResult.error) {
-                throw historyResult.error;
-            }
-
-            if (progressResult.error) {
-                console.warn('Error fetching progress data, continuing without progress:', progressResult.error);
-            }
-
-            const historyData = historyResult.data || [];
-            const progressData = progressResult.data || [];
-
-            // Create a map of progress data for quick lookup
-            const progressMap = {};
-            progressData.forEach(progress => {
-                const key = `${progress.media_id}-${progress.media_type}-${progress.season_number || 0}-${progress.episode_number || 0}`;
-                progressMap[key] = progress;
-            });
-
-            // Combine history with progress data
-            const combinedData = historyData.map(historyItem => {
-                const progressKey = `${historyItem.media_id}-${historyItem.media_type}-${historyItem.season_number || 0}-${historyItem.episode_number || 0}`;
-                const progress = progressMap[progressKey];
-                
-                return {
-                    ...historyItem,
-                    progress_seconds: progress?.progress_seconds || null,
-                    duration_seconds: progress?.duration_seconds || null
-                };
-            });
-
-            console.log('✅ Successfully fetched combined data:', {
-                totalItems: combinedData.length,
-                itemsWithProgress: combinedData.filter(item => item.progress_seconds > 0).length
-            });
-
-            return combinedData;
-            
-        } catch (error) {
-            console.error('Error in getWatchHistoryWithProgress:', error);
-            
-            // Check if it's a network or timeout error that we should retry
-            if ((error.message && (error.message.includes('NetworkError') || error.message.includes('timeout'))) && retryCount < maxRetries - 1) {
-                retryCount++;
-                console.log(`Retrying combined fetch due to network error (attempt ${retryCount + 1}/${maxRetries})`);
-                await new Promise(resolve => setTimeout(resolve, 1000 * retryCount));
-                continue;
-            }
-            
-            // If all else fails, try the fallback approach
-            try {
-                console.log('📋 All retries failed, trying fallback approach...');
-                const historyData = await getWatchHistory();
-                const progressMap = await getProgressForHistoryItems(historyData);
-                
-                return historyData.map(item => {
-                    const progressKey = `${item.media_id}-${item.media_type}-${item.season_number || 0}-${item.episode_number || 0}`;
-                    const progressData = progressMap[progressKey];
-                    return {
-                        ...item,
-                        progress_seconds: progressData?.progress_seconds || null,
-                        duration_seconds: progressData?.duration_seconds || null
-                    };
-                });
-            } catch (fallbackError) {
-                console.error('Fallback approach also failed:', fallbackError);
-                return [];
-            }
+    try {
+        const userId = await getCurrentUserId();
+        if (!userId) {
+            console.log('No authenticated user, returning empty watch history');
+            return [];
         }
+
+        console.log('🔄 Fetching combined watch history and progress via RPC...');
+        
+        const { data, error } = await supabase.rpc('get_watch_history_with_progress');
+
+        if (error) {
+            console.error('Error fetching watch history with progress:', error);
+            return [];
+        }
+
+        console.log('✅ Successfully fetched combined data via RPC:', {
+            totalItems: data.length,
+            itemsWithProgress: data.filter(item => item.progress_seconds > 0).length
+        });
+
+        return data || [];
+
+    } catch (error) {
+        console.error('Exception in getWatchHistoryWithProgress:', error);
+        return [];
     }
-    
-    console.error('Failed to fetch combined watch history and progress after all retry attempts');
-    return [];
 }; 
