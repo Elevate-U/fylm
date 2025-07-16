@@ -17,6 +17,7 @@ const Watch = (props) => {
     const [streamUrl, setStreamUrl] = useState('');
     const [loading, setLoading] = useState(true);
     const [isPlaying, setIsPlaying] = useState(false);
+    const playerContainerRef = useRef(null);
     const [currentSeason, setCurrentSeason] = useState(null);
     const [currentEpisode, setCurrentEpisode] = useState(null);
     const [currentSource, setCurrentSource] = useState('videasy');
@@ -62,6 +63,7 @@ const Watch = (props) => {
 
     const { id, type, season, episode } = props.matches;
     const { user } = useAuth(); // Get authentication state
+    const userId = user?.id;
 
     const { setCurrentMediaItem, favoritesFetched } = useStore();
 
@@ -107,7 +109,6 @@ const Watch = (props) => {
     }, [episodesPerPage]);
 
     // Create stable user ID reference to prevent unnecessary re-renders
-    const userId = user?.id;
     const userIdRef = useRef(userId);
     
     // Update ref when userId changes but don't trigger re-renders
@@ -259,7 +260,7 @@ const Watch = (props) => {
     // Separate effect to handle authentication-dependent data loading - ONLY run once to avoid overriding user selections
     useEffect(() => {
         const loadUserSpecificData = async () => {
-            if (!user || !mediaDetails || !id || !type) {
+            if (!userId || !mediaDetails || !id || !type) {
                 // Reset progress states when no user is authenticated
                 if (type === 'movie') {
                     setMovieProgress(null);
@@ -310,7 +311,7 @@ const Watch = (props) => {
         };
         
         loadUserSpecificData();
-    }, [user, mediaDetails, id, type]); // Remove season and episode from dependencies to prevent re-running when user changes selection
+    }, [userId, mediaDetails, id, type]); // Remove season and episode from dependencies to prevent re-running when user changes selection
 
     // Reset pagination when season changes, but respect initial page setting
     useEffect(() => {
@@ -541,16 +542,17 @@ const Watch = (props) => {
 
     // Progress tracking for different streaming services
     useEffect(() => {
-        if (user) {
+        const currentUserId = userIdRef.current;
+        if (currentUserId) {
             console.log('🔐 Progress tracking setup:', { 
                 hasUser: true, 
-                userId: user.id, 
+                userId: currentUserId, 
                 hasMediaDetails: !!mediaDetails 
             });
         }
         
-        if (!user || !mediaDetails) {
-            if (user && !mediaDetails) {
+        if (!currentUserId || !mediaDetails) {
+            if (currentUserId && !mediaDetails) {
                 console.log('⚠️ Progress tracking disabled - media details not yet available');
             }
             return;
@@ -577,9 +579,21 @@ const Watch = (props) => {
                     return;
                 }
 
-                if (!lastProgressSave[progressKey] || now - lastProgressSave[progressKey] > 5000) {
+                // Add detailed logging for debugging the throttling issue
+                const timeSinceLastSave = now - (lastProgressSave[progressKey] || 0);
+                console.log('Throttling Check:', {
+                    now,
+                    progressKey,
+                    lastSaveTime: lastProgressSave[progressKey],
+                    timeSinceLastSave,
+                    isThrottled: timeSinceLastSave < 2000
+                });
+
+                // Throttle requests to avoid overwhelming the backend
+                if (!lastProgressSave[progressKey] || now - lastProgressSave[progressKey] > 2000) {
                     // Set saving flag immediately
                     isSavingProgressRef.current[progressKey] = true;
+                    // console.log(`🚦 Progress save lock acquired for ${progressKx`ey}`);
 
                     try {
                         console.log(`🎬 Attempting to save progress for ${type} ${id}:`, {
@@ -590,7 +604,7 @@ const Watch = (props) => {
                         });
                         
                         const saveResult = await saveWatchProgress(
-                            user?.id,
+                            userIdRef.current,
                             { ...mediaDetails, id: mediaDetails.id, type, season: seasonToSave, episode: episodeToSave },
                             progressData.progress,
                             progressData.duration
@@ -642,12 +656,14 @@ const Watch = (props) => {
                     } finally {
                         // Unset saving flag regardless of success or failure
                         isSavingProgressRef.current[progressKey] = false;
+                        // console.log(`🚦 Progress save lock released for ${progressKey}`);
                     }
                 } else {
-                    console.log('⏭️ Progress save skipped (too recent):', {
-                        timeSinceLastSave: now - (lastProgressSave[progressKey] || 0),
-                        threshold: 5000
-                    });
+                    // This log can be noisy, so consider reducing its frequency
+                    // console.log('⏭️ Progress save skipped (too recent):', {
+                    //     timeSinceLastSave: now - (lastProgressSave[progressKey] || 0),
+                    //     threshold: 5000
+                    // });
                 }
 
                 // Removed next episode prompt logic - Videasy handles autoplay automatically
@@ -694,7 +710,7 @@ const Watch = (props) => {
                         console.log(`🎬 Direct video - saving progress:`, progressData);
                         
                         const saveResult = await saveWatchProgress(
-                            user?.id,
+                            userIdRef.current,
                             { ...mediaDetails, id: mediaDetails.id, type, season: currentSeason, episode: currentEpisode },
                             progressData.progress,
                             progressData.duration
@@ -847,7 +863,7 @@ const Watch = (props) => {
                 if (progressHandler) clearInterval(progressHandler);
             };
         }
-    }, [user, mediaDetails, isDirectSource, videoRef, currentSeason, currentEpisode]);
+    }, [mediaDetails, isDirectSource, videoRef, currentSeason, currentEpisode]);
 
     // This effect specifically handles the player ready timeout logic.
     // It only runs when a stream URL for an iframe is present.
@@ -893,65 +909,6 @@ const Watch = (props) => {
             if (streamTimeoutRef.current) clearTimeout(streamTimeoutRef.current);
         };
     }, [streamUrl, streamError, currentSeason, currentEpisode, currentSource]);
-
-    // Auto Picture-in-Picture on tab change
-    useEffect(() => {
-        const handleVisibilityChange = async () => {
-            if (!document.pictureInPictureEnabled) {
-                return; // PiP not supported
-            }
-
-            const videoElement = videoRef.current;
-
-            if (document.visibilityState === 'hidden') {
-                if (isDirectSource && videoElement && !videoElement.paused) {
-                    if (document.pictureInPictureElement !== videoElement) {
-                        try {
-                            await videoElement.requestPictureInPicture();
-                        } catch (error) {
-                            console.error('Failed to enter PiP mode for direct video:', error);
-                        }
-                    }
-                } else if (!isDirectSource && streamUrl) {
-                    const iframe = document.querySelector('iframe');
-                    if (iframe && iframe.contentWindow) {
-                        // This is a speculative attempt to ask the iframe to enter PiP.
-                        // The player inside the iframe must be programmed to handle this message.
-                        iframe.contentWindow.postMessage({ type: 'REQUEST_PIP' }, '*');
-                        console.log('Attempted to request Picture-in-Picture from iframe.');
-                    }
-                }
-            } else if (document.visibilityState === 'visible') {
-                // By not exiting PiP automatically, we give the user control.
-                // The user can keep the video in PiP even when returning to the tab.
-                /*
-                if (document.pictureInPictureElement) {
-                    if (isDirectSource && videoElement && document.pictureInPictureElement === videoElement) {
-                         try {
-                            await document.exitPictureInPicture();
-                        } catch (error) {
-                            console.error('Failed to exit PiP mode:', error);
-                        }
-                    }
-                    // For iframes, we don't automatically exit PiP,
-                    // as the user might want to keep it while navigating the main page.
-                    // The PiP window has its own close button.
-                }
-                */
-            }
-        };
-
-        document.addEventListener('visibilitychange', handleVisibilityChange);
-
-        return () => {
-            document.removeEventListener('visibilitychange', handleVisibilityChange);
-            // Also, if the component unmounts and we are in PiP, we should exit.
-            // Do not exit PiP on unmount to allow for navigation
-            // if (isDirectSource && videoRef.current && document.pictureInPictureElement === videoRef.current) {
-            //     document.exitPictureInPicture().catch(e => console.error("Could not exit PiP on unmount", e));
-            // }
-        };
-    }, [isDirectSource, streamUrl]);
 
     if (loading) {
         return (
