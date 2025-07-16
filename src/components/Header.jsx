@@ -174,7 +174,7 @@ const Header = () => {
         <header class={isMenuOpen ? 'scrolled' : ''}>
             <div class="container">
                 <div class="header-left">
-                    <Link href="/" class="logo" onClick={closeMenu}>Fovi</Link>
+                    <Link href="/" class="logo" onClick={closeMenu}>Fylm</Link>
                     <nav ref={menuRef} class={isMenuOpen ? 'active' : ''} aria-hidden={!isMenuOpen}>
                         <ul>
                             <li><Link activeClassName="active" href="/movies" onClick={closeMenu}>Movies</Link></li>

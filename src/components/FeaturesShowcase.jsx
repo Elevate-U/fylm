@@ -37,7 +37,7 @@ const FeaturesShowcase = () => {
         {
             icon: '⚡',
             title: 'Enhanced Experience',
-            description: 'Unlock the full potential of Fovi with user-specific features and settings.',
+            description: 'Unlock the full potential of Fylm with user-specific features and settings.',
             highlight: false
         }
     ];

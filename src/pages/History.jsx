@@ -218,7 +218,7 @@ const History = () => {
         return (
             <div class="container">
                 <Helmet>
-                    <title>Watch History - Fovi</title>
+                    <title>Watch History - Fylm</title>
                 </Helmet>
                 <h1>Watch History</h1>
                 <div class="error-message">
@@ -232,7 +232,7 @@ const History = () => {
     return (
         <div class="container">
             <Helmet>
-                <title>Watch History - Fovi</title>
+                <title>Watch History - Fylm</title>
             </Helmet>
             <h1>Watch History</h1>
             {history.length > 0 ? (

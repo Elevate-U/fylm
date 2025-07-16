@@ -6,8 +6,8 @@ import { createHashHistory } from 'history';
 // Simple minimal app to test if basic rendering works
 const Home = () => (
     <div style="padding: 20px; text-align: center;">
-        <h1>🎬 Fovi</h1>
-        <p>Welcome to Fovi!</p>
+        <h1>🎬 Fylm</h1>
+        <p>Welcome to Fylm!</p>
         <p>If you see this, the app is working correctly.</p>
     </div>
 );

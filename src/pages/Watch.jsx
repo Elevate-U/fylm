@@ -30,6 +30,8 @@ const Watch = (props) => {
     const [streamTimeoutError, setStreamTimeoutError] = useState(false);
     const streamTimeoutRef = useRef();
     const [anilistId, setAnilistId] = useState(null);
+    const [showTrailer, setShowTrailer] = useState(false);
+
 
     const [isDirectSource, setIsDirectSource] = useState(false);
     const [qualities, setQualities] = useState([]);
@@ -122,6 +124,16 @@ const Watch = (props) => {
         }
         lastRouteChange.current = now;
         route(url, replace);
+    };
+
+    const handleTrailerClick = () => {
+        const trailer = videos.find(video => video.type === 'Trailer' && video.site === 'YouTube');
+        if (trailer) {
+            setShowTrailer(true);
+        } else {
+            // Provide feedback if no trailer is available
+            alert("No trailer available for this movie.");
+        }
     };
 
     // Clear all navigation timeouts when component unmounts or episode changes
@@ -995,6 +1007,22 @@ const Watch = (props) => {
             <Helmet>
                 <title>{title || name} - Fovi</title>
             </Helmet>
+
+            {showTrailer && (
+                <div className="trailer-modal" onClick={() => setShowTrailer(false)}>
+                    <div className="trailer-content" onClick={(e) => e.stopPropagation()}>
+                        <span className="close-trailer" onClick={() => setShowTrailer(false)}>&times;</span>
+                        <iframe
+                            src={`https://www.youtube.com/embed/${videos.find(v => v.type === 'Trailer')?.key}?autoplay=1`}
+                            frameBorder="0"
+                            allow="autoplay; encrypted-media"
+                            allowFullScreen
+                            title="Trailer"
+                        ></iframe>
+                    </div>
+                </div>
+            )}
+
             <div class="player-container">
                 {!streamUrl && streamError && (
                     <div class="stream-error-message">
@@ -1143,6 +1171,12 @@ const Watch = (props) => {
                                 disabled={!favoritesFetched}
                             >
                                 {favoritesFetched ? (favorited ? '♥ Favorited' : '♡ Favorite') : '...'}
+                            </button>
+                            <button
+                                onClick={handleTrailerClick}
+                                class="favorite-btn trailer-btn"
+                            >
+                                <i class="fas fa-film"></i> Trailer
                             </button>
                             {!user && (
                                 <span class="login-hint">
