@@ -1,5 +1,11 @@
 import { supabase } from '../supabase';
 import { API_BASE_URL } from '../config';
+// Maintain session reference to prevent fullscreen issues
+let currentSession = supabase.auth.session ? supabase.auth.session() : null;
+
+supabase.auth.onAuthStateChange((event, session) => {
+    currentSession = session;
+});
 
 // Cache user session to reduce auth overhead - THIS CACHE IS PROBLEMATIC
 // let cachedUserId = null;
