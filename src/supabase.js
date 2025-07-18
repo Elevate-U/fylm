@@ -43,23 +43,47 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
             'X-Client-Info': 'supabase-js-web'
         },
         // Add request timeout with better error handling
-        fetch: (url, options = {}) => {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-            
-            return fetch(url, {
-                ...options,
-                signal: controller.signal
-            }).finally(() => {
-                clearTimeout(timeoutId);
-            }).catch(error => {
-                console.error('🚨 Supabase request failed:', {
-                    url,
-                    error: error.message,
-                    stack: error.stack
-                });
-                throw error;
-            });
+        fetch: async (url, options = {}) => {
+            const MAX_RETRIES = 3;
+            const INITIAL_DELAY_MS = 1000;
+            let retries = 0;
+
+            while (retries < MAX_RETRIES) {
+                try {
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15-second timeout
+
+                    const response = await fetch(url, {
+                        ...options,
+                        signal: controller.signal,
+                    });
+
+                    clearTimeout(timeoutId);
+
+                    if (!response.ok && (response.status >= 500 || response.status === 429)) {
+                        // Retry on server errors or rate limiting
+                        throw new Error(`Server error: ${response.status}`);
+                    }
+
+                    return response; // Success
+
+                } catch (error) {
+                    if (error.name === 'AbortError' || (error.message && error.message.includes('network'))) {
+                        retries++;
+                        if (retries >= MAX_RETRIES) {
+                            console.error(`🚨 Supabase request failed after ${MAX_RETRIES} attempts:`, { url, error });
+                            throw error;
+                        }
+                        const delay = INITIAL_DELAY_MS * Math.pow(2, retries - 1);
+                        console.warn(`Supabase request failed. Retrying in ${delay}ms... (Attempt ${retries}/${MAX_RETRIES})`);
+                        await new Promise(resolve => setTimeout(resolve, delay));
+                    } else {
+                        // Don't retry on other errors (e.g., client-side errors)
+                        console.error('🚨 Supabase request failed with a non-retriable error:', { url, error });
+                        throw error;
+                    }
+                }
+            }
         }
     }
 });

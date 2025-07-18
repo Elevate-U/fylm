@@ -40,14 +40,13 @@ export const useStore = create(
       continueWatching: [],
       continueWatchingFetched: false,
 
-      fetchContinueWatching: async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
+      fetchContinueWatching: async (userId) => {
+        if (!userId) {
             set({ continueWatching: [], continueWatchingFetched: true });
             return;
         }
 
-        const items = await getContinueWatching();
+        const items = await getContinueWatching(userId);
         if (!items || items.length === 0) {
             set({ continueWatching: [], continueWatchingFetched: true });
             return;
@@ -120,9 +119,8 @@ export const useStore = create(
       },
 
       // Favorites
-      fetchFavorites: async () => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) {
+      fetchFavorites: async (userId) => {
+        if (!userId) {
           set({ favorites: [], favoritesFetched: true });
           return;
         }
@@ -130,7 +128,7 @@ export const useStore = create(
         const { data, error } = await supabase
           .from('favorites')
           .select('media_id, media_type')
-          .eq('user_id', user.id);
+          .eq('user_id', userId);
 
         if (error) {
           console.error('Error fetching favorites:', error);
@@ -167,9 +165,8 @@ export const useStore = create(
         return get().favoritedMedia.has(`${mediaId}-${mediaType}`);
       },
 
-      addFavorite: async (mediaItem) => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+      addFavorite: async (userId, mediaItem) => {
+        if (!userId) return;
       
         const { id, type } = mediaItem;
         const key = `${id}-${type}`;
@@ -187,7 +184,7 @@ export const useStore = create(
         toast.success(`"${mediaItem.title || mediaItem.name}" added to favorites!`);
       
         const { error } = await supabase.from('favorites').insert({
-          user_id: user.id,
+          user_id: userId,
           media_id: id,
           media_type: type
         });
@@ -206,9 +203,8 @@ export const useStore = create(
         }
       },
       
-      removeFavorite: async (mediaId, mediaType) => {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (!user) return;
+      removeFavorite: async (userId, mediaId, mediaType) => {
+        if (!userId) return;
       
         const key = `${mediaId}-${mediaType}`;
         const mediaItem = get().favorites.find(item => item.id === mediaId && item.type === mediaType);
@@ -228,7 +224,7 @@ export const useStore = create(
         }
       
         const { error } = await supabase.from('favorites').delete().match({
-          user_id: user.id,
+          user_id: userId,
           media_id: mediaId,
           media_type: mediaType
         });

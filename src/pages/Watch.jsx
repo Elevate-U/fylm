@@ -4,7 +4,7 @@ import { route } from 'preact-router';
 import Helmet from 'preact-helmet';
 import { useStore } from '../store';
 import MovieCard from '../components/MovieCard';
-import { getWatchProgressForMedia, saveWatchProgress, getSeriesHistory, getLastWatchedEpisode, getLastWatchedEpisodeWithProgress } from '../utils/watchHistory';
+import { getWatchProgressForMedia, saveWatchProgress, getSeriesHistory, getLastWatchedEpisode, getLastWatchedEpisodeWithProgress, syncOfflineProgress } from '../utils/watchHistory';
 import { useAuth } from '../context/Auth';
 import { addFavoriteShow, removeFavoriteShow, isShowFavorited } from '../utils/favorites';
 import './Watch.css';
@@ -57,13 +57,12 @@ const Watch = (props) => {
     const routeChangeDebounceTime = 1000; // 1 second debounce for route changes
     const ignoredLegacyNavigation = useRef(null); // Track ignored legacy navigation to prevent log spam
     const lastHistoryUpdateRef = useRef({});
-    const lastProgressSaveRef = useRef({});
     const lastProgressSaveTime = useRef(0); // For throttling
-    const isSavingProgressRef = useRef({}); // New ref to track in-flight requests
 
     const { id, type, season, episode } = props.matches;
     const { user } = useAuth(); // Get authentication state
     const userId = user?.id;
+    const tmdbType = type === 'anime' ? 'tv' : type; // Use 'tv' for TMDB anime fetches
 
     const { setCurrentMediaItem, favoritesFetched } = useStore();
 
@@ -145,6 +144,35 @@ const Watch = (props) => {
         };
     }, [currentSeason, currentEpisode]);
 
+    // Handle fullscreen events to refresh auth when exiting fullscreen
+    useEffect(() => {
+        const handleFullscreenChange = () => {
+            const isFullscreen = document.fullscreenElement || 
+                               document.webkitFullscreenElement || 
+                               document.mozFullScreenElement;
+            
+            if (!isFullscreen) {
+                console.log('📱 Exited fullscreen mode, syncing progress...');
+                // Try to sync any offline progress saved during fullscreen
+                setTimeout(() => {
+                    syncOfflineProgress(userId).catch(error => {
+                        console.error('Error syncing offline progress after fullscreen:', error);
+                    });
+                }, 1000);
+            }
+        };
+        
+        document.addEventListener('fullscreenchange', handleFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
+        document.addEventListener('mozfullscreenchange', handleFullscreenChange);
+        
+        return () => {
+            document.removeEventListener('fullscreenchange', handleFullscreenChange);
+            document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
+            document.removeEventListener('mozfullscreenchange', handleFullscreenChange);
+        };
+    }, [userId]);
+
     useEffect(() => {
         // When the component mounts or mediaDetails changes, update the global state
         if (mediaDetails) {
@@ -197,7 +225,7 @@ const Watch = (props) => {
                 
                 // Fetch data with better error handling
                 const [detailsData, videosData, recommendationsData] = await Promise.all([
-                    fetch(`${API_BASE_URL}/tmdb/${type}/${id}`, { signal: controller.signal })
+                    fetch(`${API_BASE_URL}/tmdb/${tmdbType}/${id}`, { signal: controller.signal })
                         .then(res => {
                             if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
                             return res.json();
@@ -206,7 +234,7 @@ const Watch = (props) => {
                             console.error('Error fetching media details:', err);
                             throw err;
                         }),
-                    fetch(`${API_BASE_URL}/tmdb/${type}/${id}/videos`, { signal: controller.signal })
+                    fetch(`${API_BASE_URL}/tmdb/${tmdbType}/${id}/videos`, { signal: controller.signal })
                         .then(res => {
                             if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
                             return res.json();
@@ -215,7 +243,7 @@ const Watch = (props) => {
                             console.error('Error fetching videos:', err);
                             return { results: [] }; // Return empty array on error
                         }),
-                    fetch(`${API_BASE_URL}/tmdb/${type}/${id}/recommendations`, { signal: controller.signal })
+                    fetch(`${API_BASE_URL}/tmdb/${tmdbType}/${id}/recommendations`, { signal: controller.signal })
                         .then(res => {
                             if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
                             return res.json();
@@ -255,7 +283,7 @@ const Watch = (props) => {
             }
         };
         fetchAllData();
-    }, [id, type, season, episode]); // Remove user from dependencies to prevent remount
+    }, [id, type, season, episode, tmdbType, userId]); // Remove user from dependencies to prevent remount
 
     // Separate effect to handle authentication-dependent data loading - ONLY run once to avoid overriding user selections
     useEffect(() => {
@@ -278,15 +306,15 @@ const Watch = (props) => {
                     // Modified logic: Always try to get continue watching when no explicit episode in URL
                     if (!hasExplicitEpisode && !hasLoadedResumeData.current && currentSeason !== null && currentEpisode !== null) {
                         console.log('🎬 Checking for continue watching episode...');
-                        const lastWatchedWithProgress = await getLastWatchedEpisodeWithProgress(id);
-                        if (lastWatchedWithProgress && lastWatchedWithProgress.season && lastWatchedWithProgress.episode) {
-                            console.log(`🔄 Continue watching: S${lastWatchedWithProgress.season}E${lastWatchedWithProgress.episode}`);
+                        const lastWatchedWithProgress = await getLastWatchedEpisodeWithProgress(userId, id, tmdbType);
+                        if (lastWatchedWithProgress && lastWatchedWithProgress.season_number && lastWatchedWithProgress.episode_number) {
+                            console.log(`🔄 Continue watching: S${lastWatchedWithProgress.season_number}E${lastWatchedWithProgress.episode_number}`);
                             // Use a timeout to prevent immediate re-render loops
                             setTimeout(() => {
-                                setCurrentSeason(lastWatchedWithProgress.season);
-                                setCurrentEpisode(lastWatchedWithProgress.episode);
+                                setCurrentSeason(lastWatchedWithProgress.season_number);
+                                setCurrentEpisode(lastWatchedWithProgress.episode_number);
                                 // Update URL to reflect the continue watching episode
-                                const newUrl = `/watch/${type}/${id}/season/${lastWatchedWithProgress.season}/episode/${lastWatchedWithProgress.episode}`;
+                                const newUrl = `/watch/${type}/${id}/season/${lastWatchedWithProgress.season_number}/episode/${lastWatchedWithProgress.episode_number}`;
                                 route(newUrl, true);
                             }, 100);
                         } else {
@@ -297,11 +325,11 @@ const Watch = (props) => {
                 }
                 
                 if (type === 'tv' || type === 'anime') {
-                    const history = await getSeriesHistory(id);
+                    const history = await getSeriesHistory(userId, id, tmdbType);
                     setSeriesWatchHistory(history);
                 } else if (type === 'movie') {
                     // Load movie progress data
-                    const progressData = await getWatchProgressForMedia(id, type);
+                    const progressData = await getWatchProgressForMedia(userId, id, type);
                     console.log('Movie progress data loaded:', progressData);
                     setMovieProgress(progressData);
                 }
@@ -311,7 +339,7 @@ const Watch = (props) => {
         };
         
         loadUserSpecificData();
-    }, [userId, mediaDetails, id, type]); // Remove season and episode from dependencies to prevent re-running when user changes selection
+    }, [userId, mediaDetails, id, type, season, episode, tmdbType]); // Remove season and episode from dependencies to prevent re-running when user changes selection
 
     // Reset pagination when season changes, but respect initial page setting
     useEffect(() => {
@@ -327,40 +355,33 @@ const Watch = (props) => {
     useEffect(() => {
         const fetchSeasonDetails = async () => {
             if (type !== 'tv' && type !== 'anime' || !id || !currentSeason || currentSeason === null) return;
+            
             setEpisodesLoading(true);
             try {
-                // Use the existing TMDB proxy route to fetch season details with timeout
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-                
-                const res = await fetch(`${API_BASE_URL}/tmdb/${type}/${id}/season/${currentSeason}`, {
-                    signal: controller.signal
-                });
-                clearTimeout(timeoutId);
-                
-                if (res.ok) {
-                    const data = await res.json();
+                const response = await fetch(`${API_BASE_URL}/tmdb/${tmdbType}/${id}/season/${currentSeason}`);
+                if (!response.ok) {
+                    throw new Error(`Failed to fetch season details: ${response.statusText}`);
+                }
+                const data = await response.json();
                     setSeasonDetails(data);
                     
-                    // Calculate and set initial page based on current episode
-                    if (currentEpisode && data.episodes && !initialPageSet) {
-                        const page = Math.ceil(currentEpisode / episodesPerPage);
-                        const maxPage = Math.ceil(data.episodes.length / episodesPerPage);
-                        const initialPage = Math.max(1, Math.min(page, maxPage));
-                        setCurrentEpisodePage(initialPage);
+                // If this is the initial load, set the episode page based on the current episode
+                if (!initialPageSet) {
+                    const totalEpisodes = data.episodes.length;
+                    const page = calculateInitialEpisodePage(currentEpisode, totalEpisodes);
+                    setCurrentEpisodePage(page);
                         setInitialPageSet(true);
                     }
-                } else {
-                    setSeasonDetails(null);
-                }
+
             } catch (error) {
+                console.error("Error fetching season details:", error);
                 setSeasonDetails(null);
             } finally {
                 setEpisodesLoading(false);
             }
         };
         fetchSeasonDetails();
-    }, [id, type, currentSeason, currentEpisode, initialPageSet]);
+    }, [id, type, tmdbType, currentSeason, currentEpisode, initialPageSet, calculateInitialEpisodePage]);
 
     useEffect(() => {
         // Check if this is due to episode navigation
@@ -378,45 +399,28 @@ const Watch = (props) => {
         }
 
         const fetchStreamUrl = async () => {
-            if (!id || !type || !mediaDetails) return;
+            if (!id || !type) return;
 
-            const mediaId = type === 'anime' ? anilistId : id;
-            if (!mediaId) {
-                if (type === 'anime') console.log("Waiting for AniList ID...");
-                return;
-            }
+            // For anime content, we use the ID directly from URL params as it should already be an AniList ID
+            // This is different from the previous implementation where we tried to convert TMDB ID to AniList ID
+            setStreamError(null);
+            setStreamTimeoutError(false);
+            if (streamTimeoutRef.current) clearTimeout(streamTimeoutRef.current);
+            streamTimeoutRef.current = setTimeout(() => {
+                setStreamTimeoutError(true);
+            }, 10000);
 
             const isAnimeMovie = type === 'anime' && mediaDetails && (!mediaDetails.seasons || mediaDetails.seasons.length === 0);
             
-            // For TV shows and anime SHOWS, wait until season and episode are set
             if ((type === 'tv' || (type === 'anime' && !isAnimeMovie)) && (currentSeason === null || currentEpisode === null)) {
+                console.log("Season/episode not set, aborting stream URL fetch.");
+                clearTimeout(streamTimeoutRef.current);
                 return;
             }
 
-            // Removed prompt reset - Videasy handles this automatically
-            setStreamError(null);
-            setIsRetrying(false);
-
-            // Fetch progress directly to avoid race conditions and ensure URL is up-to-date
-            let existingProgress = 0;
-            if (userIdRef.current) {
-                try {
-                    const progressData = await getWatchProgressForMedia(id, type, currentSeason, currentEpisode);
-                    if (progressData && progressData.progress_seconds > 30) {
-                        existingProgress = progressData.progress_seconds;
-                        setProgressToResume(progressData.progress_seconds); // Update state for UI elements
-                    } else {
-                        setProgressToResume(0);
-                    }
-                } catch (error) {
-                    console.error('Error fetching progress for stream URL:', error);
-                    setProgressToResume(0);
-                }
-            } else {
-                setProgressToResume(0);
-            }
-
-            let url = `${API_BASE_URL}/stream-url?type=${type}&id=${mediaId}&source=${currentSource}`;
+            try {
+                // For anime, the id is already the AniList ID
+                let url = `${API_BASE_URL}/stream-url?type=${type}&id=${id}&source=${currentSource}`;
             
             if (type === 'tv' || (type === 'anime' && !isAnimeMovie)) {
                 url += `&season=${currentSeason}&episode=${currentEpisode}`;
@@ -426,84 +430,47 @@ const Watch = (props) => {
                 url += `&dub=true`;
             }
             
-            // Add Videasy-specific parameters for enhanced functionality
             if (currentSource === 'videasy') {
-                // Add progress for resume functionality  
-                if (existingProgress > 30) {
-                    url += `&progress=${Math.floor(existingProgress)}`;
-                }
-                
-                // For TV shows and anime, enable all Videasy features
+                    if (progressToResume > 0) url += `&progress=${Math.round(progressToResume)}`;
                 if (type === 'tv' || type === 'anime') {
                     url += `&nextEpisode=true&episodeSelector=true&autoplayNextEpisode=true`;
                 }
             }
 
-            try {
-                // Add timeout to stream URL fetch
-                const controller = new AbortController();
-                const timeoutId = setTimeout(() => controller.abort(), 20000); // 20 second timeout for streams
+                console.log(`Fetching stream URL: ${url}`);
+                const response = await fetch(url);
+                if (!response.ok) throw new Error(`Server responded with ${response.status}`);
+                const data = await response.json();
+
+                clearTimeout(streamTimeoutRef.current);
                 
-                const response = await fetch(url, { signal: controller.signal });
-                clearTimeout(timeoutId);
-                const streamUrlData = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(streamUrlData.message || `HTTP ${response.status}`);
-                }
-
-                let finalStreamUrl = streamUrlData.url;
-
-                if (!finalStreamUrl) {
-                    throw new Error("The streaming service did not provide a valid URL. This content might not be available.");
-                }
-                
-                if (streamUrlData.isDirectSource) {
-                    setStreamUrl(finalStreamUrl);
-                    setQualities(streamUrlData.qualities || []);
-                    setIsDirectSource(true);
-                } else {
-                    setStreamUrl(finalStreamUrl);
-                    setIsDirectSource(false);
-                    setQualities([]);
-                }
-
-                if (streamUrlData.currentSource && streamUrlData.currentSource !== currentSource) {
+                if (data.url) {
+                    console.log(`Stream URL generated: ${data.url}`);
+                    setStreamUrl(data.url);
+                    setIsDirectSource(data.isDirectSource || false);
+                    setQualities(data.qualities || []);
+                    if (data.availableSources && data.availableSources.length > 0) {
+                        setAvailableSources(data.availableSources);
+                    }
+                    if (data.currentSource) {
                     sourceUpdatedFromBackend.current = true;
-                    setCurrentSource(streamUrlData.currentSource);
+                        setCurrentSource(data.currentSource);
                 }
-
-                if (streamUrlData.availableSources) {
-                    setAvailableSources(streamUrlData.availableSources);
-                }
-
                 setStreamError(null);
-            } catch (error) {
-                let errorMessage = "Could not load the video stream.";
-                let canRetry = true;
-                
-                if (error.name === 'AbortError') {
-                    errorMessage = "Stream request timed out. Please try again.";
-                } else if (error.message.includes('unavailable')) {
-                    errorMessage = "All streaming sources are currently unavailable. This is usually temporary.";
-                } else if (error.message.includes('503')) {
-                    errorMessage = "Streaming service is temporarily down. Please try again in a few minutes.";
-                } else if (error.message.includes('404')) {
-                    errorMessage = "This content is not available from the current source.";
-                } else if (error.message.includes('NetworkError') || error.message.includes('fetch')) {
-                    errorMessage = "Network connection issue. Please check your internet and try again.";
+                    setPlayerReady(true);
                 } else {
-                    errorMessage = "Unable to load video stream. This might be due to leaving and returning to the browser.";
+                    throw new Error(data.message || 'No stream URL returned from API');
                 }
-                
-                setStreamError({ message: errorMessage, canRetry });
-                setStreamUrl('');
-                setIsDirectSource(false);
+            } catch (error) {
+                clearTimeout(streamTimeoutRef.current);
+                console.error('Error fetching stream URL:', error.message);
+                setStreamError(`Failed to load video: ${error.message}. Try changing the source or refreshing.`);
+                setPlayerReady(false);
             }
         };
 
         fetchStreamUrl();
-    }, [id, type, currentSeason, currentEpisode, currentSource, isDubbed, mediaDetails, anilistId]); // Add mediaDetails as a dependency
+    }, [id, type, currentSeason, currentEpisode, currentSource, isDubbed, mediaDetails, anilistId, progressToResume, userId]); // Add mediaDetails as a dependency
 
     // Removed handleNextEpisode and countdown logic - Videasy handles episode navigation automatically
 
@@ -569,106 +536,104 @@ const Watch = (props) => {
 
             if (progressData && progressData.progress >= 0 && progressData.duration > 0) {
                 const now = Date.now();
-                const progressKey = `${id}-${type}-${seasonToSave}-${episodeToSave}`;
-                const lastProgressSave = lastProgressSaveRef.current;
-                
-                // **MODIFIED LOGIC**
-                // Check if a save is already in progress for this item
-                if (isSavingProgressRef.current[progressKey]) {
-                    console.log(`⏭️ Progress save skipped (already in progress for ${progressKey})`);
+                if (now - lastProgressSaveTime.current < 1000) { // 1-second throttle
                     return;
                 }
-
-                // Add detailed logging for debugging the throttling issue
-                const timeSinceLastSave = now - (lastProgressSave[progressKey] || 0);
-                console.log('Throttling Check:', {
-                    now,
-                    progressKey,
-                    lastSaveTime: lastProgressSave[progressKey],
-                    timeSinceLastSave,
-                    isThrottled: timeSinceLastSave < 2000
-                });
-
-                // Throttle requests to avoid overwhelming the backend
-                if (!lastProgressSave[progressKey] || now - lastProgressSave[progressKey] > 2000) {
-                    // Set saving flag immediately
-                    isSavingProgressRef.current[progressKey] = true;
-                    // console.log(`🚦 Progress save lock acquired for ${progressKx`ey}`);
-
-                    try {
-                        console.log(`🎬 Attempting to save progress for ${type} ${id}:`, {
-                            progress: progressData.progress,
-                            duration: progressData.duration,
-                            season: seasonToSave,
-                            episode: episodeToSave
-                        });
-                        
-                        const saveResult = await saveWatchProgress(
-                            userIdRef.current,
-                            { ...mediaDetails, id: mediaDetails.id, type, season: seasonToSave, episode: episodeToSave },
-                            progressData.progress,
-                            progressData.duration
-                        );
-                        
-                        if (saveResult) {
-                            console.log('✅ Progress saved successfully');
-                            // Update the last save time *after* a successful save
-                            lastProgressSaveRef.current[progressKey] = now;
-
-                            // Update state in real-time only if the progress applies to the currently viewed item
-                            if (seasonToSave === currentSeason && episodeToSave === currentEpisode) {
-                                if (type === 'movie') {
-                                    setMovieProgress({
-                                        progress_seconds: progressData.progress,
-                                        duration_seconds: progressData.duration
-                                    });
-                                } else if (type === 'tv' || type === 'anime') {
-                                    setSeriesWatchHistory(prevHistory => {
-                                        const historyCopy = [...prevHistory];
-                                        const index = historyCopy.findIndex(
-                                            h => h.season_number === seasonToSave && h.episode_number === episodeToSave
-                                        );
-                                
-                                        const newProgressData = {
-                                            media_id: parseInt(id, 10),
-                                            media_type: type,
-                                            season_number: seasonToSave,
-                                            episode_number: episodeToSave,
-                                            progress_seconds: progressData.progress,
-                                            duration_seconds: progressData.duration,
-                                        };
-                                
-                                        if (index > -1) {
-                                            historyCopy[index] = { ...historyCopy[index], ...newProgressData };
-                                        } else {
-                                            historyCopy.push(newProgressData);
-                                        }
-                                
-                                        return historyCopy;
-                                    });
-                                }
-                            }
-                        } else {
-                            console.error('❌ Failed to save progress');
+                lastProgressSaveTime.current = now;
+                
+                try {
+                    console.log(`🎬 Attempting to save progress for ${type} ${id}:`, {
+                        progress: progressData.progress,
+                        duration: progressData.duration,
+                        season: seasonToSave,
+                        episode: episodeToSave
+                    });
+                    
+                    const saveResult = await saveWatchProgress(
+                        currentUserId,
+                        { ...mediaDetails, id: mediaDetails.id, type, season: seasonToSave, episode: episodeToSave },
+                        progressData.progress,
+                        progressData.duration
+                    ).catch(error => {
+                        console.error('❌ Progress save error caught:', error);
+                        if (error.message?.includes('timeout') || error.message?.includes('auth')) {
+                            // For auth timeouts, use localStorage fallback
+                            const key = `offline_progress_${type}_${id}_${seasonToSave || 0}_${episodeToSave || 0}`;
+                            const offlineData = {
+                                media_id: id,
+                                media_type: type,
+                                season_number: seasonToSave,
+                                episode_number: episodeToSave,
+                                progress_seconds: progressData.progress,
+                                duration_seconds: progressData.duration,
+                                timestamp: new Date().toISOString()
+                            };
+                            localStorage.setItem(key, JSON.stringify(offlineData));
+                            console.log('📱 Saved to localStorage after error');
+                            return true; // Pretend success for UI consistency
                         }
-                    } catch (error) {
-                        console.error('❌ An unexpected error occurred while saving progress:', error);
-                    } finally {
-                        // Unset saving flag regardless of success or failure
-                        isSavingProgressRef.current[progressKey] = false;
-                        // console.log(`🚦 Progress save lock released for ${progressKey}`);
-                    }
-                } else {
-                    // This log can be noisy, so consider reducing its frequency
-                    // console.log('⏭️ Progress save skipped (too recent):', {
-                    //     timeSinceLastSave: now - (lastProgressSave[progressKey] || 0),
-                    //     threshold: 5000
-                    // });
-                }
+                        return false;
+                    });
+                    
+                    if (saveResult) {
+                        console.log('✅ Progress saved successfully');
 
-                // Removed next episode prompt logic - Videasy handles autoplay automatically
-                const timeRemaining = progressData.duration - progressData.progress;
-                // Videasy will handle next episode prompts automatically
+                        // Update state in real-time only if the progress applies to the currently viewed item
+                        if (seasonToSave === currentSeason && episodeToSave === currentEpisode) {
+                            if (type === 'movie') {
+                                setMovieProgress({
+                                    progress_seconds: progressData.progress,
+                                    duration_seconds: progressData.duration
+                                });
+                            } else if (type === 'tv' || type === 'anime') {
+                                setSeriesWatchHistory(prevHistory => {
+                                    const historyCopy = [...prevHistory];
+                                    const index = historyCopy.findIndex(
+                                        h => h.season_number === seasonToSave && h.episode_number === episodeToSave
+                                    );
+                                
+                                    const newProgressData = {
+                                        media_id: parseInt(id, 10),
+                                        media_type: type,
+                                        season_number: seasonToSave,
+                                        episode_number: episodeToSave,
+                                        progress_seconds: progressData.progress,
+                                        duration_seconds: progressData.duration,
+                                    };
+                                
+                                    if (index > -1) {
+                                        historyCopy[index] = { ...historyCopy[index], ...newProgressData };
+                                    } else {
+                                        historyCopy.push(newProgressData);
+                                    }
+                                
+                                    return historyCopy;
+                                });
+                            }
+                        }
+                    } else {
+                        console.error('❌ Failed to save progress, will retry on next update');
+                    }
+                } catch (error) {
+                    console.error('❌ An unexpected error occurred while saving progress:', error);
+                    // For any unexpected error, still try to use localStorage
+                    try {
+                        const key = `offline_progress_${type}_${id}_${seasonToSave || 0}_${episodeToSave || 0}`;
+                        const offlineData = {
+                            media_id: id,
+                            media_type: type,
+                            season_number: seasonToSave,
+                            episode_number: episodeToSave,
+                            progress_seconds: progressData.progress,
+                            duration_seconds: progressData.duration,
+                            timestamp: new Date().toISOString()
+                        };
+                        localStorage.setItem(key, JSON.stringify(offlineData));
+                        console.log('📱 Saved to localStorage after exception');
+                    } catch (storageError) {
+                        console.error('💔 All save mechanisms failed:', storageError);
+                    }
+                }
             } else {
                 console.log('⚠️ Progress update ignored (insufficient data):', {
                     hasProgressData: !!progressData,
@@ -688,7 +653,7 @@ const Watch = (props) => {
             if (!videoElement) return;
 
             const handleLoadedMetadata = async () => {
-                const history = await getWatchProgressForMedia(id, type, currentSeason, currentEpisode);
+                const history = await getWatchProgressForMedia(userId, id, type, currentSeason, currentEpisode);
                 if (history && history.progress_seconds) {
                     videoElement.currentTime = history.progress_seconds;
                 }
@@ -697,68 +662,67 @@ const Watch = (props) => {
             const handleTimeUpdate = async () => {
                 if (videoElement.currentTime > 0) {
                     const now = Date.now();
-                    const progressKey = `${id}-${type}-${currentSeason}-${currentEpisode}`;
-                    const lastProgressSave = lastProgressSaveRef.current;
-                    
-                    if (!lastProgressSave[progressKey] || now - lastProgressSave[progressKey] > 5000) {
-                        const progressData = {
-                            progress: Math.round(videoElement.currentTime),
-                            duration: Math.round(videoElement.duration),
-                            percentage: videoElement.duration > 0 ? (videoElement.currentTime / videoElement.duration) * 100 : 0
-                        };
-                        
-                        console.log(`🎬 Direct video - saving progress:`, progressData);
-                        
-                        const saveResult = await saveWatchProgress(
-                            userIdRef.current,
-                            { ...mediaDetails, id: mediaDetails.id, type, season: currentSeason, episode: currentEpisode },
-                            progressData.progress,
-                            progressData.duration
-                        );
-                        
-                        if (saveResult) {
-                            console.log('✅ Direct video progress saved successfully');
-                            lastProgressSave[progressKey] = now;
-
-                            // Update state in real-time
-                            if (type === 'movie') {
-                                setMovieProgress({
-                                    progress_seconds: progressData.progress,
-                                    duration_seconds: progressData.duration
-                                });
-                            } else if (type === 'tv' || type === 'anime') {
-                                setSeriesWatchHistory(prevHistory => {
-                                    const historyCopy = [...prevHistory];
-                                    const index = historyCopy.findIndex(
-                                        h => h.season_number === currentSeason && h.episode_number === currentEpisode
-                                    );
-                            
-                                    const newProgressData = {
-                                        media_id: parseInt(id, 10),
-                                        media_type: type,
-                                        season_number: currentSeason,
-                                        episode_number: currentEpisode,
-                                        progress_seconds: progressData.progress,
-                                        duration_seconds: progressData.duration,
-                                    };
-                            
-                                    if (index > -1) {
-                                        historyCopy[index] = { ...historyCopy[index], ...newProgressData };
-                                    } else {
-                                        historyCopy.push(newProgressData);
-                                    }
-                            
-                                    return historyCopy;
-                                });
-                            }
-                        } else {
-                            console.error('❌ Failed to save direct video progress');
-                        }
-
-                        // Removed next episode prompt logic - Videasy handles autoplay automatically
-                        const timeRemaining = progressData.duration - progressData.progress;
-                        // Videasy will handle next episode prompts automatically
+                    if (now - lastProgressSaveTime.current < 1000) { // 5-second throttle
+                        return;
                     }
+                    lastProgressSaveTime.current = now;
+
+                    const progressData = {
+                        progress: Math.round(videoElement.currentTime),
+                        duration: Math.round(videoElement.duration),
+                        percentage: videoElement.duration > 0 ? (videoElement.currentTime / videoElement.duration) * 100 : 0
+                    };
+                    
+                    console.log(`🎬 Direct video - saving progress:`, progressData);
+                    
+                    const saveResult = await saveWatchProgress(
+                        userId,
+                        { ...mediaDetails, id: mediaDetails.id, type, season: currentSeason, episode: currentEpisode },
+                        progressData.progress,
+                        progressData.duration
+                    );
+                    
+                    if (saveResult) {
+                        console.log('✅ Direct video progress saved successfully');
+
+                        // Update state in real-time
+                        if (type === 'movie') {
+                            setMovieProgress({
+                                progress_seconds: progressData.progress,
+                                duration_seconds: progressData.duration
+                            });
+                        } else if (type === 'tv' || type === 'anime') {
+                            setSeriesWatchHistory(prevHistory => {
+                                const historyCopy = [...prevHistory];
+                                const index = historyCopy.findIndex(
+                                    h => h.season_number === currentSeason && h.episode_number === currentEpisode
+                                );
+                            
+                                const newProgressData = {
+                                    media_id: parseInt(id, 10),
+                                    media_type: type,
+                                    season_number: currentSeason,
+                                    episode_number: currentEpisode,
+                                    progress_seconds: progressData.progress,
+                                    duration_seconds: progressData.duration,
+                                };
+                            
+                                if (index > -1) {
+                                    historyCopy[index] = { ...historyCopy[index], ...newProgressData };
+                                } else {
+                                    historyCopy.push(newProgressData);
+                                }
+                            
+                                return historyCopy;
+                            });
+                        }
+                    } else {
+                        console.error('❌ Failed to save direct video progress');
+                    }
+
+                    // Removed next episode prompt logic - Videasy handles autoplay automatically
+                    const timeRemaining = progressData.duration - progressData.progress;
+                    // Videasy will handle next episode prompts automatically
                 }
             };
 
@@ -863,7 +827,7 @@ const Watch = (props) => {
                 if (progressHandler) clearInterval(progressHandler);
             };
         }
-    }, [mediaDetails, isDirectSource, videoRef, currentSeason, currentEpisode]);
+    }, [mediaDetails, isDirectSource, videoRef, currentSeason, currentEpisode, userId]);
 
     // This effect specifically handles the player ready timeout logic.
     // It only runs when a stream URL for an iframe is present.

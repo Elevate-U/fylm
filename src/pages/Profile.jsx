@@ -97,7 +97,10 @@ const Profile = () => {
 
       // 3. Update the user's auth metadata.
       // This will now use the improved updateUser from AuthContext.
-      const { error: userError } = await updateUser(userUpdateData);
+      const { error: userError } = await updateUser({
+        ...userUpdateData,
+        id: user.id, // Ensure the user ID is passed
+      });
 
       if (userError) throw userError;
 

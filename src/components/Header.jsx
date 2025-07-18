@@ -179,6 +179,7 @@ const Header = () => {
                         <ul>
                             <li><Link activeClassName="active" href="/movies" onClick={closeMenu}>Movies</Link></li>
                             <li><Link activeClassName="active" href="/tv" onClick={closeMenu}>TV</Link></li>
+                            <li><Link activeClassName="active" href="/anime" onClick={closeMenu}>Anime</Link></li>
                             {user ? (
                                 <>
                                     <li><Link activeClassName="active" href="/favorites" onClick={closeMenu}>Favorites</Link></li>

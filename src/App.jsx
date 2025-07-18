@@ -23,6 +23,7 @@ const AsyncSignUp = asyncComponent(() => import('./pages/SignUp'));
 const AsyncForgotPassword = asyncComponent(() => import('./pages/ForgotPassword'));
 const AsyncUpdatePassword = asyncComponent(() => import('./pages/UpdatePassword'));
 const AsyncProfile = asyncComponent(() => import('./pages/Profile'));
+const AsyncAnime = asyncComponent(() => import('./pages/Anime'));
 
 
 const MainApp = () => {
@@ -34,11 +35,12 @@ const MainApp = () => {
 
     useEffect(() => {
         if (user) {
+            const userId = user.id;
             if (!favoritesFetched) {
-                fetchFavorites();
+                fetchFavorites(userId);
             }
             if (!continueWatchingFetched) {
-                fetchContinueWatching();
+                fetchContinueWatching(userId);
             }
         }
     }, [user, favoritesFetched, fetchFavorites, continueWatchingFetched, fetchContinueWatching]);
@@ -52,6 +54,7 @@ const MainApp = () => {
                     <AsyncHome path="/" />
                     <AsyncHome path="/movies" />
                     <AsyncHome path="/tv" />
+                    <AsyncAnime path="/anime" />
                     {user ? <AsyncFavorites path="/favorites" /> : <AsyncLogin path="/favorites" />}
                     {user ? <AsyncHistory path="/history" /> : <AsyncLogin path="/history" />}
                     <AsyncWatch path="/watch/:type/:id" />

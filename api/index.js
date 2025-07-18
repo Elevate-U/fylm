@@ -154,7 +154,7 @@ app.get('/stream-url', async (req, res) => {
         let imdbId = null;
 
         // For vidsrc, try to get IMDb ID for better compatibility
-        if (currentSource === 'vidsrc' && TMDB_API_KEY) {
+        if (currentSource === 'vidsrc' && type !== 'anime' && TMDB_API_KEY) {
             try {
                 // Construct the correct TMDB API URL
                 const externalIdsUrl = `https://api.themoviedb.org/3/${type}/${id}/external_ids?api_key=${TMDB_API_KEY}`;
@@ -183,10 +183,13 @@ app.get('/stream-url', async (req, res) => {
                 path = sourceConfig.tv(id, season, episode, imdbId);
                 break;
             case 'anime':
+                // For anime, pass the AniList ID directly without any conversion
                 if (season && episode) { // This indicates an anime series with episodes
-                    path = sourceConfig.anime(id, season, episode, imdbId);
+                    path = sourceConfig.anime(id, season, episode);
+                    console.log(`[Stream URL] Using AniList ID ${id} for anime series, episode ${episode}`);
                 } else { // This indicates an anime movie
-                    path = sourceConfig.animeMovie(id, imdbId);
+                    path = sourceConfig.animeMovie(id);
+                    console.log(`[Stream URL] Using AniList ID ${id} for anime movie`);
                 }
                 break;
             default:
@@ -224,7 +227,6 @@ app.get('/stream-url', async (req, res) => {
             params.append('autoplay', '1');
         }
 
-
         // Append parameters to URL if any exist
         if (params.toString()) {
             const separator = finalUrl.includes('?') ? '&' : '?';
@@ -251,49 +253,194 @@ app.get('/stream-url', async (req, res) => {
 });
 
 
-// 3. Robust TMDB Catch-all Proxy
-app.get('/tmdb/*', async (req, res) => {
-    res.setHeader('Content-Type', 'application/json');
+// 3. AniList API proxy
+app.post('/anilist', async (req, res) => {
+    try {
+        const { query, variables } = req.body;
+        
+        if (!query) {
+            return res.status(400).json({ error: 'Query is required' });
+        }
+        
+        const response = await fetch('https://graphql.anilist.co', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+                query,
+                variables: variables || {}
+            })
+        });
+
+        if (!response.ok) {
+            const errorText = await response.text().catch(() => `Status: ${response.statusText}`);
+            console.error('AniList API error:', { status: response.status, body: errorText.substring(0, 500) });
+            return res.status(response.status).json({
+                error: 'Error from AniList API',
+                details: errorText.substring(0, 500)
+            });
+    }
+
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error('AniList proxy error:', error);
+        res.status(500).json({ error: 'Failed to proxy AniList request', details: error.message });
+    }
+});
+
+// 4. AniList to TMDB mapping endpoint
+app.get('/anilist/from-tmdb/:tmdbId', async (req, res) => {
+    try {
+        const tmdbId = req.params.tmdbId;
+        
+        // First, get TMDB details to find external IDs including MAL ID
+        const tmdbResponse = await fetch(`https://api.themoviedb.org/3/tv/${tmdbId}/external_ids?api_key=${TMDB_API_KEY}`);
+        
+        if (!tmdbResponse.ok) {
+            return res.status(tmdbResponse.status).json({ 
+                error: 'Failed to fetch TMDB external IDs',
+                details: `Status: ${tmdbResponse.statusText}`
+            });
+        }
+        
+        const externalIds = await tmdbResponse.json();
+        const malId = externalIds.mal_id;
+        
+        if (!malId) {
+            return res.status(404).json({ error: 'No MyAnimeList ID found for this TMDB ID' });
+        }
+        
+        // Query AniList for the anime with this MAL ID
+        const query = `
+            query ($malId: Int) {
+                Media (idMal: $malId, type: ANIME) {
+                    id
+                    title {
+                        romaji
+                        english
+                        native
+                    }
+                    format
+                    episodes
+            }
+            }
+        `;
+
+        const anilistResponse = await fetch('https://graphql.anilist.co', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+            },
+            body: JSON.stringify({
+                query,
+                variables: { malId }
+            })
+        });
+        
+        if (!anilistResponse.ok) {
+            return res.status(anilistResponse.status).json({ 
+                error: 'Failed to fetch from AniList',
+                details: `Status: ${anilistResponse.statusText}`
+            });
+        }
+        
+        const anilistData = await anilistResponse.json();
+        
+        if (!anilistData.data || !anilistData.data.Media) {
+            return res.status(404).json({ error: 'No anime found with this MAL ID on AniList' });
+        }
+        
+        res.json(anilistData.data.Media);
+    } catch (error) {
+        console.error('AniList mapping error:', error);
+        res.status(500).json({ error: 'Failed to map TMDB ID to AniList', details: error.message });
+    }
+});
+
+
+// 3. Bulk TMDB Details Endpoint
+app.post('/tmdb/bulk', async (req, res) => {
+    const { requests } = req.body;
+
+    if (!Array.isArray(requests) || requests.length === 0) {
+        return res.status(400).json({ error: 'Invalid request body. Expected an array of requests.' });
+    }
 
     if (!TMDB_API_KEY) {
-        return res.status(503).json({ error: true, message: "Server is not configured: Missing TMDB API key." });
+        return res.status(503).json({ error: 'TMDB API key is not configured on the server.' });
     }
 
     try {
-        const tmdbPath = req.params[0];
-        const params = new URLSearchParams(req.query);
-        params.set('api_key', TMDB_API_KEY);
-        if (!params.has('language')) {
-            params.set('language', 'en-US');
-        }
-        
-        const tmdbUrl = `https://api.themoviedb.org/3/${tmdbPath}?${params.toString()}`;
-        console.log(`[TMDB Proxy] Requesting: ${tmdbUrl}`);
+        const promises = requests.map(async (request) => {
+            const { type, id } = request;
+            if (!type || !id) {
+                return { success: false, type, id, error: 'Missing type or id' };
+            }
 
-        const tmdbResponse = await fetch(tmdbUrl);
-
-        res.status(tmdbResponse.status);
-        tmdbResponse.headers.forEach((value, name) => {
-            if (!['content-encoding', 'transfer-encoding'].includes(name.toLowerCase())) {
-                res.setHeader(name, value);
+            try {
+                const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_API_KEY}&append_to_response=videos,credits`;
+                const response = await fetch(url);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    return { success: false, type, id, error: `TMDB API error: ${response.status} - ${errorText}` };
+                }
+                const data = await response.json();
+                return { success: true, type, id, data };
+            } catch (fetchError) {
+                return { success: false, type, id, error: fetchError.message };
             }
         });
 
-        const responseBody = await tmdbResponse.text();
-        
-        if (!tmdbResponse.ok) {
-            console.error(`[TMDB Proxy] Upstream error from TMDB. Status: ${tmdbResponse.status}`, { url: tmdbUrl, body: responseBody.substring(0, 500) });
-        }
-        
-        res.send(responseBody);
+        const results = await Promise.all(promises);
+        res.status(200).json(results);
 
     } catch (error) {
-        console.error('[TMDB Proxy] Fatal proxy error:', { message: error.message });
-        res.status(500).json({
-            error: true,
-            message: 'An internal error occurred in the TMDB proxy.',
-            details: error.message,
-        });
+        console.error('Bulk TMDB fetch error:', error);
+        res.status(500).json({ error: 'Failed to process bulk request.' });
+    }
+});
+
+
+// 4. TMDB API Proxy (for single items, search, etc.)
+app.get('/tmdb/*', async (req, res) => {
+    if (!TMDB_API_KEY) {
+        console.warn('TMDB API key not configured, blocking request.');
+        return res.status(500).json({ error: "TMDB API key not configured" });
+    }
+
+    try {
+        // Extract the path after '/tmdb/' to proxy to TMDB API
+        let tmdbPath = req.url.split('/tmdb/')[1];
+        
+        // Handle anime type by converting it to TV for TMDB API
+        if (tmdbPath.startsWith('anime/')) {
+            tmdbPath = 'tv/' + tmdbPath.substring(6); // Replace 'anime/' with 'tv/'
+            console.log(`Converted anime request to TV: ${tmdbPath}`);
+        }
+        
+        // Construct the TMDB API URL
+        const tmdbApiUrl = `https://api.themoviedb.org/3/${tmdbPath}`;
+        
+        // Add API key to URL
+        const separator = tmdbApiUrl.includes('?') ? '&' : '?';
+        const fullUrl = `${tmdbApiUrl}${separator}api_key=${TMDB_API_KEY}`;
+        
+        const response = await fetch(fullUrl);
+        
+        if (!response.ok) {
+            console.error(`TMDB API error: ${response.status} for path ${tmdbPath}`);
+            return res.status(response.status).json({ error: `TMDB API error: ${response.statusText}` });
+        }
+        
+        const data = await response.json();
+        res.json(data);
+    } catch (error) {
+        console.error('TMDB proxy error:', error);
+        res.status(500).json({ error: 'Failed to fetch from TMDB API', details: error.message });
     }
 });
 

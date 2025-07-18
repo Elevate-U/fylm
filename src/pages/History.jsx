@@ -63,14 +63,8 @@ const History = () => {
         setError(null);
         
         try {
-            // Test Supabase connection first
-            const connectionOk = await testSupabaseConnection();
-            if (!connectionOk) {
-                throw new Error('Supabase connection test failed. Please check your internet connection and try again.');
-            }
-            
             // Use the new combined function to fetch history with progress data
-            const historyData = await getWatchHistoryWithProgress();
+            const historyData = await getWatchHistoryWithProgress(user.id);
             if (!historyData || historyData.length === 0) {
                 setHistory([]);
                 setLoading(false);
@@ -194,10 +188,10 @@ const History = () => {
 
         try {
             // Call the delete function from the utils
-            await deleteWatchItem(itemToDelete);
+            await deleteWatchItem(user.id, itemToDelete);
 
             // Refetch continue watching to ensure it's up to date
-            await fetchContinueWatching();
+            await fetchContinueWatching(user.id);
         } catch (error) {
             console.error("Failed to delete item or refetch continue watching:", error);
             // Optionally, add the item back to the history list on failure
