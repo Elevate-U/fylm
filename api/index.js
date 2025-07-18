@@ -749,7 +749,7 @@ const handleAnimeRequest = async (req, res, subpath = '') => {
                 query ($id: Int) {
                     Media(id: $id, type: ANIME) {
                         id
-                        trailer {
+                        videos {
                             id
                             site
                             thumbnail
@@ -838,16 +838,18 @@ const handleAnimeRequest = async (req, res, subpath = '') => {
             };
         } else if (subpath === 'videos') {
             // Format videos to match TMDB format
-            const trailer = media.trailer;
+            const videos = media.videos || [];
             formattedResponse = {
-                results: trailer ? [{
-                    id: trailer.id,
-                    key: trailer.id,
-                    site: trailer.site,
-                    type: 'Trailer',
-                    name: 'Official Trailer',
-                    thumbnail: trailer.thumbnail
-                }] : []
+                results: videos
+                    .filter(video => video.site === 'YouTube')
+                    .map(video => ({
+                        id: video.id,
+                        key: video.id,
+                        site: video.site,
+                        type: 'Trailer',
+                        name: 'Official Trailer',
+                        thumbnail: video.thumbnail,
+                    })),
             };
         } else if (subpath.startsWith('season/')) {
             // Format season data to match TMDB format
