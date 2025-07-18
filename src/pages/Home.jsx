@@ -31,8 +31,8 @@ const Home = (props) => {
         continueWatching,
         continueWatchingFetched,
         fetchContinueWatching,
-    fetchFavorites,
-    favoritesFetched,
+        fetchFavorites,
+        favoritesFetched,
     isFavorited
     } = useStore();
     

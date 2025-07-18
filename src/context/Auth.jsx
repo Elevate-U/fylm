@@ -9,6 +9,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [authReady, setAuthReady] = useState(false);
 
   const fetchProfile = useCallback(async (user) => {
     if (!user) {
@@ -53,11 +54,17 @@ export function AuthProvider({ children }) {
           if (currentUser) {
             await fetchProfile(currentUser);
           }
-          setLoading(false);
+          if (isMounted) {
+            setLoading(false);
+            setAuthReady(true);
+          }
         }
       } catch (error) {
         console.error('Auth check failed:', error);
-        if (isMounted) setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+          setAuthReady(true);
+        }
       }
     };
 
@@ -168,11 +175,13 @@ export function AuthProvider({ children }) {
     refreshProfile,
     updateUser, // Expose the updateUser function
     signOut,
+    authReady,
+    loading,
   };
 
   return (
     <AuthContext.Provider value={value}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 }

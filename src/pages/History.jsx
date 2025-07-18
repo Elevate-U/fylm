@@ -5,7 +5,6 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 // Import getWatchHistory instead of getContinueWatching for actual watch history
 import { getWatchHistoryWithProgress, deleteWatchItem } from '../utils/watchHistory';
 import { useAuth } from '../context/Auth';
-import { testSupabaseConnection } from '../supabase';
 import { API_BASE_URL } from '../config';
 import MovieCard from '../components/MovieCard';
 import { useStore } from '../store';

@@ -113,44 +113,21 @@ export const getContinueWatching = async (userId) => {
         console.log(`🗺️ Found ${latestEntries.length} unique media items.`);
 
         // 4. Process these latest entries to determine if they are "continuable".
-        const continueWatchingItems = await Promise.all(
-            latestEntries.map(async (entry) => {
-                // An item is "continuable" if it's not finished.
-                const { progress_seconds, duration_seconds } = entry;
-                
-                if (progress_seconds && duration_seconds > 0) {
-                    const completion = progress_seconds / duration_seconds;
-                    
-                    if (completion >= 0.9) { // Consider items >= 90% complete as finished
-                        // If it's a TV show, check if there is a next episode.
-                        if (entry.media_type !== 'movie') {
-                            const nextEpisode = await getNextEpisode(entry.media_id, entry.season_number, entry.episode_number, entry.media_type);
-                            if (nextEpisode) {
-                                console.log(`✅ Episode S${entry.season_number}E${entry.episode_number} completed, suggesting next: S${nextEpisode.season}E${nextEpisode.episode}`);
-                                // Return an object for the *next* episode, with progress reset.
-                                return {
-                                    ...entry,
-                                    season_number: nextEpisode.season,
-                                    episode_number: nextEpisode.episode,
-                                    progress_seconds: 0,
-                                    duration_seconds: null,
-                                    // Use the original watched_at to maintain order, but this will be sorted by updated_at later
-                                };
-                            }
-                        }
-                        // If it's a finished movie or the last episode of a series, exclude it.
-                        return null;
-                    }
+        const continueWatchingItems = latestEntries.map(entry => {
+            const { progress_seconds, duration_seconds } = entry;
+            if (progress_seconds && duration_seconds > 0) {
+                const completion = progress_seconds / duration_seconds;
+                if (completion >= 0.9) {
+                    // Item is likely finished, exclude it from "Continue Watching" for now.
+                    // The logic to find the next episode can be handled elsewhere or deferred.
+                    return null;
                 }
-                
-                // If the item has progress but is not finished, it's a candidate.
-                // Include items with little or no progress, as the user might have just started.
-                return entry;
-            })
-        );
-        
-        // 5. Filter out nulls (completed items with no next episode).
-        const validItems = continueWatchingItems.filter(Boolean);
+            }
+            return entry;
+        }).filter(Boolean);
+
+        // 5. Filter out nulls (completed items).
+        const validItems = continueWatchingItems;
         
         // 6. Sort by `watched_at` to show the most recently watched items first.
         validItems.sort((a, b) => new Date(b.watched_at) - new Date(a.watched_at));

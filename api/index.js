@@ -638,7 +638,7 @@ app.post('/tmdb/bulk', async (req, res) => {
 
             try {
                 const url = `https://api.themoviedb.org/3/${type}/${id}?api_key=${TMDB_API_KEY}&append_to_response=videos,credits`;
-                const response = await fetch(url);
+                const response = await fetchWithRetry(url);
                 if (!response.ok) {
                     const errorText = await response.text();
                     return { success: false, type, id, error: `TMDB API error: ${response.status} - ${errorText}` };

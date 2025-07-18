@@ -67,7 +67,7 @@ const Watch = (props) => {
     const userId = user?.id;
     const tmdbType = 'tv'; // Always use 'tv' for TMDB anime lookups
 
-    const { setCurrentMediaItem, favoritesFetched } = useStore();
+    const { setCurrentMediaItem, favoritesFetched, fetchContinueWatching } = useStore();
 
     // Initialize season and episode from URL parameters immediately
     useEffect(() => {
@@ -554,7 +554,7 @@ const Watch = (props) => {
 
             if (progressData && progressData.progress >= 0 && progressData.duration > 0) {
                 const now = Date.now();
-                if (now - lastProgressSaveTime.current < 1000) { // 1-second throttle
+                if (now - lastProgressSaveTime.current < 3000) { // 1-second throttle
                     return;
                 }
                 lastProgressSaveTime.current = now;
@@ -595,6 +595,7 @@ const Watch = (props) => {
                     
                     if (saveResult) {
                         console.log('✅ Progress saved successfully');
+                        fetchContinueWatching(); // Refresh continue watching list
 
                         // Update state in real-time only if the progress applies to the currently viewed item
                         if (seasonToSave === currentSeason && episodeToSave === currentEpisode) {

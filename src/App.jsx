@@ -12,6 +12,7 @@ import Header from './components/Header';
 import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
 import asyncComponent from './components/asyncComponent';
+import LoadingSpinner from './components/LoadingSpinner';
 
 const AsyncHome = asyncComponent(() => import('./pages/Home'));
 const AsyncFavorites = asyncComponent(() => import('./pages/Favorites'));
@@ -28,7 +29,7 @@ const AsyncMoviePage = asyncComponent(() => import('./movie.jsx'));
 
 
 const MainApp = () => {
-    const { user } = useAuth();
+    const { user, authReady, loading } = useAuth();
     const fetchFavorites = useStore((state) => state.fetchFavorites);
     const favoritesFetched = useStore((state) => state.favoritesFetched);
     const fetchContinueWatching = useStore((state) => state.fetchContinueWatching);
@@ -45,6 +46,10 @@ const MainApp = () => {
             }
         }
     }, [user, favoritesFetched, fetchFavorites, continueWatchingFetched, fetchContinueWatching]);
+
+    if (loading && !authReady) {
+        return <LoadingSpinner />;
+    }
 
     return (
         <div class="app">

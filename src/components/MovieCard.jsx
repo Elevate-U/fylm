@@ -1,4 +1,5 @@
 import { h } from 'preact';
+import { useState, useCallback } from 'preact/hooks';
 import { route } from 'preact-router';
 import { useStore } from '../store';
 import { useAuth } from '../context/Auth';
@@ -153,25 +154,40 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete,
         );
     };
 
-    const getFullImageUrl = (path) => {
+    const getFullImageUrl = useCallback((path, size = 'w500') => {
         if (!path) {
             return 'https://via.placeholder.com/500x750/1a1a1a/ffffff?text=No+Image';
         }
         if (path.startsWith('http')) {
             return getProxiedImageUrl(path);
         }
-        return getProxiedImageUrl(`${IMAGE_BASE_URL}${path}`);
-    };
+        const baseUrl = IMAGE_BASE_URL.replace('w500', size);
+        return getProxiedImageUrl(`${baseUrl}${path}`);
+    }, []);
+
+    const [imageUrl, setImageUrl] = useState(() => getFullImageUrl(imagePath, 'w200'));
+
+    const handleMouseEnter = useCallback(() => {
+        setImageUrl(getFullImageUrl(imagePath, 'w500'));
+    }, [imagePath, getFullImageUrl]);
+
+    const handleMouseLeave = useCallback(() => {
+        setImageUrl(getFullImageUrl(imagePath, 'w200'));
+    }, [imagePath, getFullImageUrl]);
 
     // Enhanced card with anime-specific features
     const cardContent = (
-        <div className={`poster-wrapper ${type === 'anime' ? 'anime-card-enhanced' : ''}`}>
+        <div
+            className={`poster-wrapper ${type === 'anime' ? 'anime-card-enhanced' : ''}`}
+            onMouseEnter={handleMouseEnter}
+            onMouseLeave={handleMouseLeave}
+        >
             <img
-                src={getFullImageUrl(imagePath)}
+                src={imageUrl}
                 alt={seriesTitle}
-                loading="eager"
-                width="500"
-                height="750"
+                loading="lazy"
+                width="400"
+                height="600"
             />
             {/* Gradient overlay for text readability */}
             <div className="scrim"></div>

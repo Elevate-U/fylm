@@ -150,10 +150,5 @@ if (typeof window !== 'undefined') {
     window.testSupabaseConnection = testSupabaseConnection;
     window.handleAuthError = handleAuthError;
     
-    // Auto-test connection in development
-    if (import.meta.env.MODE === 'development') {
-        setTimeout(() => {
-            testSupabaseConnection();
-        }, 1000);
-    }
+    // Auto-test connection in development is disabled.
 } 

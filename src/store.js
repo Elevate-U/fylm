@@ -39,27 +39,21 @@ export const useStore = create(
       currentMediaItem: null,
       continueWatching: [],
       continueWatchingFetched: false,
+      continueWatchingLoading: false,
 
-      fetchContinueWatching: async (userId) => {
-        if (!userId) {
-            set({ continueWatching: [], continueWatchingFetched: true });
+      fetchContinueWatching: async () => {
+        if (get().continueWatchingLoading) return;
+
+        set({ continueWatchingLoading: true });
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+            set({ continueWatching: [], continueWatchingFetched: true, continueWatchingLoading: false });
             return;
         }
 
-        const items = await getContinueWatching(userId);
-        if (!items || items.length === 0) {
-            set({ continueWatching: [], continueWatchingFetched: true });
-            return;
-        }
-
-        const uniqueInProgressItems = items.reduce((acc, current) => {
-            if (!acc.some(item => item.media_id === current.media_id)) {
-                acc.push(current);
-            }
-            return acc;
-        }, []);
-
-        set({ continueWatching: uniqueInProgressItems, continueWatchingFetched: true });
+        const items = await getContinueWatching(user.id);
+        set({ continueWatching: items || [], continueWatchingFetched: true, continueWatchingLoading: false });
       },
 
       removeContinueWatchingItem: (mediaId) => {
