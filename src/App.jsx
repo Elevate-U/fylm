@@ -24,6 +24,7 @@ const AsyncForgotPassword = asyncComponent(() => import('./pages/ForgotPassword'
 const AsyncUpdatePassword = asyncComponent(() => import('./pages/UpdatePassword'));
 const AsyncProfile = asyncComponent(() => import('./pages/Profile'));
 const AsyncAnime = asyncComponent(() => import('./pages/Anime'));
+const AsyncMoviePage = asyncComponent(() => import('./movie.jsx'));
 
 
 const MainApp = () => {
@@ -54,6 +55,8 @@ const MainApp = () => {
                     <AsyncHome path="/" />
                     <AsyncHome path="/movies" />
                     <AsyncHome path="/tv" />
+                    <AsyncMoviePage path="/movie/:id" type="movie" />
+                    <AsyncMoviePage path="/tv/:id" type="tv" />
                     <AsyncAnime path="/anime" />
                     {user ? <AsyncFavorites path="/favorites" /> : <AsyncLogin path="/favorites" />}
                     {user ? <AsyncHistory path="/history" /> : <AsyncLogin path="/history" />}

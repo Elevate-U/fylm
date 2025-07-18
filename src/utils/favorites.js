@@ -19,18 +19,19 @@ export const addFavoriteShow = async (show) => {
   }
 
   const showId = show.id;
+  const mediaType = show.type || 'tv'; // Default to 'tv' if type is not specified
   const { getState, setState } = useStore;
   const state = getState();
 
   // Prevent adding if already favorited
-  const favoriteKey = `${showId}-tv`;
+  const favoriteKey = `${showId}-${mediaType}`;
   if (state.favoritedMedia.has(favoriteKey)) {
     return;
   }
 
   // Optimistic update
   setState((currentState) => ({
-    favorites: [{ ...show, type: 'tv' }, ...currentState.favorites],
+    favorites: [{ ...show, type: mediaType }, ...currentState.favorites],
     favoritedMedia: new Set(currentState.favoritedMedia).add(favoriteKey),
   }));
 
@@ -41,7 +42,7 @@ export const addFavoriteShow = async (show) => {
   const { error } = await supabase.from('favorites').insert({
     user_id: user.id,
     media_id: showId,
-    media_type: 'tv',
+    media_type: mediaType,
   });
 
   if (error) {
@@ -69,8 +70,9 @@ export const removeFavoriteShow = async (show) => {
   if (!user) return;
 
   const showId = show.id;
+  const mediaType = show.type || 'tv';
   const { getState, setState } = useStore;
-  const favoriteKey = `${showId}-tv`;
+  const favoriteKey = `${showId}-${mediaType}`;
 
   const originalFavorites = getState().favorites;
   const originalFavoritedMedia = getState().favoritedMedia;
@@ -85,7 +87,11 @@ export const removeFavoriteShow = async (show) => {
   toast.error(`'${show.name || show.title}' has been removed from your Favorites.`);
 
   // Remove from Supabase
-  const { error } = await supabase.from('favorites').delete().match({ user_id: user.id, media_id: showId, media_type: 'tv' });
+  const { error } = await supabase.from('favorites').delete().match({
+    user_id: user.id,
+    media_id: showId,
+    media_type: mediaType
+  });
 
   if (error) {
       console.error('Error removing favorite show:', error);
@@ -99,8 +105,9 @@ export const removeFavoriteShow = async (show) => {
  * Checks if a show is favorited.
  *
  * @param {number} showId - The ID of the show.
+ * @param {string} type - The media type ('tv', 'movie', 'anime').
  * @returns {boolean}
  */
-export const isShowFavorited = (showId) => {
-  return useStore.getState().favoritedMedia.has(`${showId}-tv`);
+export const isShowFavorited = (showId, type = 'tv') => {
+    return useStore.getState().favoritedMedia.has(`${showId}-${type}`);
 };

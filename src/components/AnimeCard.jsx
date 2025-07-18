@@ -45,9 +45,9 @@ const AnimeCard = ({ item, progress, duration, showDeleteButton, onDelete, onCli
     const year = first_air_date ? new Date(first_air_date).getFullYear() : seasonYear;
 
     const { user } = useAuth();
-    const { addFavorite, removeFavorite, isFavorited, favoritesFetched } = useStore();
+    const { addFavorite, removeFavorite, isShowFavorited, favoritesFetched } = useStore();
     
-    const favorited = isFavorited(item.id, 'anime', item.season_number, item.episode_number);
+    const favorited = isShowFavorited(item.id, 'anime', item.season_number, item.episode_number);
 
     const handleFavoriteClick = (e) => {
         e.preventDefault();

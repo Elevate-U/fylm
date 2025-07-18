@@ -158,7 +158,7 @@ export const useStore = create(
         set({ favorites: favoritesWithDetails.filter(Boolean) });
       },
 
-      isFavorited: (mediaId, mediaType) => {
+      isShowFavorited: (mediaId, mediaType) => {
         if (mediaType === 'tv' || mediaType === 'anime') {
           return get().favoritedMedia.has(`${mediaId}-tv`);
         }

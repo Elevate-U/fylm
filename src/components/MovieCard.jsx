@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { Link } from 'preact-router/match';
+import { route } from 'preact-router';
 import { useStore } from '../store';
 import { useAuth } from '../context/Auth';
 import './MovieCard.css';
@@ -43,10 +43,10 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete,
     const year = (release_date || first_air_date) ? new Date(release_date || first_air_date).getFullYear() : null;
 
     const { user } = useAuth();
-    const { addFavorite, removeFavorite, isFavorited, favoritesFetched } = useStore();
+    const { addFavorite, removeFavorite, isShowFavorited, favoritesFetched } = useStore();
     
    
-    const favorited = isFavorited(item.id, type, item.season_number, item.episode_number);
+    const favorited = isShowFavorited(item.id, type, item.season_number, item.episode_number);
 
     const handleFavoriteClick = (e) => {
         e.preventDefault();
@@ -61,21 +61,25 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete,
         }
     };
 
-    // Enhanced click handler for anime
+    // Enhanced click handler for all cards
     const handleCardClick = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
         if (onClick) {
-            e.preventDefault();
+            // Use the custom onClick handler if provided (e.g., for the Anime page)
             onClick(item);
+        } else {
+            // Default navigation logic for other pages
+            const mediaId = type === 'anime' && item.anilist_id ? item.anilist_id : item.id;
+            let link = `/watch/${type}/${mediaId}`;
+            
+            if ((type === 'tv' || type === 'anime') && item.season_number && item.episode_number) {
+                link += `/season/${item.season_number}/episode/${item.episode_number}`;
+            }
+            route(link);
         }
     };
-
-    // For anime, use the anilist_id if available
-    const mediaId = type === 'anime' && item.anilist_id ? item.anilist_id : item.id;
-    let link = `/watch/${type}/${mediaId}`;
-    
-    if ((type === 'tv' || type === 'anime') && item.season_number && item.episode_number) {
-        link += `/season/${item.season_number}/episode/${item.episode_number}`;
-    }
 
     // Enhanced subtitle text for anime
     const getSubtitleText = () => {
@@ -165,7 +169,7 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete,
             <img
                 src={getFullImageUrl(imagePath)}
                 alt={seriesTitle}
-                loading="lazy"
+                loading="eager"
                 width="500"
                 height="750"
             />
@@ -230,15 +234,9 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete,
 
     return (
         <div className="movie-card-container">
-            {onClick ? (
-                <div className="movie-card clickable" onClick={handleCardClick}>
-                    {cardContent}
-                </div>
-            ) : (
-                <Link href={link} className="movie-card">
-                    {cardContent}
-                </Link>
-            )}
+            <div className="movie-card clickable" onClick={handleCardClick}>
+                {cardContent}
+            </div>
         </div>
     );
 };

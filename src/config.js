@@ -17,9 +17,12 @@ const getApiBaseUrl = () => {
     return import.meta.env.VITE_API_BASE_URL;
   }
 
-  // Both development and production will now use a relative path.
-  // The Vite dev server proxy will handle it locally, and Vercel's
-  // rewrites will handle it in production.
+  // In development, point directly to the API server
+  // In production, use relative path for Vercel
+  if (import.meta.env.MODE === 'development') {
+    return '/api';
+  }
+  
   return '/api';
 };
 

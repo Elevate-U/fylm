@@ -30,7 +30,10 @@ const Watch = (props) => {
     const [isRetrying, setIsRetrying] = useState(false);
     const [streamTimeoutError, setStreamTimeoutError] = useState(false);
     const streamTimeoutRef = useRef();
-    const [anilistId, setAnilistId] = useState(null);
+    const [error, setError] = useState(null);
+    const { id, type, season, episode } = props.matches;
+    const [tmdbId, setTmdbId] = useState(type === 'anime' ? null : id);
+    const [mediaType, setMediaType] = useState(type === 'anime' ? 'anime' : type);
     const [showTrailer, setShowTrailer] = useState(false);
 
 
@@ -42,6 +45,7 @@ const Watch = (props) => {
     const [playerReady, setPlayerReady] = useState(false);
     const [progressToResume, setProgressToResume] = useState(0);
     const [currentEpisodePage, setCurrentEpisodePage] = useState(1);
+    const [paginationPage, setPaginationPage] = useState(1);
     const [initialPageSet, setInitialPageSet] = useState(false);
     const episodesPerPage = 10;
     const sourceUpdatedFromBackend = useRef(false); // Track if source change is from backend
@@ -59,10 +63,9 @@ const Watch = (props) => {
     const lastHistoryUpdateRef = useRef({});
     const lastProgressSaveTime = useRef(0); // For throttling
 
-    const { id, type, season, episode } = props.matches;
     const { user } = useAuth(); // Get authentication state
     const userId = user?.id;
-    const tmdbType = type === 'anime' ? 'tv' : type; // Use 'tv' for TMDB anime fetches
+    const tmdbType = 'tv'; // Always use 'tv' for TMDB anime lookups
 
     const { setCurrentMediaItem, favoritesFetched } = useStore();
 
@@ -76,7 +79,8 @@ const Watch = (props) => {
                 setCurrentSeason(newSeason);
                 setCurrentEpisode(newEpisode);
             } else {
-                // Default to season 1, episode 1 if no explicit values
+                // For anime, default to season 1, episode 1
+                // For TV shows, also default to season 1, episode 1
                 setCurrentSeason(1);
                 setCurrentEpisode(1);
             }
@@ -190,6 +194,24 @@ const Watch = (props) => {
             route('/');
             return;
         }
+        
+        // If it's a regular movie or TV show, set the IDs immediately
+        if (type !== 'anime') {
+            setTmdbId(id);
+            setMediaType(type);
+        } else {
+             // For anime, we use the anilist ID directly, so tmdbId can be null initially.
+             // The API will handle the conversion.
+            setMediaType('anime');
+            setTmdbId(null); // Explicitly set to null to trigger fetches correctly
+        }
+
+    }, [id, type]);
+
+    useEffect(() => {
+        // For non-anime, we need a tmdbId. For anime, we use the main `id` from props.
+        if ((type !== 'anime' && !tmdbId) || (type === 'anime' && !id)) return;
+
 
         // Reset state on new content
         setStreamUrl('');
@@ -224,54 +246,42 @@ const Watch = (props) => {
                 const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
                 
                 // Fetch data with better error handling
+                const anilistId = id; // Use the raw ID from props for anime
+                const detailsUrl = type === 'anime' ? `${API_BASE_URL}/tmdb/anime/${anilistId}` : `${API_BASE_URL}/tmdb/${mediaType}/${tmdbId}`;
+                const videosUrl = type === 'anime' ? `${API_BASE_URL}/tmdb/anime/${anilistId}/videos` : `${API_BASE_URL}/tmdb/${mediaType}/${tmdbId}/videos`;
+                const recommendationsUrl = type === 'anime' ? `${API_BASE_URL}/tmdb/anime/${anilistId}/recommendations` : `${API_BASE_URL}/tmdb/${mediaType}/${tmdbId}/recommendations`;
+
+                const fetchData = async (url, errorMessage) => {
+                    try {
+                        const res = await fetch(url, { signal: controller.signal });
+                        if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
+                        const data = await res.json();
+                        // When using the anime route, update the tmdbId from the response
+                        if (type === 'anime' && data._conversion?.tmdbId) {
+                            setTmdbId(data._conversion.tmdbId);
+                            // DO NOT change the mediaType. It should remain 'anime'.
+                        }
+                        return data;
+                    } catch (err) {
+                        console.error(`${errorMessage}:`, err);
+                        // For videos/recs, return empty results to avoid breaking the page
+                        if (errorMessage.includes('videos') || errorMessage.includes('recommendations')) {
+                            return { results: [] };
+                        }
+                        throw err;
+                    }
+                };
+
                 const [detailsData, videosData, recommendationsData] = await Promise.all([
-                    fetch(`${API_BASE_URL}/tmdb/${tmdbType}/${id}`, { signal: controller.signal })
-                        .then(res => {
-                            if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-                            return res.json();
-                        })
-                        .catch(err => {
-                            console.error('Error fetching media details:', err);
-                            throw err;
-                        }),
-                    fetch(`${API_BASE_URL}/tmdb/${tmdbType}/${id}/videos`, { signal: controller.signal })
-                        .then(res => {
-                            if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-                            return res.json();
-                        })
-                        .catch(err => {
-                            console.error('Error fetching videos:', err);
-                            return { results: [] }; // Return empty array on error
-                        }),
-                    fetch(`${API_BASE_URL}/tmdb/${tmdbType}/${id}/recommendations`, { signal: controller.signal })
-                        .then(res => {
-                            if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
-                            return res.json();
-                        })
-                        .catch(err => {
-                            console.error('Error fetching recommendations:', err);
-                            return { results: [] }; // Return empty array on error
-                        })
+                    fetchData(detailsUrl, 'Error fetching media details'),
+                    fetchData(videosUrl, 'Error fetching videos'),
+                    fetchData(recommendationsUrl, 'Error fetching recommendations')
                 ]);
                 
                 clearTimeout(timeoutId);
                 setMediaDetails(detailsData);
                 setVideos(videosData.results || []);
                 setRecommendations(recommendationsData.results || []);
-
-                if (type === 'anime' && detailsData.id) {
-                    try {
-                        const anilistResponse = await fetch(`${API_BASE_URL}/anilist/from-tmdb/${detailsData.id}`);
-                        if (anilistResponse.ok) {
-                            const anilistData = await anilistResponse.json();
-                            if (anilistData.id) {
-                                setAnilistId(anilistData.id);
-                            }
-                        }
-                    } catch (error) {
-                        console.error('Error fetching AniList ID:', error);
-                    }
-                }
                 
                 // Season and episode initialization is now handled in a separate effect
             } catch (error) {
@@ -283,7 +293,7 @@ const Watch = (props) => {
             }
         };
         fetchAllData();
-    }, [id, type, season, episode, tmdbType, userId]); // Remove user from dependencies to prevent remount
+    }, [tmdbId, mediaType, season, episode, userId]);
 
     // Separate effect to handle authentication-dependent data loading - ONLY run once to avoid overriding user selections
     useEffect(() => {
@@ -354,11 +364,18 @@ const Watch = (props) => {
 
     useEffect(() => {
         const fetchSeasonDetails = async () => {
-            if (type !== 'tv' && type !== 'anime' || !id || !currentSeason || currentSeason === null) return;
-            
+            if ((type !== 'tv' && type !== 'anime') || !currentSeason || currentSeason === null) return;
+            // Use tmdbId for TV shows, and the original `id` (AniList) for anime
+            const mediaIdForRequest = type === 'anime' ? id : tmdbId;
+            if (!mediaIdForRequest) return; // Don't fetch if the necessary ID isn't available yet
+
             setEpisodesLoading(true);
             try {
-                const response = await fetch(`${API_BASE_URL}/tmdb/${tmdbType}/${id}/season/${currentSeason}`);
+                const url = type === 'anime' ?
+                    `${API_BASE_URL}/tmdb/anime/${mediaIdForRequest}/season/${currentSeason}` :
+                    `${API_BASE_URL}/tmdb/${mediaType}/${mediaIdForRequest}/season/${currentSeason}`;
+                
+                const response = await fetch(url);
                 if (!response.ok) {
                     throw new Error(`Failed to fetch season details: ${response.statusText}`);
                 }
@@ -399,28 +416,29 @@ const Watch = (props) => {
         }
 
         const fetchStreamUrl = async () => {
-            if (!id || !type) return;
+            if (!tmdbId || !mediaType) return;
 
-            // For anime content, we use the ID directly from URL params as it should already be an AniList ID
-            // This is different from the previous implementation where we tried to convert TMDB ID to AniList ID
+
+            // Use AniList ID for anime, TMDB ID for others.
+            const streamId = type === 'anime' ? id : tmdbId;
+            if (!streamId) return;
+
             setStreamError(null);
             setStreamTimeoutError(false);
             if (streamTimeoutRef.current) clearTimeout(streamTimeoutRef.current);
-            streamTimeoutRef.current = setTimeout(() => {
-                setStreamTimeoutError(true);
-            }, 10000);
+            streamTimeoutRef.current = setTimeout(() => setStreamTimeoutError(true), 10000);
 
             const isAnimeMovie = type === 'anime' && mediaDetails && (!mediaDetails.seasons || mediaDetails.seasons.length === 0);
             
-            if ((type === 'tv' || (type === 'anime' && !isAnimeMovie)) && (currentSeason === null || currentEpisode === null)) {
+            if ((type === 'tv' || type === 'anime') && !isAnimeMovie && (currentSeason === null || currentEpisode === null)) {
                 console.log("Season/episode not set, aborting stream URL fetch.");
                 clearTimeout(streamTimeoutRef.current);
                 return;
             }
 
             try {
-                // For anime, the id is already the AniList ID
-                let url = `${API_BASE_URL}/stream-url?type=${type}&id=${id}&source=${currentSource}`;
+                // Use `type` from props for the stream-url endpoint, `streamId` for the ID
+                let url = `${API_BASE_URL}/stream-url?type=${type}&id=${streamId}&source=${currentSource}`;
             
             if (type === 'tv' || (type === 'anime' && !isAnimeMovie)) {
                 url += `&season=${currentSeason}&episode=${currentEpisode}`;
@@ -431,7 +449,7 @@ const Watch = (props) => {
             }
             
             if (currentSource === 'videasy') {
-                    if (progressToResume > 0) url += `&progress=${Math.round(progressToResume)}`;
+                if (progressToResume > 0) url += `&progress=${Math.round(progressToResume)}`;
                 if (type === 'tv' || type === 'anime') {
                     url += `&nextEpisode=true&episodeSelector=true&autoplayNextEpisode=true`;
                 }
@@ -470,7 +488,7 @@ const Watch = (props) => {
         };
 
         fetchStreamUrl();
-    }, [id, type, currentSeason, currentEpisode, currentSource, isDubbed, mediaDetails, anilistId, progressToResume, userId]); // Add mediaDetails as a dependency
+    }, [tmdbId, mediaType, currentSeason, currentEpisode, currentSource, isDubbed, mediaDetails, progressToResume, userId]);
 
     // Removed handleNextEpisode and countdown logic - Videasy handles episode navigation automatically
 
@@ -874,6 +892,18 @@ const Watch = (props) => {
         };
     }, [streamUrl, streamError, currentSeason, currentEpisode, currentSource]);
 
+    if (error) {
+        return (
+            <div class="container" style={{ textAlign: 'center', marginTop: '50px' }}>
+                <div class="error-state">
+                    <h2>An Error Occurred</h2>
+                    <p>{error}</p>
+                    <button onClick={() => route('/')} class="btn btn-primary">Go Home</button>
+                </div>
+            </div>
+        );
+    }
+
     if (loading) {
         return (
             <div class="loading-state">
@@ -910,16 +940,19 @@ const Watch = (props) => {
     
     const { title, name, overview, vote_average, release_date, first_air_date, last_air_date, runtime, number_of_seasons, genres, poster_path, status } = mediaDetails;
     
-    // For TV episodes, check if this specific episode is favorited
-    const favorited = isShowFavorited(mediaDetails.id);
+    // Use AniList ID for anime, TMDB ID for others, and the correct type from props
+    const favoritedId = type === 'anime' ? id : mediaDetails.id;
+    const favorited = isShowFavorited(favoritedId, type);
     
     const year = release_date || first_air_date ? new Date(release_date || first_air_date).getFullYear() : '';
 
     const handleFavoriteClick = () => {
+        // Ensure the correct ID (AniList for anime) and type are passed for both add and remove
+        const itemToFavorite = { ...mediaDetails, id: favoritedId, type: type };
         if (favorited) {
-            removeFavoriteShow(mediaDetails);
+            removeFavoriteShow(itemToFavorite);
         } else {
-            addFavoriteShow({ ...mediaDetails, type });
+            addFavoriteShow(itemToFavorite);
         }
     };
 
@@ -1287,43 +1320,31 @@ const Watch = (props) => {
                                 </div>
 
                                 {/* Pagination Controls */}
-                                {seasonDetails?.episodes && seasonDetails.episodes.length > episodesPerPage && (
+                                {seasonDetails?.episodes && seasonDetails.episodes.length > episodesPerPage && (() => {
+                        const totalPages = Math.ceil(seasonDetails.episodes.length / episodesPerPage);
+                        const pagesPerPagination = 10;
+                        const totalPaginationPages = Math.ceil(totalPages / pagesPerPagination);
+                        const startPage = (paginationPage - 1) * pagesPerPagination + 1;
+                        const endPage = Math.min(startPage + pagesPerPagination - 1, totalPages);
+                        
+                        const pageNumbers = Array.from({ length: (endPage - startPage + 1) }, (_, i) => startPage + i);
+
+                        return (
                                     <div class="pagination-controls">
-                                        <button 
-                                            class="pagination-btn" 
-                                            onClick={() => setCurrentEpisodePage(prev => Math.max(1, prev - 1))}
-                                            disabled={currentEpisodePage === 1}
-                                        >
-                                            ← Previous
-                                        </button>
-                                        
-                                        <div class="pagination-info">
-                                            <span class="page-numbers">
-                                                {Array.from({ length: Math.ceil(seasonDetails.episodes.length / episodesPerPage) }, (_, i) => i + 1).map(pageNum => (
-                                                    <button
-                                                        key={pageNum}
-                                                        class={`page-number ${pageNum === currentEpisodePage ? 'active' : ''}`}
-                                                        onClick={() => setCurrentEpisodePage(pageNum)}
-                                                    >
-                                                        {pageNum}
-                                                    </button>
-                                                ))}
-                                            </span>
-                                            <span class="page-text">
-                                                Page {currentEpisodePage} of {Math.ceil(seasonDetails.episodes.length / episodesPerPage)} 
-                                                ({seasonDetails.episodes.length} episodes)
-                                            </span>
-                                        </div>
-                                        
-                                        <button 
-                                            class="pagination-btn" 
-                                            onClick={() => setCurrentEpisodePage(prev => Math.min(Math.ceil(seasonDetails.episodes.length / episodesPerPage), prev + 1))}
-                                            disabled={currentEpisodePage === Math.ceil(seasonDetails.episodes.length / episodesPerPage)}
-                                        >
-                                            Next →
-                                        </button>
+                                        {paginationPage > 1 && <button onClick={() => setPaginationPage(p => p - 1)}><i class="fas fa-angle-double-left"></i></button>}
+                                        {pageNumbers.map(number => (
+                                            <button
+                                                key={number}
+                                                class={currentEpisodePage === number ? 'active' : ''}
+                                                onClick={() => setCurrentEpisodePage(number)}
+                                            >
+                                                {number}
+                                            </button>
+                                        ))}
+                                        {paginationPage < totalPaginationPages && <button onClick={() => setPaginationPage(p => p + 1)}><i class="fas fa-angle-double-right"></i></button>}
                                     </div>
-                                )}
+                        );
+                    })()}
                             </>
                         )}
                     </div>

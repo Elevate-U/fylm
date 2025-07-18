@@ -1,5 +1,63 @@
-document.addEventListener('DOMContentLoaded', () => {
+import { API_BASE_URL, ORIGINAL_IMAGE_BASE_URL } from "./config";
 
+export async function fetchJson(url) {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        return await response.json();
+    } catch (error) {
+        console.error('Fetch error:', error);
+        return null;
+    }
+}
+
+export function createMovieCard(item, type) {
+    const isMovie = type === 'movie';
+    const title = isMovie ? item.title : item.name;
+    const releaseDate = isMovie ? item.release_date : item.first_air_date;
+    const itemType = item.media_type || type;
+
+    const card = document.createElement('div');
+    card.className = 'movie-card';
+    card.innerHTML = `
+        <a href="movie.html?id=${item.id}&type=${itemType}">
+            <img src="${API_BASE_URL}${item.poster_path}" alt="${title}" loading="lazy">
+            <div class="movie-card-info">
+                <h3>${title}</h3>
+                <p>⭐ ${item.vote_average.toFixed(1)}</p>
+            </div>
+        </a>
+    `;
+    return card.innerHTML;
+}
+
+export function setupUniversalSearch() {
+    const searchInput = document.getElementById('search-input');
+    const searchButton = document.getElementById('search-button');
+
+    const executeSearch = () => {
+        const query = searchInput.value.trim();
+        if (query) {
+            window.location.href = `search.html?q=${encodeURIComponent(query)}`;
+        }
+    };
+
+    if(searchButton) {
+        searchButton.addEventListener('click', executeSearch);
+    }
+
+    if(searchInput) {
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                executeSearch();
+            }
+        });
+    }
+}
+
+document.addEventListener('DOMContentLoaded', () => {
     const app = {
         // State
         currentMediaType: 'movie',
@@ -245,4 +303,4 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     app.init();
-}); 
+});
