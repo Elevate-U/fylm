@@ -13,24 +13,24 @@ const Footer = () => (
                 <div class="footer-section">
                     <h4>Platform</h4>
                     <ul>
-                        <li><Link href="/">Home</Link></li>
-                        <li><Link href="/movies">Movies</Link></li>
-                        <li><Link href="/tv">TV Shows</Link></li>
+                        <li><Link href="/" class="footer-legal-link">Home</Link></li>
+                        <li><Link href="/movies" class="footer-legal-link">Movies</Link></li>
+                        <li><Link href="/tv" class="footer-legal-link">TV Shows</Link></li>
                     </ul>
                 </div>
                 <div class="footer-section">
                     <h4>Account</h4>
                     <ul>
-                        <li><Link href="/login">Login</Link></li>
-                        <li><Link href="/signup">Sign Up</Link></li>
-                        <li><Link href="/favorites">Favorites</Link></li>
+                        <li><Link href="/login" class="footer-legal-link">Login</Link></li>
+                        <li><Link href="/signup" class="footer-legal-link">Sign Up</Link></li>
+                        <li><Link href="/favorites" class="footer-legal-link">Favorites</Link></li>
                     </ul>
                 </div>
                 <div class="footer-section">
                     <h4>Legal</h4>
                     <ul>
-                        <li><a href="#">Terms of Service</a></li>
-                        <li><a href="#">Privacy Policy</a></li>
+                        <li><Link href="/terms-of-service" class="footer-legal-link">Terms of Service</Link></li>
+                        <li><Link href="/privacy-policy" class="footer-legal-link">Privacy Policy</Link></li>
                     </ul>
                 </div>
             </div>
@@ -38,11 +38,11 @@ const Footer = () => (
         <div class="footer-bottom">
             <p>&copy; 2024 Fylm. All Rights Reserved. Not a real streaming service.</p>
             <div class="footer-socials">
-                <a href="#" aria-label="Github"><i class="fab fa-github"></i></a>
-                <a href="#" aria-label="Twitter"><i class="fab fa-twitter"></i></a>
+                <a href="https://x.com/FylmStream" target="_blank" rel="noopener noreferrer" aria-label="Follow us on X"><i class="fab fa-twitter"></i></a>
+                <a href="https://x.com/FylmStream" target="_blank" rel="noopener noreferrer" aria-label="Github"><i class="fab fa-github"></i></a>
             </div>
         </div>
     </footer>
 );
 
-export default Footer; 
+export default Footer;

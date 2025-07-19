@@ -26,6 +26,8 @@ const AsyncUpdatePassword = asyncComponent(() => import('./pages/UpdatePassword'
 const AsyncProfile = asyncComponent(() => import('./pages/Profile'));
 const AsyncAnime = asyncComponent(() => import('./pages/Anime'));
 const AsyncMoviePage = asyncComponent(() => import('./movie.jsx'));
+const AsyncTermsOfService = asyncComponent(() => import('./pages/TermsOfService'));
+const AsyncPrivacyPolicy = asyncComponent(() => import('./pages/PrivacyPolicy'));
 
 
 const MainApp = () => {
@@ -73,6 +75,8 @@ const MainApp = () => {
                     <AsyncForgotPassword path="/forgot-password" />
                     <AsyncUpdatePassword path="/update-password" />
                     {user ? <AsyncProfile path="/profile" /> : <AsyncLogin path="/profile" />}
+                    <AsyncTermsOfService path="/terms-of-service" />
+                    <AsyncPrivacyPolicy path="/privacy-policy" />
                 </Router>
             </main>
             <Footer />
@@ -94,4 +98,4 @@ const App = () => {
     );
 };
 
-export default App; 
+export default App;

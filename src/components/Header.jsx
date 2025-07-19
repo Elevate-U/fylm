@@ -193,8 +193,8 @@ const Header = () => {
                                 </>
                             ) : (
                                 <>
-                                    <li><a href="/login" style={{ color: '#999', fontSize: '0.9em' }} onClick={closeMenu}>Favorites (Login Required)</a></li>
-                                    <li><a href="/login" style={{ color: '#999', fontSize: '0.9em' }} onClick={closeMenu}>History (Login Required)</a></li>
+                                    <li><a href="/login" style={{ color: '#999', fontSize: '0.9em' }} onClick={closeMenu}>Favorites</a></li>
+                                    <li><a href="/login" style={{ color: '#999', fontSize: '0.9em' }} onClick={closeMenu}>History</a></li>
                                 </>
                             )}
                         </ul>

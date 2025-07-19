@@ -80,7 +80,7 @@ export default function Login() {
     <div className="auth-container">
       <div className="auth-form">
         <h1 className="auth-header">Login</h1>
-        <p className="description">Sign in to your account.</p>
+        <p className="description">Welcome back! Please login to your account.</p>
         
         {errors.general && (
           <div className="error-message">
@@ -90,12 +90,12 @@ export default function Login() {
         
         <form onSubmit={handleLogin} noValidate>
           <div className="input-group">
-            <label htmlFor="email">Email</label>
+            <label htmlFor="email">EMAIL</label>
             <input
               id="email"
               className={`input-field ${errors.email ? 'error' : ''}`}
               type="email"
-              placeholder="Your email"
+              placeholder="Enter your email"
               value={email}
               onChange={(e) => {
                 setEmail(e.target.value);
@@ -109,13 +109,13 @@ export default function Login() {
           </div>
           
           <div className="input-group">
-            <label htmlFor="password">Password</label>
+            <label htmlFor="password">PASSWORD</label>
             <div className="password-input-container">
               <input
                 id="password"
-                className={`input-field ${errors.password ? 'error' : ''}`}
+                className={`input-field password-field ${errors.password ? 'error' : ''}`}
                 type={showPassword ? "text" : "password"}
-                placeholder="Your password"
+                placeholder="Enter your password"
                 value={password}
                 onChange={(e) => {
                   setPassword(e.target.value);
@@ -127,18 +127,30 @@ export default function Login() {
               />
               <button
                 type="button"
-                className="password-toggle"
+                className="password-toggle-eye"
                 onClick={() => setShowPassword(!showPassword)}
                 aria-label={showPassword ? "Hide password" : "Show password"}
               >
-                {showPassword ? 'Hide' : 'Show'}
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  {showPassword ? (
+                    <>
+                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <path d="M1 1l22 22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </>
+                  ) : (
+                    <>
+                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </>
+                  )}
+                </svg>
               </button>
             </div>
             {errors.password && <span id="password-error" className="field-error" role="alert">{errors.password}</span>}
           </div>
           
           <div className="auth-options">
-            <a href="/forgot-password" className="auth-link">Forgot password?</a>
+            <a href="/forgot-password" className="forgot-password-link">Forgot password?</a>
           </div>
 
           <div>
@@ -149,7 +161,7 @@ export default function Login() {
         </form>
         
         <div className="auth-divider">
-          <span>OR</span>
+          <span>or</span>
         </div>
 
         <div className="social-login-group">
@@ -164,7 +176,7 @@ export default function Login() {
         <div className="auth-links">
           <p>
             Don't have an account?
-            <a href="/signup" className="auth-link"> Sign up</a>
+            <a href="/signup" className="button"> Sign up</a>
           </p>
         </div>
       </div>
