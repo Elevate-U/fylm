@@ -135,7 +135,7 @@ const MoviePage = () => {
         <div id="trailer-modal" class="modal">
             <div class="modal-content">
                 <span class="close-button" onClick={() => document.getElementById('trailer-modal').style.display = 'none'}>&times;</span>
-                <iframe width="560" height="315" src={`https://www.youtube.com/embed/${trailer.key}`} frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                <iframe width="560" height="315" src={`https://www.youtube.com/embed/${trailer.key}`} frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; fullscreen; picture-in-picture" allowfullscreen></iframe>
             </div>
         </div>
     );
@@ -294,4 +294,4 @@ const MoviePage = () => {
   );
 };
 
-render(<MoviePage />, document.getElementById('app')); 
+render(<MoviePage />, document.getElementById('app'));

@@ -195,15 +195,20 @@ const Watch = (props) => {
             return;
         }
         
-        // If it's a regular movie or TV show, set the IDs immediately
-        if (type !== 'anime') {
+        // Determine the correct handling based on the type parameter
+        if (type === 'anime') {
+            // For anime route, we use the anilist ID directly, so tmdbId can be null initially.
+            // The API will handle the conversion.
+            setMediaType('anime');
+            setTmdbId(null); // Explicitly set to null to trigger fetches correctly
+        } else if (type === 'tv' || type === 'movie') {
+            // For regular TMDB content (TV shows and movies), set the IDs immediately
             setTmdbId(id);
             setMediaType(type);
         } else {
-             // For anime, we use the anilist ID directly, so tmdbId can be null initially.
-             // The API will handle the conversion.
-            setMediaType('anime');
-            setTmdbId(null); // Explicitly set to null to trigger fetches correctly
+            // Handle any other cases by defaulting to the provided type
+            setTmdbId(id);
+            setMediaType(type);
         }
 
     }, [id, type]);
@@ -363,13 +368,14 @@ const Watch = (props) => {
                 
                 if (type === 'tv' || type === 'anime') {
                     const history = await getSeriesHistory(userId, id, tmdbType);
+                    console.log(`📺 [Watch] Series history loaded for ${type} ${id}:`, history);
                     setSeriesWatchHistory(history);
-                } else if (type === 'movie') {
-                    // Load movie progress data
-                    const progressData = await getWatchProgressForMedia(userId, id, type);
-                    console.log('Movie progress data loaded:', progressData);
-                    setMovieProgress(progressData);
                 }
+                
+                // Load progress data for all media types
+                const progressData = await getWatchProgressForMedia(userId, id, type);
+                console.log('Progress data loaded:', progressData);
+                setMovieProgress(progressData);
             } catch (error) {
                 console.error('Error loading user-specific data:', error);
             }
@@ -997,7 +1003,7 @@ const Watch = (props) => {
                         <iframe
                             src={`https://www.youtube.com/embed/${videos.find(v => v.type === 'Trailer')?.key}?autoplay=1`}
                             frameBorder="0"
-                            allow="autoplay; encrypted-media"
+                            allow="autoplay; encrypted-media; fullscreen"
                             allowFullScreen
                             title="Trailer"
                         ></iframe>
@@ -1085,7 +1091,7 @@ const Watch = (props) => {
                             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
                             frameBorder="0"
                             allowFullScreen
-                            allow="autoplay; picture-in-picture"
+                            allow="autoplay; fullscreen; picture-in-picture"
                             sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts allow-top-navigation"
                             title="Video Player"
                             loading="eager"
@@ -1303,6 +1309,15 @@ const Watch = (props) => {
                                                 return 0;
                                             })();
 
+                                            // Debug logging for progress data
+                                            if (episodeHistory && episodeHistory.progress_seconds > 0) {
+                                                console.log(`📊 Episode ${episode.episode_number} progress:`, {
+                                                    progress_seconds: episodeHistory.progress_seconds,
+                                                    duration_seconds: episodeHistory.duration_seconds,
+                                                    progressPercent: progressPercent
+                                                });
+                                            }
+
                                             return (
                                                 <div 
                                                     key={episode.id}
@@ -1316,11 +1331,19 @@ const Watch = (props) => {
                                                     }}
                                                 >
                                                     <div class="episode-card-image">
-                                                        <img src={getProxiedImageUrl(episode.still_path ? `${IMAGE_BASE_URL}${episode.still_path}` : `https://via.placeholder.com/300x169.png?text=${encodeURIComponent(episode.name)}`)} alt={episode.name} />
+                                                        <img src={getProxiedImageUrl(episode.still_path ? (episode.still_path.startsWith('/anilist_images/') || episode.still_path.startsWith('http') ? episode.still_path : `${IMAGE_BASE_URL}${episode.still_path}`) : `https://via.placeholder.com/300x169.png?text=${encodeURIComponent(episode.name)}`)} alt={episode.name} />
                                                         <div class="episode-number-badge">{episode.episode_number}</div>
                                                         {progressPercent > 0 && (
-                                                            <div class="episode-progress-bar">
-                                                                <div class="episode-progress" style={{width: `${Math.max(2, progressPercent)}%`}}></div>
+                                                            <div class="episode-progress-container">
+                                                                <div class="episode-progress-bar">
+                                                                    <div class="episode-progress" style={{width: `${Math.max(2, progressPercent)}%`}}></div>
+                                                                </div>
+                                                                <div class="episode-progress-text">
+                                                                    {episodeHistory && episodeHistory.duration_seconds > 0 
+                                                                        ? `${Math.floor(episodeHistory.progress_seconds / 60)}m / ${Math.floor(episodeHistory.duration_seconds / 60)}m`
+                                                                        : `${Math.floor(episodeHistory.progress_seconds / 60)}m watched`
+                                                                    }
+                                                                </div>
                                                             </div>
                                                         )}
                                                     </div>
@@ -1399,4 +1422,4 @@ const Watch = (props) => {
     );
 };
 
-export default Watch; 
+export default Watch;

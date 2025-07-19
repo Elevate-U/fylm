@@ -54,20 +54,47 @@ const Anime = () => {
 
 
     const handleAnimeClick = useCallback(async (animeItem) => {
-        const mediaType = 'anime';
-        if (user) {
-            const nextEpisode = await getLastWatchedEpisodeWithProgress(user.id, animeItem.id);
-            if (nextEpisode) {
-                route(`/watch/${mediaType}/${animeItem.id}/season/${nextEpisode.season}/episode/${nextEpisode.episode}`);
-            } else {
-                // Default to S1E1 if no history
-                route(`/watch/${mediaType}/${animeItem.id}/season/1/episode/1`);
+        // Determine the correct routing based on source
+        let mediaType, itemId, routePath;
+        
+        if (animeItem.source === 'tmdb') {
+            // For TMDB content, use the appropriate media type and TMDB ID
+            mediaType = animeItem.media_type || 'tv';
+            itemId = animeItem.tmdb_id || animeItem.id;
+            routePath = `/watch/${mediaType}/${itemId}`;
+            
+            // Only add season/episode for TV shows
+            if (mediaType === 'tv') {
+                if (user) {
+                    const nextEpisode = await getLastWatchedEpisodeWithProgress(user.id, itemId, mediaType);
+                    if (nextEpisode) {
+                        routePath += `/season/${nextEpisode.season}/episode/${nextEpisode.episode}`;
+                    } else {
+                        routePath += `/season/1/episode/1`;
+                    }
+                } else {
+                    routePath += `/season/1/episode/1`;
+                }
             }
         } else {
-            // Fallback for non-logged-in users should probably go to a details page
-            // that doesn't exist yet, so we'll send to watch page for now.
-            route(`/watch/${mediaType}/${animeItem.id}/season/1/episode/1`);
+            // For AniList content, use anime route with AniList ID
+            mediaType = 'anime';
+            itemId = animeItem.anilist_id || animeItem.id;
+            routePath = `/watch/anime/${itemId}`;
+            
+            if (user) {
+                const nextEpisode = await getLastWatchedEpisodeWithProgress(user.id, itemId, 'anime');
+                if (nextEpisode) {
+                    routePath += `/season/${nextEpisode.season}/episode/${nextEpisode.episode}`;
+                } else {
+                    routePath += `/season/1/episode/1`;
+                }
+            } else {
+                routePath += `/season/1/episode/1`;
+            }
         }
+        
+        route(routePath);
     }, [user]);
 
     const checkServiceAvailability = useCallback(async () => {

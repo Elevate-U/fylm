@@ -72,27 +72,48 @@ const AnimeCard = ({ item, progress, duration, showDeleteButton, onDelete, onCli
         if (onClick) {
             onClick(item);
         } else {
-            // Conditional routing logic - use AniList ID for anime
-            const animeId = item.anilist_id || item.id;
-            let link = `/watch/anime/${animeId}`;
+            // Determine the correct routing based on source
+            let link;
             
-            // Deep linking support for specific episodes
-            if (item.season_number && item.episode_number) {
-                link += `/season/${item.season_number}/episode/${item.episode_number}`;
+            if (item.source === 'tmdb') {
+                // For TMDB content, route to the appropriate media type
+                const mediaType = item.media_type || 'tv'; // Default to TV for anime
+                const tmdbId = item.tmdb_id || item.id;
+                link = `/watch/${mediaType}/${tmdbId}`;
+                
+                // For TV shows, add season/episode
+                if (mediaType === 'tv') {
+                    if (item.season_number && item.episode_number) {
+                        link += `/season/${item.season_number}/episode/${item.episode_number}`;
+                    } else {
+                        link += `/season/1/episode/1`;
+                    }
+                }
             } else {
-                // Default to season 1, episode 1 for anime
-                link += `/season/1/episode/1`;
+                // For AniList content, use anime route with AniList ID
+                const animeId = item.anilist_id || item.id;
+                link = `/watch/anime/${animeId}`;
+                
+                // Deep linking support for specific episodes
+                if (item.season_number && item.episode_number) {
+                    link += `/season/${item.season_number}/episode/${item.episode_number}`;
+                } else {
+                    // Default to season 1, episode 1 for anime
+                    link += `/season/1/episode/1`;
+                }
             }
             
-            // Get audio preference for routing
-            const audioPreference = localStorage.getItem('anime-audio-preference') || 'subbed';
-            const urlParams = new URLSearchParams();
-            if (audioPreference === 'dubbed') {
-                urlParams.set('dub', 'true');
-            }
-            
-            if (urlParams.toString()) {
-                link += `?${urlParams.toString()}`;
+            // Get audio preference for routing (only for anime)
+            if (item.source !== 'tmdb' || item.media_type === 'tv') {
+                const audioPreference = localStorage.getItem('anime-audio-preference') || 'subbed';
+                const urlParams = new URLSearchParams();
+                if (audioPreference === 'dubbed') {
+                    urlParams.set('dub', 'true');
+                }
+                
+                if (urlParams.toString()) {
+                    link += `?${urlParams.toString()}`;
+                }
             }
             
             console.log('Routing to:', link);

@@ -1124,6 +1124,25 @@ const handleAnimeRequest = async (req, res, subpath = '') => {
                 // Format season data to match TMDB format
                 const seasonNumber = parseInt(req.params.seasonNumber) || 1;
                 
+                // Try to get TMDB episode data if TMDB ID is available
+                let tmdbEpisodes = null;
+                if (tmdbId && TMDB_API_KEY) {
+                    try {
+                        console.log(`[ANIME_HANDLER] Attempting to fetch TMDB episode data for TMDB ID ${tmdbId}, season ${seasonNumber}`);
+                        const tmdbSeasonUrl = `https://api.themoviedb.org/3/tv/${tmdbId}/season/${seasonNumber}?api_key=${TMDB_API_KEY}`;
+                        const tmdbResponse = await fetch(tmdbSeasonUrl);
+                        if (tmdbResponse.ok) {
+                            const tmdbSeasonData = await tmdbResponse.json();
+                            tmdbEpisodes = tmdbSeasonData.episodes;
+                            console.log(`[ANIME_HANDLER] Successfully fetched ${tmdbEpisodes?.length || 0} TMDB episodes`);
+                        } else {
+                            console.log(`[ANIME_HANDLER] TMDB season request failed with status ${tmdbResponse.status}`);
+                        }
+                    } catch (error) {
+                        console.error(`[ANIME_HANDLER] Error fetching TMDB episode data: ${error.message}`);
+                    }
+                }
+                
                 // Create episode list
                 const episodes = [];
                 const totalEpisodes = media.episodes || 0;
@@ -1134,16 +1153,35 @@ const handleAnimeRequest = async (req, res, subpath = '') => {
                     const episodeName = `Episode ${i}`;
                     const animeTitle = media.title?.english || media.title?.romaji || 'Unknown Anime';
                     
+                    // Use TMDB episode data if available, otherwise fall back to AniList data
+                    const tmdbEpisode = tmdbEpisodes?.find(ep => ep.episode_number === i);
+                    let stillPath;
+                    let episodeOverview;
+                    let episodeTitle;
+                    
+                    if (tmdbEpisode) {
+                        // Use TMDB episode data with proper still_path
+                        stillPath = tmdbEpisode.still_path || `/placeholder/episode_${i}.jpg`;
+                        episodeOverview = tmdbEpisode.overview || `Episode ${i} of ${animeTitle}`;
+                        episodeTitle = tmdbEpisode.name || episodeName;
+                        console.log(`[ANIME_HANDLER] Using TMDB data for episode ${i}: still_path=${stillPath}`);
+                    } else {
+                        // Fall back to AniList images
+                        stillPath = media.bannerImage ? `/anilist_images/${encodeURIComponent(media.bannerImage)}` :
+                                   media.coverImage?.large ? `/anilist_images/${encodeURIComponent(media.coverImage.large)}` :
+                                   `/placeholder/episode_${i}.jpg`;
+                        episodeOverview = `Episode ${i} of ${animeTitle}`;
+                        episodeTitle = episodeName;
+                    }
+                    
                     episodes.push({
                         id: `${media.id}_${seasonNumber}_${i}`,
-                        name: episodeName,
-                        title: episodeName, // Add title field for frontend compatibility
+                        name: episodeTitle,
+                        title: episodeTitle, // Add title field for frontend compatibility
                         episode_number: i,
                         season_number: seasonNumber,
-                        overview: `Episode ${i} of ${animeTitle}`,
-                        still_path: media.bannerImage ? `/anilist_images/${encodeURIComponent(media.bannerImage)}` :
-                                   media.coverImage?.large ? `/anilist_images/${encodeURIComponent(media.coverImage.large)}` :
-                                   `/placeholder/episode_${i}.jpg`
+                        overview: episodeOverview,
+                        still_path: stillPath
                     });
                 }
                 
@@ -1152,7 +1190,8 @@ const handleAnimeRequest = async (req, res, subpath = '') => {
                     name: `Season ${seasonNumber}`,
                     season_number: seasonNumber,
                     episodes: episodes,
-                    _air_date: media.startDate ? `${media.startDate.year}-${media.startDate.month || '01'}-${media.startDate.day || '01'}` : null
+                    _air_date: media.startDate ? `${media.startDate.year}-${media.startDate.month || '01'}-${media.startDate.day || '01'}` : null,
+                    _tmdb_data_used: tmdbEpisodes ? true : false // Add flag to indicate if TMDB data was used
                 };
             } else {
                 // Format basic anime details to match TMDB format
@@ -1982,6 +2021,7 @@ app.get('/trending/anime/combined', async (req, res) => {
                 if (data?.data?.trending?.media) {
                     results.anilist = data.data.trending.media.map(item => ({
                         id: item.id,
+                        anilist_id: item.id, // Store AniList ID explicitly
                         title: item.title.english || item.title.romaji,
                         name: item.title.english || item.title.romaji,
                         original_name: item.title.native,
@@ -2005,6 +2045,7 @@ app.get('/trending/anime/combined', async (req, res) => {
                 if (data?.data?.season?.media) {
                     results.seasonal = data.data.season.media.map(item => ({
                         id: item.id,
+                        anilist_id: item.id, // Store AniList ID explicitly
                         title: item.title.english || item.title.romaji,
                         name: item.title.english || item.title.romaji,
                         original_name: item.title.native,
@@ -2046,21 +2087,25 @@ app.get('/trending/anime/combined', async (req, res) => {
                 const movieResults = movieData.results ? movieData.results.map(item => ({ ...item, media_type: 'movie' })) : [];
                 
                 // Store separated by type
-                results.tmdb.tv = tvResults.map(item => ({
-                    ...item,
-                    source: 'tmdb',
-                    trending_source: 'popular',
-                    poster_path: item.poster_path, // Pass raw path
-                    backdrop_path: item.backdrop_path, // Pass raw path
-                }));
-                
-                results.tmdb.movies = movieResults.map(item => ({
-                    ...item,
-                    source: 'tmdb',
-                    trending_source: 'popular',
-                    poster_path: item.poster_path, // Pass raw path
-                    backdrop_path: item.backdrop_path, // Pass raw path
-                }));
+        results.tmdb.tv = tvResults.map(item => ({
+            ...item,
+            source: 'tmdb',
+            trending_source: 'popular',
+            poster_path: item.poster_path, // Pass raw path
+            backdrop_path: item.backdrop_path, // Pass raw path
+            tmdb_id: item.id, // Store original TMDB ID
+            media_type: 'tv' // Ensure media type is preserved
+        }));
+        
+        results.tmdb.movies = movieResults.map(item => ({
+            ...item,
+            source: 'tmdb',
+            trending_source: 'popular',
+            poster_path: item.poster_path, // Pass raw path
+            backdrop_path: item.backdrop_path, // Pass raw path
+            tmdb_id: item.id, // Store original TMDB ID
+            media_type: 'movie' // Ensure media type is preserved
+        }));
                 
                 // Add all to flat array for combined sort
                 const tmdbResults = [...tvResults, ...movieResults];
