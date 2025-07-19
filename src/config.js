@@ -30,8 +30,25 @@ export const API_BASE_URL = getApiBaseUrl();
 
 export function getProxiedImageUrl(url) {
   if (!url) return '';
-  // Use the API_BASE_URL to construct the full proxy path
-  return `${API_BASE_URL}/image-proxy?url=${encodeURIComponent(url)}`;
+  
+  // Check if this is an AniList URL (either direct or with our special prefix)
+  if (url.includes('anilist.co') || url.includes('anilistcdn') || url.includes('anili.st')) {
+    return `${API_BASE_URL}/image-proxy?url=${encodeURIComponent(url)}`;
+  }
+  
+  // Check if this is our special format for AniList images
+  if (url.startsWith('/anilist_images/')) {
+    const actualImageUrl = decodeURIComponent(url.substring('/anilist_images/'.length));
+    return `${API_BASE_URL}/image-proxy?url=${encodeURIComponent(actualImageUrl)}`;
+  }
+  
+  // For regular http/https URLs
+  if (url.startsWith('http')) {
+    return `${API_BASE_URL}/image-proxy?url=${encodeURIComponent(url)}`;
+  }
+  
+  // For TMDB relative paths, prepend the TMDB base URL
+  return `${API_BASE_URL}/image-proxy?url=${encodeURIComponent(`${IMAGE_BASE_URL}${url}`)}`;
 }
 
 console.log(`🚀 API Base URL: ${API_BASE_URL}`);

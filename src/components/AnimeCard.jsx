@@ -188,9 +188,18 @@ const AnimeCard = ({ item, progress, duration, showDeleteButton, onDelete, onCli
         if (!path) {
             return 'https://via.placeholder.com/500x750/1a1a1a/ffffff?text=No+Image';
         }
+        
+        // For AniList images (which already have full URLs), send them directly to the image proxy
+        if (path.includes('anilist.co') || path.includes('anili.st') || path.includes('anilistcdn')) {
+            return getProxiedImageUrl(path);
+        }
+        
+        // For other full URLs, use the proxy directly
         if (path.startsWith('http')) {
             return getProxiedImageUrl(path);
         }
+        
+        // For relative paths (TMDB), use the proxy with the base URL added
         return getProxiedImageUrl(path);
     };
 

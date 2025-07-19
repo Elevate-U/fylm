@@ -69,7 +69,7 @@ const Profile = () => {
       // 1. If a new avatar is selected, upload it first.
       if (avatarFile) {
         const fileExt = avatarFile.name.split('.').pop();
-        const filePath = `avatars/${user.id}/${Date.now()}.${fileExt}`;
+        const filePath = `${user.id}/avatar.${fileExt}`;
 
         const { error: uploadError } = await supabase.storage
           .from('avatars')
@@ -82,7 +82,8 @@ const Profile = () => {
 
         // Get the public URL of the uploaded file.
         const { data: urlData } = supabase.storage.from('avatars').getPublicUrl(filePath);
-        newAvatarUrl = urlData.publicUrl;
+        // Add a timestamp to the URL to bypass cache
+        newAvatarUrl = `${urlData.publicUrl}?t=${new Date().getTime()}`;
       }
 
       // 2. Prepare the data for the user update.

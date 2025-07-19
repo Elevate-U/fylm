@@ -15,7 +15,7 @@ const SOURCES_CONFIG = {
         baseUrl: 'https://player.videasy.net',
         movie: (id) => `/movie/${id}`,
         tv: (id, s, e) => `/tv/${id}/${s}/${e}`,
-        anime: (id, s, e) => `/anime/${id}/${s}/${e}`,
+        anime: (id, s, e) => `/anime/${id}/${e}`, // AniList format uses /anime/id/episode
         animeMovie: (id) => `/anime/${id}`
     },
     'vidsrc': {
@@ -102,7 +102,7 @@ app.get('/image-proxy', async (req, res) => {
     if (!imageUrl || typeof imageUrl !== 'string') {
         return res.status(400).json({ error: 'Image URL is required as a string.' });
     }
-    
+
     // Handle placeholder images
     if (imageUrl.startsWith('/placeholder/')) {
         // Return a simple colored placeholder image
@@ -112,20 +112,136 @@ app.get('/image-proxy', async (req, res) => {
         const colors = ['#3498db', '#2ecc71', '#e74c3c', '#f39c12', '#9b59b6', '#1abc9c'];
         const randomColor = colors[Math.floor(Math.random() * colors.length)];
         
-        const svg = `<svg width="500" height="281" xmlns="http://www.w3.org/2000/svg">
+        // Determine image type from path
+        let label = imageUrl.split('/').pop().replace('.jpg', '');
+        let width = 500;
+        let height = 750;
+        
+        // Special handling for anime placeholders
+        if (label.startsWith('anime_')) {
+            const animeId = label.replace('anime_', '');
+            label = `Anime ${animeId}`;
+            // For backdrop images, use different dimensions
+            if (label.includes('backdrop')) {
+                width = 1280;
+                height = 720;
+                label = `Anime ${animeId} Backdrop`;
+            }
+        } else if (label.startsWith('episode_')) {
+            const episodeNum = label.replace('episode_', '');
+            label = `Episode ${episodeNum}`;
+            width = 1280;
+            height = 720;
+        }
+        
+        const svg = `<svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
             <rect width="100%" height="100%" fill="${randomColor}" />
             <text x="50%" y="50%" font-family="Arial" font-size="24" fill="white" text-anchor="middle" dominant-baseline="middle">
-                ${imageUrl.split('/').pop().replace('.jpg', '')}
+                ${label}
             </text>
         </svg>`;
         
         return res.send(svg);
     }
 
+    // Handle AniList images with special format
+    if (imageUrl.startsWith('/anilist_images/')) {
+        try {
+            // Extract and decode the actual image URL
+            const actualImageUrl = decodeURIComponent(imageUrl.substring('/anilist_images/'.length));
+            
+            // Check if the URL is valid
+            const url = new URL(actualImageUrl);
+            if (!['http:', 'https:'].includes(url.protocol)) {
+                return res.status(400).json({ error: 'Invalid AniList image URL protocol.' });
+            }
+            
+            // Now proceed with fetching the image
+            console.log(`[IMAGE_PROXY] Fetching AniList image: ${actualImageUrl}`);
+            const response = await fetch(actualImageUrl, {
+                headers: { 
+                    'User-Agent': 'ai-business-image-proxy/1.0 (AniList)',
+                    'Accept': 'image/*'
+                }
+            });
+            
+            if (!response.ok) {
+                console.error(`[IMAGE_PROXY] Failed to fetch AniList image: ${response.status}`, actualImageUrl);
+                // Return a placeholder image instead of an error
+                res.setHeader('Content-Type', 'image/svg+xml');
+                res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+                
+                const svg = `<svg width="500" height="750" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="100%" height="100%" fill="#6a5acd" />
+                    <text x="50%" y="50%" font-family="Arial" font-size="24" fill="white" text-anchor="middle" dominant-baseline="middle">
+                        Anime Image
+                    </text>
+                </svg>`;
+                
+                return res.send(svg);
+            }
+            
+            res.setHeader('Content-Type', response.headers.get('content-type') || 'application/octet-stream');
+            res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+            // Stream the image directly to the client to save memory
+            Readable.fromWeb(response.body).pipe(res);
+            return;
+        } catch (error) {
+            console.error('[IMAGE_PROXY] AniList image proxy error:', error);
+            return res.status(500).json({ error: 'Failed to proxy AniList image', details: error.message });
+        }
+    }
+    
+    // Handle direct AniList image URLs
+    if (imageUrl.includes('anilist.co') || imageUrl.includes('anilistcdn') || imageUrl.includes('anili.st')) {
+        try {
+            console.log(`[IMAGE_PROXY] Direct AniList image URL detected: ${imageUrl}`);
+            
+            // Check if the URL is valid
+            const url = new URL(imageUrl);
+            if (!['http:', 'https:'].includes(url.protocol)) {
+                return res.status(400).json({ error: 'Invalid AniList image URL protocol.' });
+            }
+            
+            // Now proceed with fetching the image
+            const response = await fetch(imageUrl, {
+                headers: { 
+                    'User-Agent': 'ai-business-image-proxy/1.0 (AniList)',
+                    'Accept': 'image/*'
+                }
+            });
+            
+            if (!response.ok) {
+                console.error(`[IMAGE_PROXY] Failed to fetch direct AniList image: ${response.status}`, imageUrl);
+                // Return a placeholder image instead of an error
+                res.setHeader('Content-Type', 'image/svg+xml');
+                res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+                
+                const svg = `<svg width="500" height="750" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="100%" height="100%" fill="#6a5acd" />
+                    <text x="50%" y="50%" font-family="Arial" font-size="24" fill="white" text-anchor="middle" dominant-baseline="middle">
+                        Anime Image
+                    </text>
+                </svg>`;
+                
+                return res.send(svg);
+            }
+            
+            res.setHeader('Content-Type', response.headers.get('content-type') || 'application/octet-stream');
+            res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+            // Stream the image directly to the client to save memory
+            Readable.fromWeb(response.body).pipe(res);
+            return;
+        } catch (error) {
+            console.error('[IMAGE_PROXY] Direct AniList image error:', error);
+            return res.status(500).json({ error: 'Failed to proxy direct AniList image', details: error.message });
+        }
+    }
+
     // Regular image URL handling
     try {
         const url = new URL(imageUrl);
-        if (!['http:', 'https:',].includes(url.protocol)) {
+        if (!['http:', 'https:'].includes(url.protocol)) {
             return res.status(400).json({ error: 'Invalid image URL protocol. Only HTTP and HTTPS are allowed.' });
         }
     } catch (error) {
@@ -139,7 +255,7 @@ app.get('/image-proxy', async (req, res) => {
 
         if (!response.ok) {
             const errorText = await response.text().catch(() => `Upstream status: ${response.statusText}`);
-            console.error(`Image proxy failed to fetch image. Status: ${response.status}`, { url: imageUrl, body: errorText.substring(0, 500) });
+            console.error(`[IMAGE_PROXY] Failed to fetch image. Status: ${response.status}`, { url: imageUrl, body: errorText.substring(0, 500) });
             return res.status(response.status).json({
                 error: `Failed to fetch image: ${response.statusText}`,
                 details: errorText.substring(0, 500)
@@ -152,7 +268,7 @@ app.get('/image-proxy', async (req, res) => {
         Readable.fromWeb(response.body).pipe(res);
 
     } catch (error) {
-        console.error('Image proxy error:', { url: imageUrl, message: error.message });
+        console.error('[IMAGE_PROXY] General image proxy error:', { url: imageUrl, message: error.message });
         res.status(500).json({ error: 'Failed to proxy image', details: error.message });
     }
 });
@@ -180,9 +296,10 @@ app.get('/stream-url', async (req, res) => {
             
             // Videasy supports AniList IDs directly
             if (currentSource === 'videasy') {
-                if (episode) {
-                    path = sourceConfig.anime(anilistId, season, episode);
-                    console.log(`[Stream URL] Using AniList ID ${anilistId} for anime series on Videasy, episode ${episode}`);
+                // Check if this is an anime movie or series
+                if (season && episode) {
+                    path = sourceConfig.anime(anilistId, season || 1, episode || 1);
+                    console.log(`[Stream URL] Using AniList ID ${anilistId} for anime series on Videasy, episode ${episode || 1}`);
                 } else {
                     path = sourceConfig.animeMovie(anilistId);
                     console.log(`[Stream URL] Using AniList ID ${anilistId} for anime movie on Videasy`);
@@ -272,7 +389,7 @@ app.get('/stream-url', async (req, res) => {
                     } else {
                         // Fallback to using AniList ID directly for Videasy
                         console.log(`[Stream URL] Falling back to AniList ID for Videasy`);
-                        if (episode) {
+                        if (season && episode) {
                            path = sourceConfig.anime(anilistId, season, episode);
                        } else {
                            path = sourceConfig.animeMovie(anilistId);
@@ -283,37 +400,37 @@ app.get('/stream-url', async (req, res) => {
         }
         // For non-anime content, proceed as before
         else {
-            // For vidsrc, try to get IMDb ID for better compatibility
+        // For vidsrc, try to get IMDb ID for better compatibility
             if (currentSource === 'vidsrc' && TMDB_API_KEY) {
-                try {
-                    // Construct the correct TMDB API URL
-                    const externalIdsUrl = `https://api.themoviedb.org/3/${type}/${id}/external_ids?api_key=${TMDB_API_KEY}`;
-                    const tmdbRes = await fetch(externalIdsUrl);
-                    
-                    if (tmdbRes.ok) {
-                        const externalIds = await tmdbRes.json();
-                        if (externalIds.imdb_id) {
-                            imdbId = externalIds.imdb_id;
-                            console.log(`[Stream URL] Found IMDb ID for vidsrc: ${imdbId}`);
-                        }
+            try {
+                // Construct the correct TMDB API URL
+                const externalIdsUrl = `https://api.themoviedb.org/3/${type}/${id}/external_ids?api_key=${TMDB_API_KEY}`;
+                const tmdbRes = await fetch(externalIdsUrl);
+                
+                if (tmdbRes.ok) {
+                    const externalIds = await tmdbRes.json();
+                    if (externalIds.imdb_id) {
+                        imdbId = externalIds.imdb_id;
+                        console.log(`[Stream URL] Found IMDb ID for vidsrc: ${imdbId}`);
                     }
-                } catch (err) {
-                    console.error(`[Stream URL] Failed to fetch IMDb ID for ${type}/${id}:`, err.message);
                 }
+            } catch (err) {
+                console.error(`[Stream URL] Failed to fetch IMDb ID for ${type}/${id}:`, err.message);
             }
+        }
 
-            switch (type) {
-                case 'movie':
-                    path = sourceConfig.movie(id, imdbId);
-                    break;
-                case 'tv':
-                    if (!season || !episode) {
-                        return res.status(400).json({ error: true, message: 'Missing "season" or "episode" for TV shows.' });
-                    }
-                    path = sourceConfig.tv(id, season, episode, imdbId);
-                    break;
-                default:
-                    return res.status(400).json({ error: true, message: `Unsupported type: "${type}"` });
+        switch (type) {
+            case 'movie':
+                path = sourceConfig.movie(id, imdbId);
+                break;
+            case 'tv':
+                if (!season || !episode) {
+                    return res.status(400).json({ error: true, message: 'Missing "season" or "episode" for TV shows.' });
+                }
+                path = sourceConfig.tv(id, season, episode, imdbId);
+                break;
+            default:
+                return res.status(400).json({ error: true, message: `Unsupported type: "${type}"` });
             }
         }
 
@@ -512,7 +629,7 @@ app.get('/tmdb/from-anilist/:anilistId', async (req, res) => {
         }
         const anilistData = await anilistResponse.json();
         const malId = anilistData?.data?.Media?.idMal;
-
+        
         if (!malId) {
             return res.status(404).json({ error: 'Could not find MAL ID on AniList for the given AniList ID.' });
         }
@@ -569,25 +686,25 @@ app.get('/anilist/from-tmdb/:type/:tmdbId', async (req, res) => {
             query ($search: String) {
                 Page(page: 1, perPage: 5) {
                     media(search: $search, type: ANIME, sort: SEARCH_MATCH) {
-                        id
-                        title {
-                            romaji
-                            english
-                            native
-                        }
+                    id
+                    title {
+                        romaji
+                        english
+                        native
                     }
-                }
+                    }
+            }
             }
         `;
-        
+
         const searchOnAniList = async (searchTerm) => {
-            const anilistResponse = await fetch('https://graphql.anilist.co', {
-                method: 'POST',
+        const anilistResponse = await fetch('https://graphql.anilist.co', {
+            method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
                 body: JSON.stringify({ query: searchQuery, variables: { search: searchTerm } })
-            });
-
-            if (!anilistResponse.ok) {
+        });
+        
+        if (!anilistResponse.ok) {
                 throw new Error(`Failed to fetch from AniList: ${anilistResponse.statusText}`);
             }
             return await anilistResponse.json();
@@ -618,6 +735,47 @@ app.get('/anilist/from-tmdb/:type/:tmdbId', async (req, res) => {
 });
 
 // 3. Bulk TMDB Details Endpoint
+app.post('/tmdb/bulk-episodes', async (req, res) => {
+    const { requests } = req.body;
+
+    if (!Array.isArray(requests) || requests.length === 0) {
+        return res.status(400).json({ error: 'Invalid request body. Expected an array of requests.' });
+    }
+
+    if (!TMDB_API_KEY) {
+        return res.status(503).json({ error: 'TMDB API key is not configured on the server.' });
+    }
+
+    try {
+        const promises = requests.map(async (request) => {
+            const { id, season, episode } = request;
+            if (!id || !season || !episode) {
+                return { success: false, id, season, episode, error: 'Missing id, season, or episode' };
+            }
+
+            try {
+                const url = `https://api.themoviedb.org/3/tv/${id}/season/${season}/episode/${episode}?api_key=${TMDB_API_KEY}`;
+                const response = await fetchWithRetry(url);
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    return { success: false, id, season, episode, error: `TMDB API error: ${response.status} - ${errorText}` };
+                }
+                const data = await response.json();
+                return { success: true, id, season, episode, data };
+            } catch (fetchError) {
+                return { success: false, id, season, episode, error: fetchError.message };
+            }
+        });
+
+        const results = await Promise.all(promises);
+        res.status(200).json(results);
+
+    } catch (error) {
+        console.error('Bulk episode fetch error:', error);
+        res.status(500).json({ error: 'Failed to process bulk episode request.' });
+    }
+});
+
 app.post('/tmdb/bulk', async (req, res) => {
     const { requests } = req.body;
 
@@ -664,15 +822,22 @@ app.post('/tmdb/bulk', async (req, res) => {
 const handleAnimeRequest = async (req, res, subpath = '') => {
     try {
         const { anilistId } = req.params;
+        
+        if (!anilistId || isNaN(parseInt(anilistId))) {
+            return res.status(400).json({ error: 'Invalid AniList ID provided', details: 'ID must be a number' });
+        }
+        
         const queryParams = req.query;
+        const numericId = parseInt(anilistId);
 
-        console.log(`[ANIME_HANDLER] Request for AniList ID ${anilistId}, subpath: '${subpath}'`);
+        console.log(`[ANIME_HANDLER] Request for AniList ID ${numericId}, subpath: '${subpath}'`);
 
         // Base query for anime details
         let query = `
             query ($id: Int) {
                 Media(id: $id, type: ANIME) {
                     id
+                    idMal
                     title {
                         romaji
                         english
@@ -736,8 +901,9 @@ const handleAnimeRequest = async (req, res, subpath = '') => {
                                         large
                                     }
                                     format
-                                    averageScore
-                                    genres
+                                    status
+                                    episodes
+                                    meanScore
                                 }
                             }
                         }
@@ -749,7 +915,11 @@ const handleAnimeRequest = async (req, res, subpath = '') => {
                 query ($id: Int) {
                     Media(id: $id, type: ANIME) {
                         id
-                        videos {
+                        title {
+                            romaji
+                            english
+                        }
+                        trailer {
                             id
                             site
                             thumbnail
@@ -757,199 +927,466 @@ const handleAnimeRequest = async (req, res, subpath = '') => {
                     }
                 }
             `;
-        } else if (subpath.startsWith('season/')) {
-            // For season requests, we'll use the episodes data from AniList
-            query = `
-                query ($id: Int) {
-                    Media(id: $id, type: ANIME) {
-                        id
-                        idMal
-                        title {
-                            romaji
-                            english
-                            native
-                        }
-                        episodes
-                        coverImage {
-                            extraLarge
-                            large
-                            medium
-                        }
-                        bannerImage
-                        airingSchedule {
-                            nodes {
-                                episode
-                                airingAt
-                                timeUntilAiring
-                            }
-                        }
+        }
+
+        try {
+            // Make request to AniList GraphQL API
+            console.log(`[ANIME_HANDLER] Sending GraphQL query to AniList for ID ${numericId}`);
+            
+            const response = await fetch('https://graphql.anilist.co', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    query: query,
+                    variables: { id: numericId }
+                })
+            });
+    
+            if (!response.ok) {
+                throw new Error(`AniList API error: ${response.status}`);
+            }
+    
+            const graphqlResponse = await response.json();
+            
+            // Check for GraphQL errors
+            if (graphqlResponse.errors) {
+                throw new Error(`GraphQL errors: ${JSON.stringify(graphqlResponse.errors)}`);
+            }
+            
+            const media = graphqlResponse.data?.Media;
+            
+            if (!media) {
+                // Instead of returning 404, use fallback data
+                console.log(`[ANIME_HANDLER] No AniList data for ID ${numericId}, using fallback data`);
+                return sendFallbackAnimeResponse(req, res, numericId, subpath);
+            }
+    
+            // Format response based on subpath
+            let formattedResponse;
+            if (subpath === 'recommendations') {
+                const recommendations = media.recommendations?.nodes?.map(node => {
+                    const rec = node.mediaRecommendation;
+                    return {
+                        id: rec.id,
+                        title: rec.title.english || rec.title.romaji,
+                        name: rec.title.english || rec.title.romaji,
+                        poster_path: `/anilist_images/${encodeURIComponent(rec.coverImage?.large)}`,
+                        vote_average: rec.meanScore / 10 || 0,
+                        media_type: 'anime'
+                    };
+                }) || [];
+                
+                formattedResponse = { results: recommendations };
+            } else if (subpath === 'videos') {
+                const videos = [];
+                if (media.trailer) {
+                    const site = media.trailer.site?.toLowerCase();
+                    if (site === 'youtube') {
+                        videos.push({
+                            name: `${media.title.english || media.title.romaji} Trailer`,
+                            key: media.trailer.id,
+                            site: 'YouTube',
+                            type: 'Trailer',
+                            official: true
+                        });
                     }
                 }
-            `;
+                
+                formattedResponse = { results: videos };
+            } else if (subpath.startsWith('season/')) {
+                // Format season data to match TMDB format
+                const seasonNumber = parseInt(req.params.seasonNumber) || 1;
+                
+                // Create episode list
+                const episodes = [];
+                const totalEpisodes = media.episodes || 0;
+                
+                // Create episode objects
+                for (let i = 1; i <= totalEpisodes; i++) {
+                    // Create episode with proper name mapping for frontend compatibility
+                    const episodeName = `Episode ${i}`;
+                    const animeTitle = media.title?.english || media.title?.romaji || 'Unknown Anime';
+                    
+                    episodes.push({
+                        id: `${media.id}_${seasonNumber}_${i}`,
+                        name: episodeName,
+                        title: episodeName, // Add title field for frontend compatibility
+                        episode_number: i,
+                        season_number: seasonNumber,
+                        overview: `Episode ${i} of ${animeTitle}`,
+                        still_path: media.bannerImage ? `/anilist_images/${encodeURIComponent(media.bannerImage)}` :
+                                   media.coverImage?.large ? `/anilist_images/${encodeURIComponent(media.coverImage.large)}` :
+                                   `/placeholder/episode_${i}.jpg`
+                    });
+                }
+                
+                formattedResponse = {
+                    id: media.id,
+                    name: `Season ${seasonNumber}`,
+                    season_number: seasonNumber,
+                    episodes: episodes,
+                    _air_date: media.startDate ? `${media.startDate.year}-${media.startDate.month || '01'}-${media.startDate.day || '01'}` : null
+                };
+            } else {
+                // Format basic anime details to match TMDB format
+                formattedResponse = {
+                    id: media.id,
+                    title: media.title.english || media.title.romaji,
+                    name: media.title.english || media.title.romaji,
+                    original_name: media.title.native,
+                    overview: media.description ? media.description.replace(/<[^>]*>/g, '') : '',
+                    // Use a special format for image paths that the image proxy can handle
+                    poster_path: media.coverImage?.extraLarge ? `/anilist_images/${encodeURIComponent(media.coverImage.extraLarge)}` :
+                                media.coverImage?.large ? `/anilist_images/${encodeURIComponent(media.coverImage.large)}` :
+                                media.coverImage?.medium ? `/anilist_images/${encodeURIComponent(media.coverImage.medium)}` : null,
+                    backdrop_path: media.bannerImage ? `/anilist_images/${encodeURIComponent(media.bannerImage)}` : null,
+                    vote_average: media.averageScore / 10,
+                    popularity: media.popularity,
+                    first_air_date: media.startDate ? `${media.startDate.year}-${media.startDate.month || '01'}-${media.startDate.day || '01'}` : '',
+                    last_air_date: media.endDate && media.endDate.year ? `${media.endDate.year}-${media.endDate.month || '01'}-${media.endDate.day || '01'}` : '',
+                    status: media.status,
+                    genres: media.genres.map(genre => ({ id: genre, name: genre })),
+                    number_of_seasons: 1,
+                    number_of_episodes: media.episodes,
+                    episode_run_time: [media.duration],
+                    seasons: [
+                        {
+                            id: `${media.id}_season_1`,
+                            name: 'Season 1',
+                            season_number: 1,
+                            episode_count: media.episodes
+                        }
+                    ],
+                    studios: media.studios?.nodes?.map(studio => studio.name) || [],
+                    next_episode_to_air: media.nextAiringEpisode ? {
+                        episode_number: media.nextAiringEpisode.episode,
+                        air_date: new Date(media.nextAiringEpisode.airingAt * 1000).toISOString().split('T')[0]
+                    } : null
+                };
+            }
+    
+            // Add AniList ID and TMDB conversion info to the response
+            res.json({
+                ...formattedResponse,
+                anilist_id: numericId,
+                _conversion: {
+                    anilistId: numericId,
+                    source: 'anilist'
+                }
+            });
+        } catch (error) {
+            console.error(`[ANIME_HANDLER] AniList API error: ${error.message}`);
+            return sendFallbackAnimeResponse(req, res, numericId, subpath);
         }
+    } catch (error) {
+        console.error(`[ANIME_HANDLER] Error for subpath '${subpath}':`, error);
+        return sendFallbackAnimeResponse(req, res, parseInt(req.params.anilistId), subpath);
+    }
+};
 
-        // Fetch data from AniList
-        const anilistResponse = await fetch('https://graphql.anilist.co', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                query: query,
-                variables: { id: parseInt(anilistId) }
-            }),
+// Helper function to send fallback anime data
+const sendFallbackAnimeResponse = (req, res, animeId, subpath = '') => {
+    console.log(`[ANIME_HANDLER] Using fallback data for ID ${animeId}, subpath: '${subpath}'`);
+    
+    // Create a generic anime response based on the ID
+    const title = `Anime ${animeId}`;
+    
+    if (subpath === 'recommendations') {
+        return res.json({
+            results: getFallbackAnimeRecommendations()
         });
-
-        if (!anilistResponse.ok) {
-            throw new Error(`AniList API error: ${anilistResponse.status}`);
-        }
+    } else if (subpath === 'videos') {
+        return res.json({
+            results: [] // Empty videos array
+        });
+    } else if (subpath.startsWith('season/')) {
+        const seasonNumber = parseInt(req.params.seasonNumber) || 1;
+        const episodes = [];
         
-        const anilistData = await anilistResponse.json();
-        
-        if (anilistData.errors) {
-            console.error('AniList GraphQL errors:', anilistData.errors);
-            return res.status(500).json({
-                error: 'GraphQL errors in response',
-                details: anilistData.errors
+        // Create 12 generic episodes (common anime season length)
+        for (let i = 1; i <= 12; i++) {
+            episodes.push({
+                id: `${animeId}_${seasonNumber}_${i}`,
+                name: `Episode ${i}`,
+                title: `Episode ${i}`,
+                episode_number: i,
+                season_number: seasonNumber,
+                overview: `Episode ${i} of ${title}`,
+                still_path: `/placeholder/episode_${i}.jpg`
             });
         }
+        
+        return res.json({
+            id: animeId,
+            name: `Season ${seasonNumber}`,
+            season_number: seasonNumber,
+            episodes: episodes,
+            _air_date: "2023-01-01"
+        });
+    } else {
+        // Basic anime details
+        return res.json({
+            id: animeId,
+            anilist_id: animeId,
+            title: title,
+            name: title,
+            original_name: title,
+            overview: `This is a placeholder for anime with ID ${animeId}.`,
+            poster_path: `/placeholder/anime_${animeId}.jpg`,
+            backdrop_path: `/placeholder/anime_backdrop_${animeId}.jpg`,
+            vote_average: 7.5,
+            popularity: 100,
+            first_air_date: '2023-01-01',
+            status: 'RELEASING',
+            genres: [{ id: 'Action', name: 'Action' }, { id: 'Adventure', name: 'Adventure' }],
+            number_of_seasons: 1,
+            number_of_episodes: 12,
+            episode_run_time: [24],
+            seasons: [
+                {
+                    id: `${animeId}_season_1`,
+                    name: 'Season 1',
+                    season_number: 1,
+                    episode_count: 12
+                }
+            ],
+            studios: ['Studio'],
+            _conversion: {
+                anilistId: animeId,
+                source: 'fallback'
+            }
+        });
+    }
+};
 
-        if (!anilistData.data || !anilistData.data.Media) {
-            return res.status(404).json({ error: 'Anime not found' });
+// Helper function for fallback recommendations
+const getFallbackAnimeRecommendations = () => {
+    return [
+        {
+            id: 1,
+            title: 'One Piece',
+            name: 'One Piece',
+            poster_path: `/placeholder/anime_1.jpg`,
+            vote_average: 8.7,
+            media_type: 'anime'
+        },
+        {
+            id: 5114,
+            title: 'Fullmetal Alchemist: Brotherhood',
+            name: 'Fullmetal Alchemist: Brotherhood',
+            poster_path: `/placeholder/anime_5114.jpg`,
+            vote_average: 9.1,
+            media_type: 'anime'
+        },
+        {
+            id: 21,
+            title: 'One Piece',
+            name: 'One Piece',
+            poster_path: `/placeholder/anime_21.jpg`,
+            vote_average: 8.5,
+            media_type: 'anime'
+        },
+        {
+            id: 16498,
+            title: 'Attack on Titan',
+            name: 'Attack on Titan',
+            poster_path: `/placeholder/anime_16498.jpg`,
+            vote_average: 8.9,
+            media_type: 'anime'
+        }
+    ];
+};
+
+app.get('/tmdb/anime/:anilistId', (req, res) => handleAnimeRequest(req, res));
+app.get('/tmdb/anime/:anilistId/videos', (req, res) => handleAnimeRequest(req, res, 'videos'));
+app.get('/tmdb/anime/:anilistId/recommendations', (req, res) => handleAnimeRequest(req, res, 'recommendations'));
+app.get('/tmdb/anime/:anilistId/season/:seasonNumber', (req, res) => handleAnimeRequest(req, res, `season/${req.params.seasonNumber}`));
+
+// Enhanced Anime endpoint that combines AniList and TMDB data
+app.get('/tmdb/anime/:anilistId/enhanced', async (req, res) => {
+    try {
+        const { anilistId } = req.params;
+        
+        if (!anilistId || isNaN(parseInt(anilistId))) {
+            return res.status(400).json({ error: 'Invalid AniList ID', details: 'ID must be a number' });
         }
 
-        const media = anilistData.data.Media;
-
-        // Format response based on subpath
-        let formattedResponse;
+        console.log(`[ANIME_ENHANCED] Processing enhanced request for anime ID ${anilistId}`);
         
-        if (subpath === 'recommendations') {
-            // Format recommendations to match TMDB format
-            const recommendations = media.recommendations?.nodes || [];
-            formattedResponse = {
-                results: recommendations.map(rec => ({
-                    id: rec.mediaRecommendation.id,
-                    title: rec.mediaRecommendation.title.english || rec.mediaRecommendation.title.romaji,
-                    name: rec.mediaRecommendation.title.english || rec.mediaRecommendation.title.romaji,
-                    // Use a special format for poster_path that the image proxy can handle
-                    poster_path: `/anilist_images/${encodeURIComponent(rec.mediaRecommendation.coverImage.large)}`,
-                    vote_average: rec.mediaRecommendation.averageScore / 10,
-                    media_type: 'anime',
-                    anilist_id: rec.mediaRecommendation.id
-                }))
-            };
-        } else if (subpath === 'videos') {
-            // Format videos to match TMDB format
-            const videos = media.videos || [];
-            formattedResponse = {
-                results: videos
-                    .filter(video => video.site === 'YouTube')
-                    .map(video => ({
-                        id: video.id,
-                        key: video.id,
-                        site: video.site,
-                        type: 'Trailer',
-                        name: 'Official Trailer',
-                        thumbnail: video.thumbnail,
-                    })),
-            };
-        } else if (subpath.startsWith('season/')) {
-            // Format season data to match TMDB format
-            const seasonNumber = parseInt(req.params.seasonNumber) || 1;
-            
-            // Create episode list
-            const episodes = [];
-            const totalEpisodes = media.episodes || 0;
-            
-            // Get airing schedule if available
-            const airingSchedule = media.airingSchedule?.nodes || [];
-            
-            // Try to get TMDB episode data if we can map this anime to TMDB
-            let tmdbEpisodes = [];
-            try {
-                if (TMDB_API_KEY && media.idMal) {
-                    // Get TMDB ID from MAL ID
-                    const findResponse = await fetch(`https://api.themoviedb.org/3/find/${media.idMal}?api_key=${TMDB_API_KEY}&external_source=myanimelist_id`);
-                    
-                    if (findResponse.ok) {
-                        const findData = await findResponse.json();
-                        const tvResult = findData.tv_results?.[0];
-                        
-                        if (tvResult) {
-                            // Get TMDB season data with episode images and names
-                            const tmdbSeasonResponse = await fetch(`https://api.themoviedb.org/3/tv/${tvResult.id}/season/${seasonNumber}?api_key=${TMDB_API_KEY}`);
-                            
-                            if (tmdbSeasonResponse.ok) {
-                                const tmdbSeasonData = await tmdbSeasonResponse.json();
-                                tmdbEpisodes = tmdbSeasonData.episodes || [];
-                                console.log(`[ANIME_HANDLER] Found ${tmdbEpisodes.length} TMDB episodes for anime ${anilistId}`);
-                            }
+        // Define the GraphQL query with all the fields needed for enhanced data
+        const query = `
+            query ($id: Int) {
+                Media(id: $id, type: ANIME) {
+                    id
+                    idMal
+                    title {
+                        romaji
+                        english
+                        native
+                    }
+                    description
+                    coverImage {
+                        extraLarge
+                        large
+                        medium
+                    }
+                    bannerImage
+                    startDate {
+                        year
+                        month
+                        day
+                    }
+                    endDate {
+                        year
+                        month
+                        day
+                    }
+                    season
+                    seasonYear
+                    format
+                    status
+                    episodes
+                    duration
+                    genres
+                    averageScore
+                    popularity
+                    studios {
+                        nodes {
+                            name
+                            isAnimationStudio
                         }
                     }
+                    nextAiringEpisode {
+                        airingAt
+                        timeUntilAiring
+                        episode
+                    }
+                    trailer {
+                        id
+                        site
+                        thumbnail
+                    }
+                    characters(sort: ROLE, perPage: 6) {
+                        edges {
+                            node {
+                                id
+                                name {
+                                    full
+                                }
+                                image {
+                                    medium
+                                }
+                            }
+                            role
+                        }
+                    }
+                    staff(sort: RELEVANCE, perPage: 4) {
+                        edges {
+                            node {
+                                id
+                                name {
+                                    full
+                                }
+                                image {
+                                    medium
+                                }
+                            }
+                            role
+                        }
+                    }
+                    tags {
+                        name
+                        rank
+                    }
                 }
-            } catch (error) {
-                console.warn(`[ANIME_HANDLER] Could not fetch TMDB episode data for anime ${anilistId}:`, error.message);
+            }
+        `;
+
+        try {
+            // Make request to AniList GraphQL API with error handling
+            const response = await fetch('https://graphql.anilist.co', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                },
+                body: JSON.stringify({
+                    query: query,
+                    variables: { id: parseInt(anilistId) }
+                }),
+                timeout: 8000 // 8 second timeout
+            }).catch(err => {
+                console.error(`[ANIME_ENHANCED] AniList fetch error: ${err.message}`);
+                throw new Error(`AniList API request failed: ${err.message}`);
+            });
+            
+            if (!response || !response.ok) {
+                throw new Error(`AniList API returned status ${response?.status || 'unknown'}`);
             }
             
-            // Create episode objects
-            for (let i = 1; i <= totalEpisodes; i++) {
-                const airingInfo = airingSchedule.find(node => node.episode === i);
-                const tmdbEpisode = tmdbEpisodes.find(ep => ep.episode_number === i);
-                
-                // Determine the best image source with improved fallback logic
-                let still_path;
-                if (tmdbEpisode?.still_path) {
-                    // Use TMDB episode image if available (just the path, not full URL)
-                    still_path = tmdbEpisode.still_path;
-                } else if (media.bannerImage) {
-                    // Use anime's banner image as fallback
-                    still_path = `/anilist_images/${encodeURIComponent(media.bannerImage)}`;
-                } else if (media.coverImage?.extraLarge) {
-                    // Use highest quality cover image
-                    still_path = `/anilist_images/${encodeURIComponent(media.coverImage.extraLarge)}`;
-                } else if (media.coverImage?.large) {
-                    // Use large cover image as fallback
-                    still_path = `/anilist_images/${encodeURIComponent(media.coverImage.large)}`;
-                } else if (media.coverImage?.medium) {
-                    // Use medium cover image as final AniList fallback
-                    still_path = `/anilist_images/${encodeURIComponent(media.coverImage.medium)}`;
-                } else {
-                    // Use placeholder as last resort
-                    still_path = `/placeholder/episode_${i}.jpg`;
-                }
-                
-                // Create episode with proper name mapping for frontend compatibility
-                const episodeName = tmdbEpisode?.name || `Episode ${i}`;
-                const animeTitle = media.title?.english || media.title?.romaji || 'Unknown Anime';
-                
-                episodes.push({
-                    id: `${media.id}_${seasonNumber}_${i}`,
-                    name: episodeName,
-                    title: episodeName, // Add title field for frontend compatibility
-                    episode_number: i,
-                    season_number: seasonNumber,
-                    air_date: tmdbEpisode?.air_date || (airingInfo ? new Date(airingInfo.airingAt * 1000).toISOString().split('T')[0] : null),
-                    overview: tmdbEpisode?.overview || `Episode ${i} of ${animeTitle}`,
-                    still_path: still_path,
-                    runtime: tmdbEpisode?.runtime || null,
-                    vote_average: tmdbEpisode?.vote_average || null
-                });
+            const graphqlResponse = await response.json().catch(err => {
+                console.error(`[ANIME_ENHANCED] JSON parse error: ${err.message}`);
+                throw new Error('Failed to parse AniList response');
+            });
+            
+            // Check for GraphQL errors
+            if (graphqlResponse.errors) {
+                console.error(`[ANIME_ENHANCED] GraphQL errors:`, graphqlResponse.errors);
+                throw new Error(`GraphQL errors: ${JSON.stringify(graphqlResponse.errors)}`);
             }
             
-            formattedResponse = {
+            const media = graphqlResponse.data?.Media;
+            
+            if (!media) {
+                console.log(`[ANIME_ENHANCED] No data found for anime ID ${anilistId}`);
+                return sendFallbackAnimeResponse(req, res, parseInt(anilistId));
+            }
+            
+            // Try to fetch TMDB ID via MAL ID if available
+            let tmdbId = null;
+            if (media.idMal) {
+                try {
+                    const tmdbMappingUrl = `https://api.themoviedb.org/3/find/${media.idMal}?api_key=${TMDB_API_KEY}&external_source=imdb_id`;
+                    const tmdbResponse = await fetch(tmdbMappingUrl).catch(() => null);
+                    if (tmdbResponse && tmdbResponse.ok) {
+                        const tmdbData = await tmdbResponse.json().catch(() => null);
+                        if (tmdbData && tmdbData.tv_results && tmdbData.tv_results.length > 0) {
+                            tmdbId = tmdbData.tv_results[0].id;
+                        }
+                    }
+                } catch (error) {
+                    console.error(`[ANIME_ENHANCED] Error finding TMDB ID: ${error.message}`);
+                    // Continue without TMDB ID
+                }
+            }
+            
+            // Extract videos data
+            const videos = [];
+            if (media.trailer) {
+                const site = media.trailer.site?.toLowerCase();
+                if (site === 'youtube') {
+                    videos.push({
+                        name: `${media.title.english || media.title.romaji} Trailer`,
+                        key: media.trailer.id,
+                        site: 'YouTube',
+                        type: 'Trailer',
+                        official: true
+                    });
+                }
+            }
+            
+            // Format basic anime details to match TMDB format with enhanced fields
+            const enhancedResponse = {
                 id: media.id,
-                name: `Season ${seasonNumber}`,
-                season_number: seasonNumber,
-                episodes: episodes,
-                _air_date: media.startDate ? `${media.startDate.year}-${media.startDate.month || '01'}-${media.startDate.day || '01'}` : null
-            };
-        } else {
-            // Format basic anime details to match TMDB format
-            formattedResponse = {
-                id: media.id,
+                tmdb_id: tmdbId,
                 title: media.title.english || media.title.romaji,
                 name: media.title.english || media.title.romaji,
                 original_name: media.title.native,
                 overview: media.description ? media.description.replace(/<[^>]*>/g, '') : '',
-                // Use a special format for image paths that the image proxy can handle
+                // Handle image paths properly using the special anilist_images format
                 poster_path: media.coverImage?.extraLarge ? `/anilist_images/${encodeURIComponent(media.coverImage.extraLarge)}` :
                             media.coverImage?.large ? `/anilist_images/${encodeURIComponent(media.coverImage.large)}` :
                             media.coverImage?.medium ? `/anilist_images/${encodeURIComponent(media.coverImage.medium)}` : null,
@@ -971,35 +1408,62 @@ const handleAnimeRequest = async (req, res, subpath = '') => {
                         episode_count: media.episodes
                     }
                 ],
-                studios: media.studios?.nodes?.map(studio => studio.name) || [],
-                next_episode_to_air: media.nextAiringEpisode ? {
+                // Enhanced fields
+                studios: media.studios?.nodes?.map(studio => ({ 
+                    name: studio.name, 
+                    isMain: studio.isAnimationStudio 
+                })) || [],
+                characters: media.characters?.edges?.map(edge => ({
+                    id: edge.node.id,
+                    name: edge.node.name.full,
+                    image: edge.node.image?.medium ? `/anilist_images/${encodeURIComponent(edge.node.image.medium)}` : null,
+                    role: edge.role
+                })) || [],
+                staff: media.staff?.edges?.map(edge => ({
+                    id: edge.node.id,
+                    name: edge.node.name.full,
+                    image: edge.node.image?.medium ? `/anilist_images/${encodeURIComponent(edge.node.image.medium)}` : null,
+                    role: edge.role
+                })) || [],
+                tags: media.tags?.map(tag => ({
+                    name: tag.name,
+                    rank: tag.rank
+                })) || [],
+                nextAiringEpisode: media.nextAiringEpisode ? {
                     episode_number: media.nextAiringEpisode.episode,
-                    air_date: new Date(media.nextAiringEpisode.airingAt * 1000).toISOString().split('T')[0]
-                } : null
+                    air_date: new Date(media.nextAiringEpisode.airingAt * 1000).toISOString().split('T')[0],
+                    time_until_airing: media.nextAiringEpisode.timeUntilAiring
+                } : null,
+                videos: { results: videos },
+                format: media.format,
+                season: media.season,
+                seasonYear: media.seasonYear
             };
+            
+            // Send the enhanced response
+            res.json({
+                ...enhancedResponse,
+                anilist_id: parseInt(anilistId),
+                _conversion: {
+                    anilistId: parseInt(anilistId),
+                    tmdbId: tmdbId,
+                    source: 'anilist'
+                }
+            });
+            
+        } catch (error) {
+            console.error(`[ANIME_ENHANCED] AniList API error: ${error.message}`);
+            // Use fallback response if AniList API fails
+            return sendFallbackAnimeResponse(req, res, parseInt(anilistId));
         }
-
-        // Add AniList ID and TMDB conversion info to the response
-        res.json({
-            ...formattedResponse,
-            anilist_id: parseInt(anilistId),
-            _conversion: {
-                anilistId: parseInt(anilistId),
-                source: 'anilist'
-            }
-        });
-
     } catch (error) {
-        console.error(`[ANIME_HANDLER] Error for subpath '${subpath}':`, error);
-        res.status(500).json({ error: 'Failed to process anime request.', details: error.message });
+        console.error(`[ANIME_ENHANCED] Unexpected error:`, error);
+        res.status(500).json({ 
+            error: 'Internal server error processing enhanced anime data',
+            message: error.message
+        });
     }
-};
-
-app.get('/tmdb/anime/:anilistId', (req, res) => handleAnimeRequest(req, res));
-app.get('/tmdb/anime/:anilistId/videos', (req, res) => handleAnimeRequest(req, res, 'videos'));
-app.get('/tmdb/anime/:anilistId/recommendations', (req, res) => handleAnimeRequest(req, res, 'recommendations'));
-app.get('/tmdb/anime/:anilistId/season/:seasonNumber', (req, res) => handleAnimeRequest(req, res, `season/${req.params.seasonNumber}`));
-
+});
 
 // 6. Generic TMDB API Proxy (for everything else)
 // IMPORTANT: This MUST come AFTER specific routes like /tmdb/anime/:id
@@ -1033,6 +1497,469 @@ app.get('/tmdb/*', async (req, res) => {
     }
 });
 
+
+// 8. Consumet API Proxy for Anime
+app.get('/consumet/anime/:category', async (req, res) => {
+    const { category } = req.params;
+    const { page = 1, perPage = 20, query } = req.query;
+
+    // Map our frontend categories to Consumet API endpoints based on documentation
+    // Using simpler endpoints that are more likely to work
+    const categoryMapping = {
+        'trending': 'anime/gogoanime/top-airing',
+        'recent-episodes': 'anime/gogoanime/recent-episodes',
+        'popular-airing': 'anime/gogoanime/top-airing',
+        'popular': 'anime/gogoanime/top-airing',
+        'top-rated': 'anime/gogoanime/top-airing',
+        'search': 'anime/gogoanime'
+    };
+
+    // Get the endpoint from our mapping or use a default
+    let endpoint = categoryMapping[category] || 'anime/gogoanime/top-airing';
+    
+    // Get the base URL from environment variables or fallback, ensuring it has proper protocol
+    let consumetBaseUrl = process.env.VITE_CONSUMET_API_URL || 'api.consumet.org';
+    
+    // Add protocol if missing
+    if (!consumetBaseUrl.startsWith('http://') && !consumetBaseUrl.startsWith('https://')) {
+        consumetBaseUrl = `https://${consumetBaseUrl}`;
+    }
+    
+    // Prepare URL
+    let url;
+    try {
+        url = new URL(`${consumetBaseUrl}/${endpoint}`);
+        
+        // Add common query parameters
+        if (!endpoint.includes('?')) {
+            url.searchParams.append('page', page);
+        }
+        
+        // Add search query if needed
+        if (category === 'search' && query) {
+            // For GogoAnime search, we need to add the query to the path
+            endpoint = `${endpoint}/${encodeURIComponent(query)}`;
+            url = new URL(`${consumetBaseUrl}/${endpoint}`);
+            url.searchParams.append('page', page);
+        }
+        
+        console.log(`[CONSUMET] Fetching from ${url.toString()}`);
+        
+        const response = await fetch(url.toString(), {
+            headers: { 
+                'Accept': 'application/json',
+                'User-Agent': 'Fylm/1.0' 
+            },
+            timeout: 8000 // 8 second timeout
+        });
+
+        if (!response.ok) {
+            console.error(`[CONSUMET] Error: ${response.status}`);
+            return res.status(response.status).json({ 
+                error: `Consumet API error: ${response.statusText}`,
+                url: url.toString()
+            });
+        }
+
+        const data = await response.json();
+        
+        // Transform GogoAnime format to match our expected format
+        let results = data;
+        
+        // Ensure we have a consistent response format
+        if (!data.results && Array.isArray(data)) {
+            results = {
+                results: data,
+                hasNextPage: false,
+                currentPage: parseInt(page)
+            };
+        } else if (!data.results && typeof data === 'object') {
+            results = {
+                results: [data],
+                hasNextPage: false,
+                currentPage: parseInt(page)
+            };
+        }
+        
+        res.json(results);
+    } catch (error) {
+        console.error('[CONSUMET] Proxy error:', error);
+        
+        // Return empty results instead of error to allow UI to show fallback content
+        res.json({
+            results: [],
+            hasNextPage: false,
+            currentPage: parseInt(page),
+            error: error.message
+        });
+    }
+});
+
+// Add a unified search endpoint that queries both AniList and TMDB
+app.get('/search/unified', async (req, res) => {
+    try {
+        const { query, type = 'all' } = req.query;
+        
+        if (!query) {
+            return res.status(400).json({ error: 'Search query is required' });
+        }
+
+        // Initialize results containers with empty arrays for all properties
+        const results = {
+            tmdb: { movies: [], tv: [] },
+            anilist: [],
+            combined: []
+        };
+
+        // Search TMDB if type is 'all', 'movie', or 'tv'
+        if (['all', 'movie', 'tv'].includes(type) && TMDB_API_KEY) {
+            const tmdbTypes = type === 'all' ? ['movie', 'tv'] : [type];
+            const tmdbSearchPromises = tmdbTypes.map(async mediaType => {
+                try {
+                    const tmdbUrl = `https://api.themoviedb.org/3/search/${mediaType}?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`;
+                    const response = await fetch(tmdbUrl);
+                    if (response.ok) {
+                        const data = await response.json();
+                        return { type: mediaType, results: data.results || [] };
+                    }
+                } catch (error) {
+                    console.error(`TMDB search error for ${mediaType}:`, error);
+                }
+                return { type: mediaType, results: [] };
+            });
+            
+            const tmdbResults = await Promise.all(tmdbSearchPromises);
+            tmdbResults.forEach(result => {
+                // Ensure we're adding to the right property and it's always an array
+                results.tmdb[result.type + 's'] = (result.results || []).map(item => ({
+                    ...item,
+                    source: 'tmdb',
+                    media_type: result.type
+                }));
+            });
+        }
+
+        // Search AniList if type is 'all' or 'anime'
+        if (['all', 'anime'].includes(type)) {
+            try {
+                const anilistQuery = `
+                    query ($search: String) {
+                        Page(page: 1, perPage: 10) {
+                            media(search: $search, type: ANIME, sort: POPULARITY_DESC) {
+                                id
+                                idMal
+                                title {
+                                    romaji
+                                    english
+                                    native
+                                }
+                                coverImage {
+                                    large
+                                }
+                                format
+                                status
+                                episodes
+                                description
+                                genres
+                                averageScore
+                                popularity
+                                seasonYear
+                            }
+                        }
+                    }
+                `;
+
+                const anilistResponse = await fetch('https://graphql.anilist.co', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        query: anilistQuery,
+                        variables: { search: query }
+                    })
+                });
+
+                if (anilistResponse.ok) {
+                    const anilistData = await anilistResponse.json();
+                    const animeResults = anilistData?.data?.Page?.media || [];
+                    
+                    results.anilist = animeResults.map(anime => ({
+                        id: anime.id,
+                        title: anime.title.english || anime.title.romaji,
+                        name: anime.title.english || anime.title.romaji,
+                        original_name: anime.title.native,
+                        overview: anime.description ? anime.description.replace(/<[^>]*>/g, '') : '',
+                        poster_path: anime.coverImage?.large ? `/anilist_images/${encodeURIComponent(anime.coverImage.large)}` : null,
+                        vote_average: anime.averageScore ? anime.averageScore / 10 : 0,
+                        popularity: anime.popularity,
+                        media_type: 'anime',
+                        source: 'anilist',
+                        idMal: anime.idMal,
+                        format: anime.format,
+                        episodes: anime.episodes,
+                        year: anime.seasonYear
+                    }));
+                }
+            } catch (error) {
+                console.error('AniList search error:', error);
+                // Keep anilist as empty array
+            }
+        }
+
+        // Combine all results for convenience
+        results.combined = [
+            ...results.anilist,
+            ...results.tmdb.movies,
+            ...results.tmdb.tv
+        ];
+
+        res.json(results);
+    } catch (error) {
+        console.error('Unified search error:', error);
+        // Always return a valid structure even on error
+        res.status(500).json({ 
+            error: 'Failed to perform unified search', 
+            details: error.message,
+            tmdb: { movies: [], tv: [] },
+            anilist: [],
+            combined: []
+        });
+    }
+});
+
+// Fetch trending anime from both AniList and TMDB
+app.get('/trending/anime/combined', async (req, res) => {
+    try {
+        // Initialize results container with empty arrays for all expected properties
+        const results = {
+            anilist: [],
+            tmdb: { 
+                movies: [], 
+                tv: [] 
+            },
+            seasonal: [],
+            combined: []
+        };
+        
+        // Fetch trending anime from AniList
+        const anilistQuery = `
+            query {
+                trending: Page(page: 1, perPage: 20) {
+                    media(type: ANIME, sort: TRENDING_DESC) {
+                        id
+                        idMal
+                        title {
+                            romaji
+                            english
+                            native
+                        }
+                        coverImage {
+                            large
+                        }
+                        bannerImage
+                        format
+                        episodes
+                        description
+                        averageScore
+                        popularity
+                        status
+                        startDate {
+                            year
+                            month
+                            day
+                        }
+                        genres
+                    }
+                }
+                
+                season: Page(page: 1, perPage: 20) {
+                    media(type: ANIME, sort: POPULARITY_DESC, season: CURRENT) {
+                        id
+                        idMal
+                        title {
+                            romaji
+                            english
+                            native
+                        }
+                        coverImage {
+                            large
+                        }
+                        bannerImage
+                        format
+                        episodes
+                        description
+                        averageScore
+                        popularity
+                        status
+                        startDate {
+                            year
+                            month
+                            day
+                        }
+                        genres
+                    }
+                }
+            }
+        `;
+
+        // Fetch from AniList
+        try {
+            const anilistResponse = await fetch('https://graphql.anilist.co', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json'
+                },
+                body: JSON.stringify({ query: anilistQuery })
+            });
+
+            if (anilistResponse.ok) {
+                const data = await anilistResponse.json();
+                
+                // Process trending anime
+                if (data?.data?.trending?.media) {
+                    results.anilist = data.data.trending.media.map(item => ({
+                        id: item.id,
+                        title: item.title.english || item.title.romaji,
+                        name: item.title.english || item.title.romaji,
+                        original_name: item.title.native,
+                        overview: item.description ? item.description.replace(/<[^>]*>/g, '') : '',
+                        poster_path: item.coverImage?.large ? `/anilist_images/${encodeURIComponent(item.coverImage.large)}` : null,
+                        backdrop_path: item.bannerImage ? `/anilist_images/${encodeURIComponent(item.bannerImage)}` : null,
+                        vote_average: item.averageScore ? item.averageScore / 10 : 0,
+                        first_air_date: item.startDate?.year ? `${item.startDate.year}-${item.startDate.month || '01'}-${item.startDate.day || '01'}` : '',
+                        popularity: item.popularity,
+                        genres: item.genres.map(genre => ({ id: genre, name: genre })),
+                        media_type: 'anime',
+                        source: 'anilist',
+                        trending_source: 'trending',
+                        format: item.format,
+                        episodes: item.episodes,
+                        idMal: item.idMal
+                    }));
+                }
+                
+                // Process seasonal anime as a separate category
+                if (data?.data?.season?.media) {
+                    results.seasonal = data.data.season.media.map(item => ({
+                        id: item.id,
+                        title: item.title.english || item.title.romaji,
+                        name: item.title.english || item.title.romaji,
+                        original_name: item.title.native,
+                        overview: item.description ? item.description.replace(/<[^>]*>/g, '') : '',
+                        poster_path: item.coverImage?.large ? `/anilist_images/${encodeURIComponent(item.coverImage.large)}` : null,
+                        backdrop_path: item.bannerImage ? `/anilist_images/${encodeURIComponent(item.bannerImage)}` : null,
+                        vote_average: item.averageScore ? item.averageScore / 10 : 0,
+                        first_air_date: item.startDate?.year ? `${item.startDate.year}-${item.startDate.month || '01'}-${item.startDate.day || '01'}` : '',
+                        popularity: item.popularity,
+                        genres: item.genres.map(genre => ({ id: genre, name: genre })),
+                        media_type: 'anime',
+                        source: 'anilist',
+                        trending_source: 'seasonal',
+                        format: item.format,
+                        episodes: item.episodes,
+                        idMal: item.idMal
+                    }));
+                }
+            }
+        } catch (error) {
+            console.error('AniList trending fetch error:', error);
+            // Continue with partial results
+        }
+
+        // Fetch anime from TMDB if API key is available
+        if (TMDB_API_KEY) {
+            try {
+                const tmdbPromises = [
+                    fetch(`https://api.themoviedb.org/3/discover/tv?api_key=${TMDB_API_KEY}&with_keywords=210024&sort_by=popularity.desc&page=1`),
+                    fetch(`https://api.themoviedb.org/3/discover/movie?api_key=${TMDB_API_KEY}&with_keywords=210024&sort_by=popularity.desc&page=1`)
+                ];
+                
+                const [tvResponse, movieResponse] = await Promise.all(tmdbPromises);
+                const tvData = tvResponse.ok ? await tvResponse.json() : { results: [] };
+                const movieData = movieResponse.ok ? await movieResponse.json() : { results: [] };
+                
+                // Process TMDB results
+                const tvResults = tvData.results ? tvData.results.map(item => ({ ...item, media_type: 'tv' })) : [];
+                const movieResults = movieData.results ? movieData.results.map(item => ({ ...item, media_type: 'movie' })) : [];
+                
+                // Store separated by type
+                results.tmdb.tv = tvResults.map(item => ({
+                    ...item,
+                    source: 'tmdb',
+                    trending_source: 'popular',
+                    poster_path: item.poster_path ? `${IMAGE_BASE_URL}${item.poster_path}` : null,
+                    backdrop_path: item.backdrop_path ? `${IMAGE_BASE_URL}${item.backdrop_path}` : null,
+                }));
+                
+                results.tmdb.movies = movieResults.map(item => ({
+                    ...item,
+                    source: 'tmdb',
+                    trending_source: 'popular',
+                    poster_path: item.poster_path ? `${IMAGE_BASE_URL}${item.poster_path}` : null,
+                    backdrop_path: item.backdrop_path ? `${IMAGE_BASE_URL}${item.backdrop_path}` : null,
+                }));
+                
+                // Add all to flat array for combined sort
+                const tmdbResults = [...tvResults, ...movieResults];
+                tmdbResults.sort((a, b) => b.popularity - a.popularity);
+            } catch (error) {
+                console.error('TMDB anime fetch error:', error);
+                // Continue with partial results
+            }
+        }
+
+        // Create combined results from both sources
+        const uniqueIds = new Set();
+        
+        // First add all AniList results
+        results.combined = [...results.anilist];
+        
+        // Track all AniList IDs to avoid duplicates
+        results.anilist.forEach(item => uniqueIds.add(`anilist-${item.id}`));
+        
+        // Add TMDB TV results
+        for (const item of results.tmdb.tv || []) {
+            const tmdbId = item.id;
+            
+            // Skip if we've already added this TMDB ID
+            if (uniqueIds.has(`tmdb-${tmdbId}`)) continue;
+            
+            uniqueIds.add(`tmdb-${tmdbId}`);
+            results.combined.push(item);
+        }
+        
+        // Add TMDB movie results
+        for (const item of results.tmdb.movies || []) {
+            const tmdbId = item.id;
+            
+            // Skip if we've already added this TMDB ID
+            if (uniqueIds.has(`tmdb-${tmdbId}`)) continue;
+            
+            uniqueIds.add(`tmdb-${tmdbId}`);
+            results.combined.push(item);
+        }
+        
+        // Sort by popularity
+        results.combined.sort((a, b) => b.popularity - a.popularity);
+        
+        res.json(results);
+        
+    } catch (error) {
+        console.error('Combined trending anime error:', error);
+        // Always return a valid structure even on error
+        res.status(500).json({ 
+            error: 'Failed to fetch trending anime', 
+            details: error.message,
+            anilist: [],
+            tmdb: { movies: [], tv: [] },
+            seasonal: [],
+            combined: []
+        });
+    }
+});
 
 // Catch-all for 404 API routes
 app.all('*', (req, res) => {

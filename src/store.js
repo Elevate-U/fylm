@@ -152,10 +152,16 @@ export const useStore = create(
         set({ favorites: favoritesWithDetails.filter(Boolean) });
       },
 
-      isShowFavorited: (mediaId, mediaType) => {
-        if (mediaType === 'tv' || mediaType === 'anime') {
+      isShowFavorited: (mediaId, mediaType, seasonNumber, episodeNumber) => {
+        // For anime content, we need to check if the mediaId exists with either 'tv' or 'anime' type
+        if (mediaType === 'anime') {
+          return get().favoritedMedia.has(`${mediaId}-anime`) || get().favoritedMedia.has(`${mediaId}-tv`);
+        }
+        // For TV shows
+        else if (mediaType === 'tv') {
           return get().favoritedMedia.has(`${mediaId}-tv`);
         }
+        // For movies and other content types
         return get().favoritedMedia.has(`${mediaId}-${mediaType}`);
       },
 

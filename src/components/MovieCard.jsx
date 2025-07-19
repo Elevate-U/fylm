@@ -46,7 +46,7 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete,
     const { user } = useAuth();
     const { addFavorite, removeFavorite, isShowFavorited, favoritesFetched } = useStore();
     
-   
+    // Get favorited state - for anime, check using type 'anime'
     const favorited = isShowFavorited(item.id, type, item.season_number, item.episode_number);
 
     const handleFavoriteClick = (e) => {
@@ -56,7 +56,14 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete,
         if (!user) return; // Prevent action if user is not logged in
 
         if (favorited) {
-            removeFavorite(user.id, item.id, type, item.season_number, item.episode_number);
+            // For anime content, need to try removing with both tv and anime types
+            if (type === 'anime') {
+                // Try removing with both possible media types
+                removeFavorite(user.id, item.id, 'anime');
+                removeFavorite(user.id, item.id, 'tv');
+            } else {
+                removeFavorite(user.id, item.id, type, item.season_number, item.episode_number);
+            }
         } else {
             addFavorite(user.id, { ...item, type });
         }
@@ -77,10 +84,20 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete,
             
             if ((type === 'tv' || type === 'anime') && item.season_number && item.episode_number) {
                 link += `/season/${item.season_number}/episode/${item.episode_number}`;
+            } else if (type === 'anime') {
+                // Default to season 1, episode 1 for anime with no specific episode info
+                link += `/season/1/episode/1`;
             }
             route(link);
         }
     };
+    
+    const handleImageError = useCallback((e) => {
+        // Replace broken image with placeholder
+        const element = e.target;
+        element.onerror = null; // Prevent infinite error loop
+        element.src = 'https://via.placeholder.com/400x600/1a1a1a/ffffff?text=No+Image';
+    }, []);
 
     // Enhanced subtitle text for anime
     const getSubtitleText = () => {
@@ -188,6 +205,7 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete,
                 loading="lazy"
                 width="400"
                 height="600"
+                onError={handleImageError}
             />
             {/* Gradient overlay for text readability */}
             <div className="scrim"></div>
@@ -212,6 +230,9 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete,
                             onClick={handleFavoriteClick}
                             aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
                             disabled={!favoritesFetched}
+                            style={{
+                                color: favorited ? '#fca5a5' : 'var(--text-secondary)'
+                            }}
                         >
                             ♥︎
                         </button>

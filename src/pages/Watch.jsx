@@ -247,11 +247,24 @@ const Watch = (props) => {
                 
                 // Fetch data with better error handling
                 const anilistId = id; // Use the raw ID from props for anime
-                const detailsUrl = type === 'anime' ? `${API_BASE_URL}/tmdb/anime/${anilistId}` : `${API_BASE_URL}/tmdb/${mediaType}/${tmdbId}`;
-                const videosUrl = type === 'anime' ? `${API_BASE_URL}/tmdb/anime/${anilistId}/videos` : `${API_BASE_URL}/tmdb/${mediaType}/${tmdbId}/videos`;
-                const recommendationsUrl = type === 'anime' ? `${API_BASE_URL}/tmdb/anime/${anilistId}/recommendations` : `${API_BASE_URL}/tmdb/${mediaType}/${tmdbId}/recommendations`;
+                
+                // Use enhanced endpoint for anime content
+                const detailsUrl = type === 'anime' 
+                    ? `${API_BASE_URL}/tmdb/anime/${anilistId}/enhanced` 
+                    : `${API_BASE_URL}/tmdb/${mediaType}/${tmdbId}`;
+                
+                // Videos are now included in enhanced endpoint for anime
+                const videosUrl = type === 'anime' 
+                    ? null // Will get videos from enhanced endpoint
+                    : `${API_BASE_URL}/tmdb/${mediaType}/${tmdbId}/videos`;
+                
+                const recommendationsUrl = type === 'anime' 
+                    ? `${API_BASE_URL}/tmdb/anime/${anilistId}/recommendations` 
+                    : `${API_BASE_URL}/tmdb/${mediaType}/${tmdbId}/recommendations`;
 
                 const fetchData = async (url, errorMessage) => {
+                    if (!url) return null; // Skip null URLs
+                    
                     try {
                         const res = await fetch(url, { signal: controller.signal });
                         if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -260,6 +273,10 @@ const Watch = (props) => {
                         if (type === 'anime' && data._conversion?.tmdbId) {
                             setTmdbId(data._conversion.tmdbId);
                             // DO NOT change the mediaType. It should remain 'anime'.
+                        }
+                        // For enhanced endpoint, data already includes tmdb_id
+                        if (type === 'anime' && data.tmdb_id) {
+                            setTmdbId(data.tmdb_id);
                         }
                         return data;
                     } catch (err) {
@@ -272,11 +289,21 @@ const Watch = (props) => {
                     }
                 };
 
-                const [detailsData, videosData, recommendationsData] = await Promise.all([
-                    fetchData(detailsUrl, 'Error fetching media details'),
-                    fetchData(videosUrl, 'Error fetching videos'),
-                    fetchData(recommendationsUrl, 'Error fetching recommendations')
-                ]);
+                // For anime, fetch enhanced data only
+                // For non-anime, fetch details and videos separately
+                let detailsData, videosData, recommendationsData;
+                
+                if (type === 'anime') {
+                    detailsData = await fetchData(detailsUrl, 'Error fetching anime details');
+                    videosData = { results: detailsData?.videos?.results || [] };
+                    recommendationsData = await fetchData(recommendationsUrl, 'Error fetching recommendations');
+                } else {
+                    [detailsData, videosData, recommendationsData] = await Promise.all([
+                        fetchData(detailsUrl, 'Error fetching media details'),
+                        fetchData(videosUrl, 'Error fetching videos'),
+                        fetchData(recommendationsUrl, 'Error fetching recommendations')
+                    ]);
+                }
                 
                 clearTimeout(timeoutId);
                 setMediaDetails(detailsData);

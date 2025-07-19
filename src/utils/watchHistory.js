@@ -6,6 +6,153 @@ import { API_BASE_URL } from '../config';
 // We will remove this to avoid conflicts and simplify the code.
 
 // Re-implement getWatchHistory to use the more efficient RPC call
+// New, consolidated function to get full watch history with details
+export const getFullWatchHistory = async (userId) => {
+    try {
+        if (!userId) {
+            console.log('No authenticated user, returning empty history');
+            return [];
+        }
+
+        console.log('🔄 [History] Fetching combined watch history with progress via RPC...');
+        const { data: historyData, error: rpcError } = await supabase.rpc('get_watch_history_with_progress');
+
+        if (rpcError) {
+            console.error('❌ [History] Error fetching combined history:', rpcError);
+            return [];
+        }
+
+        if (!historyData || historyData.length === 0) {
+            console.log('📭 [History] No watch history found.');
+            return [];
+        }
+
+        console.log(`✅ [History] Successfully fetched ${historyData.length} raw history items.`);
+
+        // Bulk fetch TMDB details
+        const requests = historyData.map(item => ({
+            type: item.media_type,
+            id: item.media_id
+        }));
+        
+        console.log(`📡 [History] Making bulk request for ${requests.length} TMDB details...`);
+        const response = await fetch(`${API_BASE_URL}/tmdb/bulk`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requests })
+        });
+
+        if (!response.ok) {
+            console.error(`❌ [History] Bulk TMDB request failed: ${response.statusText}`);
+            // Return raw data so the UI can still display something
+            return historyData;
+        }
+
+        const bulkDetails = await response.json();
+        const detailsMap = bulkDetails.reduce((acc, detail) => {
+            if (detail.success) {
+                acc[`${detail.type}-${detail.id}`] = detail.data;
+            }
+            return acc;
+        }, {});
+
+        console.log(`🗺️ [History] Successfully fetched and mapped ${Object.keys(detailsMap).length} TMDB details.`);
+
+        // Combine history data with TMDB details
+        const detailedHistory = historyData.map(item => {
+            const details = detailsMap[`${item.media_type}-${item.media_id}`];
+            if (details) {
+                return {
+                    ...details, // Spread the TMDB details (title, poster_path, etc.)
+                    id: details.id,
+                    watch_id: `${item.user_id}-${item.media_id}-${item.media_type}-${item.season_number || 0}-${item.episode_number || 0}`,
+                    type: item.media_type,
+                    media_type: item.media_type,
+                    media_id: item.media_id,
+                    season_number: item.season_number,
+                    episode_number: item.episode_number,
+                    watched_at: item.watched_at,
+                    progress_seconds: item.progress_seconds,
+                    duration_seconds: item.duration_seconds
+                };
+            }
+            // Return a fallback object if TMDB details are missing
+            return {
+                id: item.media_id,
+                watch_id: `${item.user_id}-${item.media_id}-${item.media_type}-${item.season_number || 0}-${item.episode_number || 0}`,
+                type: item.media_type,
+                media_type: item.media_type,
+                media_id: item.media_id,
+                season_number: item.season_number,
+                episode_number: item.episode_number,
+                watched_at: item.watched_at,
+                title: 'Unknown Title',
+                poster_path: null,
+                overview: 'Details not available.',
+                _failed_to_load: true,
+                progress_seconds: item.progress_seconds,
+                duration_seconds: item.duration_seconds
+            };
+        });
+
+        // Fetch episode-specific details for TV shows in a second bulk request
+        const episodeRequests = detailedHistory
+            .filter(item => item.media_type === 'tv' && item.season_number && item.episode_number)
+            .map(item => ({
+                id: item.media_id,
+                season: item.season_number,
+                episode: item.episode_number
+            }));
+
+        if (episodeRequests.length > 0) {
+            console.log(`📡 [History] Making bulk request for ${episodeRequests.length} episode details...`);
+            const episodeResponse = await fetch(`${API_BASE_URL}/tmdb/bulk-episodes`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ requests: episodeRequests })
+            });
+
+            if (episodeResponse.ok) {
+                const bulkEpisodes = await episodeResponse.json();
+                const episodeMap = bulkEpisodes.reduce((acc, ep) => {
+                    if (ep.success) {
+                        acc[`${ep.id}-${ep.season}-${ep.episode}`] = ep.data;
+                    }
+                    return acc;
+                }, {});
+
+                // Add episode details to the main history object
+                detailedHistory.forEach((item, index) => {
+                    if (item.media_type === 'tv' && item.season_number && item.episode_number) {
+                        const episodeDetails = episodeMap[`${item.media_id}-${item.season_number}-${item.episode_number}`];
+                        if (episodeDetails) {
+                            detailedHistory[index] = {
+                                ...item,
+                                episode_name: episodeDetails.name,
+                                still_path: episodeDetails.still_path,
+                                episode_overview: episodeDetails.overview
+                            };
+                        }
+                    }
+                });
+                console.log(`📺 [History] Successfully merged ${Object.keys(episodeMap).length} episode details.`);
+            } else {
+                console.error(`❌ [History] Bulk episode fetch failed: ${episodeResponse.statusText}`);
+            }
+        }
+
+        console.log(`🏁 [History] Finished processing. Returning ${detailedHistory.length} detailed history items.`);
+        return detailedHistory;
+
+    } catch (error) {
+        console.error('❌ [History] Unexpected error in getFullWatchHistory:', error);
+        return [];
+    }
+};
+
+/**
+ * @deprecated Use `getFullWatchHistory` instead. This function is inefficient as it requires N+1 API calls in the UI.
+ */
 export const getWatchHistory = async (userId) => {
     try {
         if (!userId) {
