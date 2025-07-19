@@ -10,6 +10,7 @@ export function AuthProvider({ children }) {
   const [profile, setProfile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [authReady, setAuthReady] = useState(false);
+  const [authError, setAuthError] = useState(null);
 
   const fetchProfile = useCallback(async (user) => {
     if (!user) {
@@ -34,34 +35,54 @@ export function AuthProvider({ children }) {
 
   const refreshProfile = useCallback(async () => {
     if (user) {
-      // First, refresh the auth session to get the latest user metadata
-      await supabase.auth.refreshSession();
-      // Then, fetch the profile from the database
-      await fetchProfile(user);
+      try {
+        await supabase.auth.refreshSession();
+        await fetchProfile(user);
+      } catch (error) {
+        console.error('Failed to refresh session:', error);
+      }
     }
   }, [user, fetchProfile]);
 
   useEffect(() => {
     let isMounted = true;
+    console.log('Auth: useEffect initiated.');
 
     const getSessionAndProfile = async () => {
+      if (!isMounted) return;
+      console.log('Auth: Starting session and profile check...');
+      
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        console.log('Auth: Calling supabase.auth.getSession()...');
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        console.log('Auth: supabase.auth.getSession() completed.');
+
+        if (sessionError) {
+          console.error('Auth: getSession() returned an error:', sessionError);
+          throw sessionError;
+        }
+
         if (isMounted) {
+          console.log('Auth: Session received:', session ? `Exists (user: ${session.user.id})` : 'Null');
           setSession(session);
           const currentUser = session?.user ?? null;
           setUser(currentUser);
+
           if (currentUser) {
+            console.log('Auth: Fetching profile for user:', currentUser.id);
             await fetchProfile(currentUser);
+            console.log('Auth: Profile fetch completed.');
           }
-          if (isMounted) {
-            setLoading(false);
-            setAuthReady(true);
-          }
+          setAuthError(null);
         }
       } catch (error) {
-        console.error('Auth check failed:', error);
+        console.error('Auth: Error in getSessionAndProfile:', error);
         if (isMounted) {
+          setAuthError(error.message);
+        }
+      } finally {
+        if (isMounted) {
+          console.log('Auth: Finalizing auth check, setting authReady to true.');
           setLoading(false);
           setAuthReady(true);
         }
@@ -72,13 +93,10 @@ export function AuthProvider({ children }) {
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
-        // When a user is updated, the updateUser function handles the profile refresh.
-        // Re-fetching here can cause a race condition where we get stale data from the db
-        // trigger before it's updated.
+        console.log('Auth: onAuthStateChange event received:', _event);
         if (_event === 'USER_UPDATED') {
           setSession(session);
           setUser(session?.user ?? null);
-          // Trust that the calling function has updated the profile state already
           return;
         }
 
@@ -94,6 +112,7 @@ export function AuthProvider({ children }) {
     );
 
     return () => {
+      console.log('Auth: Unsubscribing from auth changes.');
       authListener.subscription.unsubscribe();
       isMounted = false;
     };
@@ -173,10 +192,12 @@ export function AuthProvider({ children }) {
     user,
     profile,
     refreshProfile,
-    updateUser, // Expose the updateUser function
+    updateUser, 
     signOut,
     authReady,
     loading,
+    authError, // Expose auth errors to the UI
+    isSafari: false // Expose Safari detection to components
   };
 
   return (

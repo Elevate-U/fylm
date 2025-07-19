@@ -35,6 +35,15 @@ const SOURCES_CONFIG = {
 };
 const AVAILABLE_SOURCES = Object.keys(SOURCES_CONFIG);
 
+// --- API Provider Configuration ---
+const API_PROVIDERS = {
+    ANILIST: 'anilist',
+    SHIKIMORI: 'shikimori',
+    TMDB: 'tmdb'
+};
+
+// Default API provider for anime content
+const DEFAULT_ANIME_PROVIDER = process.env.DEFAULT_ANIME_PROVIDER || API_PROVIDERS.ANILIST;
 
 // --- Environment Variable Checks ---
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
@@ -45,6 +54,15 @@ if (!TMDB_API_KEY) {
     }
 } else {
     console.log("✅ TMDB API key loaded successfully");
+}
+
+// Check for Shikimori API keys
+const SHIKIMORI_CLIENT_ID = process.env.SHIKIMORI_CLIENT_ID;
+const SHIKIMORI_CLIENT_SECRET = process.env.SHIKIMORI_CLIENT_SECRET;
+if (DEFAULT_ANIME_PROVIDER === API_PROVIDERS.SHIKIMORI && (!SHIKIMORI_CLIENT_ID || !SHIKIMORI_CLIENT_SECRET)) {
+    console.warn("⚠️ Warning: Shikimori is set as default but credentials are missing. AniList will be used as fallback.");
+} else if (SHIKIMORI_CLIENT_ID && SHIKIMORI_CLIENT_SECRET) {
+    console.log("✅ Shikimori API credentials loaded successfully");
 }
 
 // This is now handled by SOURCES_CONFIG, so it can be removed.
@@ -235,6 +253,56 @@ app.get('/image-proxy', async (req, res) => {
         } catch (error) {
             console.error('[IMAGE_PROXY] Direct AniList image error:', error);
             return res.status(500).json({ error: 'Failed to proxy direct AniList image', details: error.message });
+        }
+    }
+
+    // Handle Shikimori images
+    if (imageUrl.includes('shikimori.one') || imageUrl.startsWith('/system/')) {
+        try {
+            const fullUrl = imageUrl.startsWith('/system/') 
+                ? `https://shikimori.one${imageUrl}` 
+                : imageUrl;
+            
+            console.log(`[IMAGE_PROXY] Fetching Shikimori image: ${fullUrl}`);
+            
+            // Check if the URL is valid
+            const url = new URL(fullUrl);
+            if (!['http:', 'https:'].includes(url.protocol)) {
+                return res.status(400).json({ error: 'Invalid Shikimori image URL protocol.' });
+            }
+            
+            // Now proceed with fetching the image
+            const response = await fetch(fullUrl, {
+                headers: { 
+                    'User-Agent': 'ai-business-image-proxy/1.0 (Shikimori)',
+                    'Accept': 'image/*'
+                }
+            });
+            
+            if (!response.ok) {
+                console.error(`[IMAGE_PROXY] Failed to fetch Shikimori image: ${response.status}`, fullUrl);
+                // Return a placeholder image instead of an error
+                res.setHeader('Content-Type', 'image/svg+xml');
+                res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+                
+                const svg = `<svg width="500" height="750" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="100%" height="100%" fill="#8B0000" />
+                    <text x="50%" y="50%" font-family="Arial" font-size="24" fill="white" text-anchor="middle" dominant-baseline="middle">
+                        Anime Image
+                    </text>
+                </svg>`;
+                
+                return res.send(svg);
+            }
+            
+            res.setHeader('Content-Type', response.headers.get('content-type') || 'application/octet-stream');
+            res.setHeader('Cache-Control', 'public, max-age=86400'); // Cache for 1 day
+            // Stream the image directly to the client to save memory
+            Readable.fromWeb(response.body).pipe(res);
+            return;
+        } catch (error) {
+            console.error('[IMAGE_PROXY] Shikimori image proxy error:', error);
+            return res.status(500).json({ error: 'Failed to proxy Shikimori image', details: error.message });
         }
     }
 
@@ -1977,3 +2045,210 @@ if (process.env.NODE_ENV === 'development') {
         console.log(`🚀 API server ready at http://localhost:${PORT}`);
     });
 }
+
+// Add new Shikimori API routes
+
+// Shikimori API handling
+app.get('/shikimori/anime/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log(`[SHIKIMORI] Fetching anime details for ID ${id}`);
+        
+        const response = await fetch(`https://shikimori.one/api/animes/${id}`, {
+            headers: { 
+                'User-Agent': 'Fylm Streaming App/1.0',
+                'Accept': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Shikimori API error: ${response.status}`);
+        }
+        
+        const animeData = await response.json();
+        
+        // Transform to standardized format
+        const transformedData = {
+            id: animeData.id,
+            title: animeData.russian || animeData.name,
+            name: animeData.russian || animeData.name,
+            original_title: animeData.name,
+            overview: animeData.description,
+            poster_path: animeData.image?.original || animeData.image?.preview,
+            backdrop_path: null, // Shikimori doesn't provide backdrop images
+            vote_average: animeData.score,
+            first_air_date: animeData.aired_on,
+            status: animeData.status,
+            episodes_count: animeData.episodes,
+            episodes_aired: animeData.episodes_aired,
+            kind: animeData.kind,
+            source_provider: API_PROVIDERS.SHIKIMORI,
+            seasons: [
+                {
+                    id: 1,
+                    name: 'Season 1',
+                    season_number: 1,
+                    episode_count: animeData.episodes || 0
+                }
+            ]
+        };
+        
+        res.json(transformedData);
+    } catch (error) {
+        console.error(`[SHIKIMORI] Error fetching anime details: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/shikimori/anime/:id/episodes', async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log(`[SHIKIMORI] Fetching episodes for anime ID ${id}`);
+        
+        const response = await fetch(`https://shikimori.one/api/animes/${id}/episodes`, {
+            headers: { 
+                'User-Agent': 'Fylm Streaming App/1.0',
+                'Accept': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Shikimori API error: ${response.status}`);
+        }
+        
+        const episodesData = await response.json();
+        
+        // Transform to standardized format
+        const transformedEpisodes = episodesData.map(episode => ({
+            id: `${id}-${episode.episode}`,
+            name: episode.name || `Episode ${episode.episode}`,
+            episode_number: episode.episode,
+            season_number: 1, // Shikimori treats all as season 1
+            overview: '',
+            still_path: episode.image || null,
+            air_date: episode.airdate
+        }));
+        
+        res.json({
+            season_number: 1,
+            name: "Season 1",
+            episodes: transformedEpisodes
+        });
+    } catch (error) {
+        console.error(`[SHIKIMORI] Error fetching episodes: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/shikimori/anime/:id/recommendations', async (req, res) => {
+    try {
+        const { id } = req.params;
+        console.log(`[SHIKIMORI] Fetching recommendations for anime ID ${id}`);
+        
+        const response = await fetch(`https://shikimori.one/api/animes/${id}/similar`, {
+            headers: { 
+                'User-Agent': 'Fylm Streaming App/1.0',
+                'Accept': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Shikimori API error: ${response.status}`);
+        }
+        
+        const recommendationsData = await response.json();
+        
+        // Transform to standardized format
+        const transformedRecommendations = recommendationsData.map(anime => ({
+            id: anime.id,
+            title: anime.russian || anime.name,
+            name: anime.russian || anime.name,
+            poster_path: anime.image?.original || anime.image?.preview,
+            media_type: 'anime',
+            source_provider: API_PROVIDERS.SHIKIMORI,
+            vote_average: anime.score
+        }));
+        
+        res.json({ results: transformedRecommendations });
+    } catch (error) {
+        console.error(`[SHIKIMORI] Error fetching recommendations: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+app.get('/shikimori/search', async (req, res) => {
+    try {
+        const { query } = req.query;
+        
+        if (!query) {
+            return res.status(400).json({ error: 'Query parameter is required' });
+        }
+        
+        console.log(`[SHIKIMORI] Searching for anime: ${query}`);
+        
+        const response = await fetch(`https://shikimori.one/api/animes?search=${encodeURIComponent(query)}&limit=20`, {
+            headers: { 
+                'User-Agent': 'Fylm Streaming App/1.0',
+                'Accept': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Shikimori API error: ${response.status}`);
+        }
+        
+        const searchResults = await response.json();
+        
+        // Transform to standardized format
+        const transformedResults = searchResults.map(anime => ({
+            id: anime.id,
+            title: anime.russian || anime.name,
+            name: anime.russian || anime.name,
+            poster_path: anime.image?.original || anime.image?.preview,
+            media_type: 'anime',
+            source_provider: API_PROVIDERS.SHIKIMORI,
+            vote_average: anime.score
+        }));
+        
+        res.json({ results: transformedResults });
+    } catch (error) {
+        console.error(`[SHIKIMORI] Error searching for anime: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ID mapping service
+app.get('/mapping/anilist-to-shikimori/:anilistId', async (req, res) => {
+    try {
+        const { anilistId } = req.params;
+        console.log(`[MAPPING] Mapping AniList ID ${anilistId} to Shikimori ID`);
+        
+        const response = await fetch(`https://find-my-anime.dtimur.de/api/anilist/${anilistId}`, {
+            headers: { 
+                'User-Agent': 'Fylm Streaming App/1.0',
+                'Accept': 'application/json'
+            }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Mapping API error: ${response.status}`);
+        }
+        
+        const mappingData = await response.json();
+        
+        if (!mappingData.shikimori) {
+            return res.status(404).json({ error: 'No Shikimori ID found for this AniList ID' });
+        }
+        
+        res.json({ 
+            anilist_id: parseInt(anilistId),
+            shikimori_id: mappingData.shikimori,
+            other_mappings: mappingData
+        });
+    } catch (error) {
+        console.error(`[MAPPING] Error mapping IDs: ${error.message}`);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Existing code continues below...

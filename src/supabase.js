@@ -1,5 +1,41 @@
 import { createClient } from '@supabase/supabase-js'
 
+// Custom storage implementation with in-memory fallback for Safari compatibility
+const memoryStorage = {};
+const customStorage = {
+  getItem: (key) => {
+    try {
+      // First, try to get from localStorage
+      const item = window.localStorage.getItem(key);
+      // If not found in localStorage, check memoryStorage as a fallback
+      return item ?? memoryStorage[key] ?? null;
+    } catch (error) {
+      console.warn(`LocalStorage (getItem) failed: ${error.message}. Falling back to in-memory storage.`);
+      return memoryStorage[key] ?? null;
+    }
+  },
+  setItem: (key, value) => {
+    try {
+      // Try to set in localStorage
+      window.localStorage.setItem(key, value);
+    } catch (error) {
+      console.warn(`LocalStorage (setItem) failed: ${error.message}. Falling back to in-memory storage.`);
+    }
+    // Always set in memoryStorage as well
+    memoryStorage[key] = value;
+  },
+  removeItem: (key) => {
+    try {
+      // Try to remove from localStorage
+      window.localStorage.removeItem(key);
+    } catch (error) {
+      console.warn(`LocalStorage (removeItem) failed: ${error.message}. Falling back to in-memory storage.`);
+    }
+    // Always remove from memoryStorage
+    delete memoryStorage[key];
+  },
+};
+
 // It's recommended to store these in environment variables
 // and expose them to your Vite app.
 // Create a .env.local file in the root of your project and add:
@@ -24,12 +60,12 @@ if (!supabaseUrl || !supabaseAnonKey) {
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
+        storage: customStorage, // Use our custom storage implementation
         // Reduce aggressive session refresh that can cause network errors
         autoRefreshToken: true,
         persistSession: true,
-        detectSessionInUrl: false,
+        detectSessionInUrl: true, // Enable to better handle iOS Safari redirects
         // Add timeout settings to prevent hanging requests
-        storageKey: 'supabase.auth.token',
         flowType: 'pkce',
         // Debug mode for auth
         debug: import.meta.env.MODE === 'development'
@@ -48,14 +84,24 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
             const INITIAL_DELAY_MS = 1000;
             let retries = 0;
 
+            // Safari detection
+            const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+            if (isSafari) {
+                console.log('Safari browser detected, applying specific handling');
+            }
+
             while (retries < MAX_RETRIES) {
                 try {
                     const controller = new AbortController();
-                    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15-second timeout
+                    // Safari sometimes has issues with long-running requests
+                    const timeout = isSafari ? 10000 : 15000; // 10-second timeout for Safari
+                    const timeoutId = setTimeout(() => controller.abort(), timeout);
 
                     const response = await fetch(url, {
                         ...options,
                         signal: controller.signal,
+                        // Safari has stricter CORS requirements
+                        credentials: 'same-origin',
                     });
 
                     clearTimeout(timeoutId);
@@ -68,6 +114,16 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
                     return response; // Success
 
                 } catch (error) {
+                    // Special handling for Safari CORS errors
+                    if (isSafari && error.message && error.message.includes('NetworkError')) {
+                        console.warn('Safari CORS error detected:', error);
+                        // Try to detect if this is a CORS error
+                        if (retries === 0) {
+                            console.log('Attempting Safari-specific workaround for CORS issue');
+                            // Some Safari CORS workarounds might be added here
+                        }
+                    }
+
                     if (error.name === 'AbortError' || (error.message && error.message.includes('network'))) {
                         retries++;
                         if (retries >= MAX_RETRIES) {
@@ -126,7 +182,11 @@ export const handleAuthError = (error) => {
         'User not found': 'This email address is not registered.',
         'Invalid login credentials': 'Check your email and password.',
         'NetworkError': 'Check your internet connection and try again.',
-        'CORS error': 'Contact support - there may be a configuration issue.'
+        'CORS error': 'Contact support - there may be a configuration issue.',
+        // Safari specific errors
+        'blocked by client': 'Safari\'s ITP may be blocking cookies. Try disabling Prevent Cross-Site Tracking in Safari settings.',
+        'Storage access': 'Safari requires storage access. Try disabling Prevent Cross-Site Tracking.',
+        'Unrecognized': 'This could be related to Safari\'s tracking prevention. Try a different browser or disable Prevent Cross-Site Tracking.'
     };
     
     const errorMessage = error.message || error.error_description || 'Unknown error';

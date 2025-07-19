@@ -263,19 +263,19 @@ const Header = () => {
                             </>
                         )}
                     </div>
+                    <button 
+                        ref={hamburgerRef}
+                        class={`hamburger ${isMenuOpen ? 'active' : ''}`} 
+                        onClick={toggleMenu} 
+                        aria-label="Toggle menu"
+                        aria-expanded={isMenuOpen}
+                        aria-controls="mobile-menu"
+                    >
+                        <span class="bar"></span>
+                        <span class="bar"></span>
+                        <span class="bar"></span>
+                    </button>
                 </div>
-                <button 
-                    ref={hamburgerRef}
-                    class={`hamburger ${isMenuOpen ? 'active' : ''}`} 
-                    onClick={toggleMenu} 
-                    aria-label="Toggle menu"
-                    aria-expanded={isMenuOpen}
-                    aria-controls="mobile-menu"
-                >
-                    <span class="bar"></span>
-                    <span class="bar"></span>
-                    <span class="bar"></span>
-                </button>
             </div>
         </header>
     );

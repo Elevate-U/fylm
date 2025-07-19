@@ -194,6 +194,27 @@
   will-change: transform, opacity, backdrop-filter;
 }
 
+/* iOS & Safari specific fixes */
+@supports (-webkit-touch-callout: none) {
+  /* Fix for the 100vh issue on iOS Safari */
+  body, html, .app, #app {
+    min-height: -webkit-fill-available;
+    min-height: 100vh;
+  }
+  
+  /* Prevent background from scrolling on modal-like views */
+  html.ios-no-scroll {
+    position: fixed;
+    width: 100%;
+    overflow: hidden;
+  }
+}
+
+/* Smoother scrolling behavior on iOS */
+body {
+  -webkit-overflow-scrolling: touch;
+}
+
 body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', 'Roboto', 'Helvetica Neue', Arial, sans-serif;
   background: var(--bg-primary);
