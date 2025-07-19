@@ -174,7 +174,12 @@ const Header = () => {
         <header class={isMenuOpen ? 'scrolled' : ''}>
             <div class="container">
                 <div class="header-left">
-                    <Link href="/" class="logo" onClick={closeMenu}>Fylm</Link>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                        <Link href="/" class="logo" onClick={closeMenu} style={{ display: 'flex', alignItems: 'center', gap: '10px', textDecoration: 'none', fontSize: '2em', lineHeight: 'normal' }}>
+                            <img src="/favicon.jpg" alt="Fylm logo" style={{ height: '1em', borderRadius: '0.25em', marginRight: '4px', display: 'inline-block', verticalAlign: 'middle' }} />
+                            Fylm
+                        </Link>
+                    </div>
                     <nav ref={menuRef} class={isMenuOpen ? 'active' : ''} aria-hidden={!isMenuOpen}>
                         <ul>
                             <li><Link activeClassName="active" href="/movies" onClick={closeMenu}>Movies</Link></li>
