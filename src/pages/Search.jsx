@@ -100,14 +100,29 @@ const SearchPage = (props) => {
   };
 
   const handleFilterChange = (newFilter) => {
-    // Update URL with the new filter
-    const url = new URL(window.location.href);
-    url.searchParams.set('filter', newFilter);
-    window.history.replaceState({}, '', url);
-    
-    // Re-perform search with the new filter
     setSearchFilter(newFilter);
     performSearch(query, newFilter);
+    
+    // Update URL without reloading page
+    const url = new URL(window.location);
+    url.searchParams.set('q', query);
+    url.searchParams.set('filter', newFilter);
+    window.history.pushState({}, '', url.toString());
+  };
+
+  const handleInputChange = (e) => {
+    const newQuery = e.target.value;
+    setQuery(newQuery);
+
+    if (newQuery.trim() === '') {
+      setResults([]);
+    }
+
+    // Update URL dynamically as user types
+    const url = new URL(window.location);
+    url.searchParams.set('q', newQuery);
+    url.searchParams.set('filter', searchFilter); // Keep current filter
+    window.history.replaceState({}, '', url.toString());
   };
 
   // Helper to render movie/TV/anime cards with source badges
@@ -127,9 +142,29 @@ const SearchPage = (props) => {
     </div>
   );
 
+  const handleSearchSubmit = (e) => {
+    e.preventDefault();
+    if (query.trim()) {
+      performSearch(query.trim(), searchFilter);
+    }
+  };
+
   return (
     <div className="container home-page">
       <div className="search-header">
+        {/* New Search Form */}
+        <form onSubmit={handleSearchSubmit} className="search-form-container">
+          <input
+            type="text"
+            value={query}
+            onInput={handleInputChange}
+            placeholder="Search for movies, TV shows, or anime..."
+            className="search-input-field"
+            autofocus
+          />
+          <button type="submit" className="search-submit-button">Search</button>
+        </form>
+
         <h1 className="main-title">Search Results</h1>
         <div className="search-query-display">
           <span className="search-label">Showing results for:</span>
@@ -162,7 +197,7 @@ const SearchPage = (props) => {
           >
             TV Shows
           </button>
-          <button 
+          <button
             className={`filter-btn ${searchFilter === 'anime' ? 'active' : ''}`}
             onClick={() => handleFilterChange('anime')}
           >

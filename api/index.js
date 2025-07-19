@@ -545,6 +545,17 @@ app.get('/stream-url', async (req, res) => {
 
         console.log(`[Stream URL] Generated for ${type} ID ${id} (source: ${currentSource}): ${finalUrl}`);
         
+        // Test the URL to make sure it's accessible
+        try {
+            const testResponse = await fetch(finalUrl, { 
+                method: 'HEAD',
+                signal: AbortSignal.timeout(5000)
+            });
+            console.log(`[Stream URL] URL test result: ${testResponse.status}`);
+        } catch (error) {
+            console.warn(`[Stream URL] URL test failed: ${error.message}`);
+        }
+        
         res.status(200).json({
             url: finalUrl,
             currentSource,
@@ -947,6 +958,16 @@ const handleAnimeRequest = async (req, res, subpath = '') => {
                         timeUntilAiring
                         episode
                     }
+                    relations {
+                        edges {
+                            relationType
+                            node {
+                                id
+                                idMal
+                                type
+                            }
+                        }
+                    }
                 }
             }
         `;
@@ -1032,20 +1053,55 @@ const handleAnimeRequest = async (req, res, subpath = '') => {
                 return sendFallbackAnimeResponse(req, res, numericId, subpath);
             }
     
+            // Attempt to convert AniList ID to TMDB ID via MyAnimeList ID
+            // This is now done AFTER fetching the main data
+            let tmdbId = null;
+
+            if (media.idMal && (!subpath || subpath.startsWith('season'))) {
+                try {
+                    console.log(`[ANIME_HANDLER] Converting MAL ID ${media.idMal} to TMDB ID`);
+                    const conversionResponse = await fetch(`https://api.themoviedb.org/3/find/${media.idMal}?api_key=${TMDB_API_KEY}&external_source=myanimelist_id`);
+                    if (conversionResponse.ok) {
+                        const conversionData = await conversionResponse.json();
+                        const tvResult = conversionData.tv_results?.[0];
+                        if (tvResult) {
+                            console.log(`[ANIME_HANDLER] Found TMDB ID: ${tvResult.id}`);
+                            tmdbId = tvResult.id;
+                        } else {
+                            console.log(`[ANIME_HANDLER] No TV result found for MAL ID ${media.idMal}`);
+                        }
+                    } else {
+                        console.warn(`[ANIME_HANDLER] Failed to convert MAL ID ${media.idMal} to TMDB ID. Status: ${conversionResponse.status}`);
+                    }
+                } catch (e) {
+                    console.error('[ANIME_HANDLER] Error during MAL to TMDB conversion:', e);
+                }
+            }
+
             // Format response based on subpath
             let formattedResponse;
             if (subpath === 'recommendations') {
                 const recommendations = media.recommendations?.nodes?.map(node => {
                     const rec = node.mediaRecommendation;
+                    if (!rec) return null;
                     return {
                         id: rec.id,
                         title: rec.title.english || rec.title.romaji,
-                        name: rec.title.english || rec.title.romaji,
-                        poster_path: `/anilist_images/${encodeURIComponent(rec.coverImage?.large)}`,
-                        vote_average: rec.meanScore / 10 || 0,
-                        media_type: 'anime'
+                        poster_path: rec.coverImage?.large,
+                        media_type: 'anime',
+                        source: 'anilist',
+                        vote_average: rec.meanScore ? rec.meanScore / 10 : 0,
+                        year: rec.seasonYear,
+                        status: rec.status,
+                        episodes: rec.episodes,
+                        format: rec.format
                     };
-                }) || [];
+                }).filter(Boolean) || []; // Filter out nulls
+                
+                // Add a defensive check for recommendations
+                if (!recommendations) {
+                    console.warn(`[ANIME_HANDLER] No recommendations found for AniList ID ${numericId}`);
+                }
                 
                 formattedResponse = { results: recommendations };
             } else if (subpath === 'videos') {
@@ -1106,11 +1162,8 @@ const handleAnimeRequest = async (req, res, subpath = '') => {
                     name: media.title.english || media.title.romaji,
                     original_name: media.title.native,
                     overview: media.description ? media.description.replace(/<[^>]*>/g, '') : '',
-                    // Use a special format for image paths that the image proxy can handle
-                    poster_path: media.coverImage?.extraLarge ? `/anilist_images/${encodeURIComponent(media.coverImage.extraLarge)}` :
-                                media.coverImage?.large ? `/anilist_images/${encodeURIComponent(media.coverImage.large)}` :
-                                media.coverImage?.medium ? `/anilist_images/${encodeURIComponent(media.coverImage.medium)}` : null,
-                    backdrop_path: media.bannerImage ? `/anilist_images/${encodeURIComponent(media.bannerImage)}` : null,
+                    poster_path: media.coverImage?.extraLarge || media.coverImage?.large || media.coverImage?.medium,
+                    backdrop_path: media.bannerImage,
                     vote_average: media.averageScore / 10,
                     popularity: media.popularity,
                     first_air_date: media.startDate ? `${media.startDate.year}-${media.startDate.month || '01'}-${media.startDate.day || '01'}` : '',
@@ -1125,14 +1178,20 @@ const handleAnimeRequest = async (req, res, subpath = '') => {
                             id: `${media.id}_season_1`,
                             name: 'Season 1',
                             season_number: 1,
-                            episode_count: media.episodes
+                            episode_count: media.episodes,
+                            poster_path: media.coverImage?.large || media.coverImage?.medium
                         }
                     ],
                     studios: media.studios?.nodes?.map(studio => studio.name) || [],
                     next_episode_to_air: media.nextAiringEpisode ? {
                         episode_number: media.nextAiringEpisode.episode,
                         air_date: new Date(media.nextAiringEpisode.airingAt * 1000).toISOString().split('T')[0]
-                    } : null
+                    } : null,
+                    // Add conversion data for the frontend
+                    _conversion: {
+                        tmdbId: tmdbId,
+                        source: 'AniList'
+                    }
                 };
             }
     
@@ -1140,6 +1199,7 @@ const handleAnimeRequest = async (req, res, subpath = '') => {
             res.json({
                 ...formattedResponse,
                 anilist_id: numericId,
+                source: 'anilist', // Add source at top level for frontend compatibility
                 _conversion: {
                     anilistId: numericId,
                     source: 'anilist'
@@ -1222,6 +1282,7 @@ const sendFallbackAnimeResponse = (req, res, animeId, subpath = '') => {
                 }
             ],
             studios: ['Studio'],
+            source: 'anilist', // Add source for fallback data
             _conversion: {
                 anilistId: animeId,
                 source: 'fallback'
@@ -1512,6 +1573,7 @@ app.get('/tmdb/anime/:anilistId/enhanced', async (req, res) => {
             res.json({
                 ...enhancedResponse,
                 anilist_id: parseInt(anilistId),
+                source: 'anilist', // Add source at top level for frontend compatibility
                 _conversion: {
                     anilistId: parseInt(anilistId),
                     tmdbId: tmdbId,
@@ -1558,7 +1620,14 @@ app.get('/tmdb/*', async (req, res) => {
         }
         
         const data = await response.json();
-        res.json(data);
+        
+        // Add source property for frontend compatibility
+        const enhancedData = {
+            ...data,
+            source: 'tmdb'
+        };
+        
+        res.json(enhancedData);
     } catch (error) {
         console.error('[TMDB_PROXY] Proxy error:', error);
         res.status(500).json({ error: 'Failed to fetch from TMDB API', details: error.message });
@@ -1679,109 +1748,132 @@ app.get('/search/unified', async (req, res) => {
             combined: []
         };
 
+        const fetchWithTimeout = (url, options, timeout = 5000) => {
+            return new Promise((resolve, reject) => {
+                const timer = setTimeout(() => {
+                    reject(new Error('Request timed out'));
+                }, timeout);
+
+                fetch(url, options)
+                    .then(response => {
+                        clearTimeout(timer);
+                        resolve(response);
+                    })
+                    .catch(err => {
+                        clearTimeout(timer);
+                        reject(err);
+                    });
+            });
+        };
+
+        const searchPromises = [];
+
         // Search TMDB if type is 'all', 'movie', or 'tv'
         if (['all', 'movie', 'tv'].includes(type) && TMDB_API_KEY) {
             const tmdbTypes = type === 'all' ? ['movie', 'tv'] : [type];
-            const tmdbSearchPromises = tmdbTypes.map(async mediaType => {
-                try {
-                    const tmdbUrl = `https://api.themoviedb.org/3/search/${mediaType}?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`;
-                    const response = await fetch(tmdbUrl);
-                    if (response.ok) {
-                        const data = await response.json();
-                        return { type: mediaType, results: data.results || [] };
-                    }
-                } catch (error) {
-                    console.error(`TMDB search error for ${mediaType}:`, error);
-                }
-                return { type: mediaType, results: [] };
-            });
             
-            const tmdbResults = await Promise.all(tmdbSearchPromises);
-            tmdbResults.forEach(result => {
-                // Ensure we're adding to the right property and it's always an array
-                results.tmdb[result.type + 's'] = (result.results || []).map(item => ({
-                    ...item,
-                    source: 'tmdb',
-                    media_type: result.type
-                }));
+            tmdbTypes.forEach(mediaType => {
+                const tmdbUrl = `https://api.themoviedb.org/3/search/${mediaType}?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`;
+                searchPromises.push(
+                    fetchWithTimeout(tmdbUrl)
+                        .then(response => response.ok ? response.json() : Promise.resolve({ results: [] }))
+                        .then(data => ({
+                            source: 'tmdb',
+                            type: mediaType,
+                            data: (data.results || []).map(item => ({
+                                ...item,
+                                media_type: mediaType,
+                                source: 'tmdb'
+                            }))
+                        }))
+                        .catch(error => {
+                            console.error(`TMDB search error for ${mediaType}:`, error.message);
+                            return { source: 'tmdb', type: mediaType, data: [] };
+                        })
+                );
             });
         }
 
         // Search AniList if type is 'all' or 'anime'
         if (['all', 'anime'].includes(type)) {
-            try {
-                const anilistQuery = `
-                    query ($search: String) {
-                        Page(page: 1, perPage: 10) {
-                            media(search: $search, type: ANIME, sort: POPULARITY_DESC) {
-                                id
-                                idMal
-                                title {
-                                    romaji
-                                    english
-                                    native
-                                }
-                                coverImage {
-                                    large
-                                }
-                                format
-                                status
-                                episodes
-                                description
-                                genres
-                                averageScore
-                                popularity
-                                seasonYear
-                            }
+            const anilistUrl = `https://graphql.anilist.co`;
+            const anilistQuery = `
+                query ($search: String) {
+                    Page(page: 1, perPage: 20) {
+                        media(search: $search, type: ANIME, sort: SEARCH_MATCH) {
+                            id
+                            title { romaji english native }
+                            coverImage { extraLarge large medium color }
+                            bannerImage
+                            format
+                            type
+                            status
+                            episodes
+                            seasonYear
+                            averageScore
+                            genres
                         }
                     }
-                `;
-
-                const anilistResponse = await fetch('https://graphql.anilist.co', {
+                }
+            `;
+            const variables = { search: query };
+            searchPromises.push(
+                fetchWithTimeout(anilistUrl, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/json'
-                    },
-                    body: JSON.stringify({
-                        query: anilistQuery,
-                        variables: { search: query }
-                    })
-                });
-
-                if (anilistResponse.ok) {
-                    const anilistData = await anilistResponse.json();
-                    const animeResults = anilistData?.data?.Page?.media || [];
-                    
-                    results.anilist = animeResults.map(anime => ({
-                        id: anime.id,
-                        title: anime.title.english || anime.title.romaji,
-                        name: anime.title.english || anime.title.romaji,
-                        original_name: anime.title.native,
-                        overview: anime.description ? anime.description.replace(/<[^>]*>/g, '') : '',
-                        poster_path: anime.coverImage?.large ? `/anilist_images/${encodeURIComponent(anime.coverImage.large)}` : null,
-                        vote_average: anime.averageScore ? anime.averageScore / 10 : 0,
-                        popularity: anime.popularity,
+                    headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+                    body: JSON.stringify({ query: anilistQuery, variables })
+                })
+                .then(response => response.ok ? response.json() : Promise.resolve({ data: { Page: { media: [] } } }))
+                .then(data => ({
+                    source: 'anilist',
+                    data: (data.data?.Page?.media || []).map(item => ({
+                        id: item.id,
+                        title: item.title.english || item.title.romaji,
+                        poster_path: item.coverImage.extraLarge || item.coverImage.large,
                         media_type: 'anime',
                         source: 'anilist',
-                        idMal: anime.idMal,
-                        format: anime.format,
-                        episodes: anime.episodes,
-                        year: anime.seasonYear
-                    }));
-                }
-            } catch (error) {
-                console.error('AniList search error:', error);
-                // Keep anilist as empty array
-            }
+                        vote_average: item.averageScore,
+                        genres: item.genres,
+                        episodes: item.episodes,
+                        year: item.seasonYear,
+                        banner_path: item.bannerImage
+                    }))
+                }))
+                .catch(error => {
+                    console.error(`AniList search error:`, error.message);
+                    return { source: 'anilist', data: [] };
+                })
+            );
         }
 
-        // Combine all results for convenience
+        const allResults = await Promise.all(searchPromises);
+
+        allResults.forEach(result => {
+            if (result.source === 'tmdb') {
+                results.tmdb[result.type === 'movie' ? 'movies' : 'tv'] = result.data;
+            } else if (result.source === 'anilist') {
+                results.anilist = result.data;
+            }
+        });
+
+        // Combine and sort results - prioritize TMDB over AniList
         results.combined = [
-            ...results.anilist,
             ...results.tmdb.movies,
-            ...results.tmdb.tv
-        ];
+            ...results.tmdb.tv,
+            ...results.anilist
+        ].sort((a, b) => {
+            // Give TMDB results priority over AniList
+            const aPriority = a.source === 'tmdb' ? 1000 : 0;
+            const bPriority = b.source === 'tmdb' ? 1000 : 0;
+            
+            // First sort by source priority (TMDB first)
+            if (aPriority !== bPriority) {
+                return bPriority - aPriority;
+            }
+            
+            // Then sort by popularity/vote_average within each source
+            return (b.popularity || b.vote_average || 0) - (a.popularity || a.vote_average || 0);
+        });
 
         res.json(results);
     } catch (error) {
@@ -1894,8 +1986,8 @@ app.get('/trending/anime/combined', async (req, res) => {
                         name: item.title.english || item.title.romaji,
                         original_name: item.title.native,
                         overview: item.description ? item.description.replace(/<[^>]*>/g, '') : '',
-                        poster_path: item.coverImage?.large ? `/anilist_images/${encodeURIComponent(item.coverImage.large)}` : null,
-                        backdrop_path: item.bannerImage ? `/anilist_images/${encodeURIComponent(item.bannerImage)}` : null,
+                        poster_path: item.coverImage?.large,
+                        backdrop_path: item.bannerImage,
                         vote_average: item.averageScore ? item.averageScore / 10 : 0,
                         first_air_date: item.startDate?.year ? `${item.startDate.year}-${item.startDate.month || '01'}-${item.startDate.day || '01'}` : '',
                         popularity: item.popularity,
@@ -1917,8 +2009,8 @@ app.get('/trending/anime/combined', async (req, res) => {
                         name: item.title.english || item.title.romaji,
                         original_name: item.title.native,
                         overview: item.description ? item.description.replace(/<[^>]*>/g, '') : '',
-                        poster_path: item.coverImage?.large ? `/anilist_images/${encodeURIComponent(item.coverImage.large)}` : null,
-                        backdrop_path: item.bannerImage ? `/anilist_images/${encodeURIComponent(item.bannerImage)}` : null,
+                        poster_path: item.coverImage?.large,
+                        backdrop_path: item.bannerImage,
                         vote_average: item.averageScore ? item.averageScore / 10 : 0,
                         first_air_date: item.startDate?.year ? `${item.startDate.year}-${item.startDate.month || '01'}-${item.startDate.day || '01'}` : '',
                         popularity: item.popularity,
@@ -1958,16 +2050,16 @@ app.get('/trending/anime/combined', async (req, res) => {
                     ...item,
                     source: 'tmdb',
                     trending_source: 'popular',
-                    poster_path: item.poster_path ? `${IMAGE_BASE_URL}${item.poster_path}` : null,
-                    backdrop_path: item.backdrop_path ? `${IMAGE_BASE_URL}${item.backdrop_path}` : null,
+                    poster_path: item.poster_path, // Pass raw path
+                    backdrop_path: item.backdrop_path, // Pass raw path
                 }));
                 
                 results.tmdb.movies = movieResults.map(item => ({
                     ...item,
                     source: 'tmdb',
                     trending_source: 'popular',
-                    poster_path: item.poster_path ? `${IMAGE_BASE_URL}${item.poster_path}` : null,
-                    backdrop_path: item.backdrop_path ? `${IMAGE_BASE_URL}${item.backdrop_path}` : null,
+                    poster_path: item.poster_path, // Pass raw path
+                    backdrop_path: item.backdrop_path, // Pass raw path
                 }));
                 
                 // Add all to flat array for combined sort
@@ -2010,8 +2102,20 @@ app.get('/trending/anime/combined', async (req, res) => {
             results.combined.push(item);
         }
         
-        // Sort by popularity
-        results.combined.sort((a, b) => b.popularity - a.popularity);
+        // Sort by popularity - prioritize TMDB over AniList
+        results.combined.sort((a, b) => {
+            // Give TMDB results priority over AniList
+            const aPriority = a.source === 'tmdb' ? 1000 : 0;
+            const bPriority = b.source === 'tmdb' ? 1000 : 0;
+            
+            // First sort by source priority (TMDB first)
+            if (aPriority !== bPriority) {
+                return bPriority - aPriority;
+            }
+            
+            // Then sort by popularity within each source
+            return b.popularity - a.popularity;
+        });
         
         res.json(results);
         

@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'preact/hooks';
 import { route } from 'preact-router';
 import { useStore } from '../store';
 import MovieCard from '../components/MovieCard';
+import AnimeCard from '../components/AnimeCard';
 import { getLastWatchedEpisodeWithProgress } from '../utils/watchHistory';
 import { useAuth } from '../context/Auth';
 import { API_BASE_URL } from '../config';
@@ -13,8 +14,7 @@ import './Anime.css';
 const Anime = () => {
     const [loading, setLoading] = useState(true);
     const [trending, setTrending] = useState([]);
-    const [airingToday, setAiringToday] = useState([]);
-    const [onTheAir, setOnTheAir] = useState([]);
+    const [seasonal, setSeasonal] = useState([]);
     const [popular, setPopular] = useState([]);
     const [topRated, setTopRated] = useState([]);
     const [error, setError] = useState(null);
@@ -35,36 +35,38 @@ const Anime = () => {
 
     const animeWatchHistory = continueWatching.filter(item => item.type === 'anime');
 
-	const fetchTmdbData = useCallback(async (endpoint, retries = 3) => {
+    const fetchCombinedAnimeData = useCallback(async (retries = 3) => {
 	    try {
-	        const response = await fetch(`${API_BASE_URL}/tmdb/discover/tv?with_genres=16&${endpoint}`);
+            const response = await fetch(`${API_BASE_URL}/trending/anime/combined`);
 	        if (!response.ok) {
-	            throw new Error(`TMDB API error: ${response.status}`);
+                throw new Error(`API error: ${response.status}`);
 	        }
-	        const data = await response.json();
-	        return data.results.map(item => ({ ...item, media_type: 'tv' }));
+            return response.json();
 	    } catch (error) {
-	        console.error(`Error fetching from TMDB endpoint ${endpoint}:`, error);
+            console.error(`Error fetching combined anime data:`, error);
 	        if (retries > 0) {
 	            await new Promise(resolve => setTimeout(resolve, 1000 * (4 - retries)));
-	            return fetchTmdbData(endpoint, retries - 1);
+                return fetchCombinedAnimeData(retries - 1);
 	        }
-	        return []; // Return empty array on failure
+            return null; // Return null on failure
 	    }
 	}, []);
 
+
     const handleAnimeClick = useCallback(async (animeItem) => {
+        const mediaType = 'anime';
         if (user) {
             const nextEpisode = await getLastWatchedEpisodeWithProgress(user.id, animeItem.id);
             if (nextEpisode) {
-                route(`/watch/tv/${animeItem.id}/season/${nextEpisode.season}/episode/${nextEpisode.episode}`);
+                route(`/watch/${mediaType}/${animeItem.id}/season/${nextEpisode.season}/episode/${nextEpisode.episode}`);
             } else {
                 // Default to S1E1 if no history
-                route(`/watch/tv/${animeItem.id}/season/1/episode/1`);
+                route(`/watch/${mediaType}/${animeItem.id}/season/1/episode/1`);
             }
         } else {
-            // Fallback for non-logged-in users
-            route(`/tv/${animeItem.id}`);
+            // Fallback for non-logged-in users should probably go to a details page
+            // that doesn't exist yet, so we'll send to watch page for now.
+            route(`/watch/${mediaType}/${animeItem.id}/season/1/episode/1`);
         }
     }, [user]);
 
@@ -91,28 +93,31 @@ const Anime = () => {
             setError(null);
 
             try {
-                const [
-                    trendingData,
-                    airingTodayData,
-                    onTheAirData,
-                    popularData,
-                    topRatedData
-                ] = await Promise.all([
-                    fetchTmdbData('sort_by=popularity.desc&page=1'), // Trending
-                    fetchTmdbData('air_date.gte=2024-01-01&sort_by=popularity.desc'), // Airing Today (example)
-                    fetchTmdbData('sort_by=popularity.desc&page=2'), // On The Air (example)
-                    fetchTmdbData('sort_by=popularity.desc&page=3'), // Popular
-                    fetchTmdbData('sort_by=vote_average.desc&vote_count.gte=100') // Top Rated
-                ]);
+                const combinedData = await fetchCombinedAnimeData();
 
-                setTrending(trendingData);
-                setAiringToday(airingTodayData);
-                setOnTheAir(onTheAirData);
-                setPopular(popularData);
-                setTopRated(topRatedData);
+                if (combinedData) {
+                    // Filter out any items that don't have a poster
+                    const filterValidItems = (items) => items.filter(item => item.poster_path);
+
+                    setTrending(filterValidItems(combinedData.combined || []).slice(0, 20));
+                    setSeasonal(filterValidItems(combinedData.seasonal || []));
+
+                    // For popular and top-rated, we can sort the combined list
+                    const allAnime = filterValidItems(combinedData.combined || []);
+                    
+                    // Sort by popularity
+                    const popularAnime = [...allAnime].sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+                    setPopular(popularAnime.slice(0, 20)); // Take top 20 popular
+
+                    // Sort by vote average
+                    const topRatedAnime = [...allAnime].sort((a, b) => (b.vote_average || 0) - (a.vote_average || 0));
+                    setTopRated(topRatedAnime.slice(0, 20)); // Take top 20 rated
+                } else {
+                    throw new Error("Failed to fetch any anime data.");
+                }
 
             } catch (error) {
-                console.error('Error fetching anime data from TMDB:', error);
+                console.error('Error fetching anime data:', error);
                 setError('Failed to load anime data. Please refresh the page.');
             } finally {
                 setLoading(false);
@@ -120,7 +125,7 @@ const Anime = () => {
         };
 
         fetchAllAnimeData();
-    }, [fetchTmdbData]);
+    }, [fetchCombinedAnimeData]);
 
     const renderSection = (title, items) => {
         if (!items || items.length === 0) {
@@ -132,10 +137,9 @@ const Anime = () => {
                 <h2>{title}</h2>
                 <div class="scrolling-row">
                     {items.map(item => (
-                        <MovieCard
+                        <AnimeCard
                             key={`${title}-${item.id}`}
                             item={item}
-                            type="anime"
                             onClick={() => handleAnimeClick(item)}
                         />
                     ))}
@@ -203,10 +207,9 @@ const Anime = () => {
                     <h2>Continue Watching</h2>
                     <div class="scrolling-row scrolling-row--compact">
                         {animeWatchHistory.map(item => (
-                            <MovieCard
+                            <AnimeCard
                                 key={`continue-watching-${item.id}`}
                                 item={item}
-                                type="anime"
                                 progress={item.progress_seconds}
                                 duration={item.duration_seconds}
                                 onClick={() => handleAnimeClick(item)}
@@ -217,8 +220,7 @@ const Anime = () => {
             )}
             
             {renderSection('Trending Now', trending)}
-            {renderSection('Airing Today', airingToday)}
-            {renderSection('Currently On The Air', onTheAir)}
+            {renderSection('This Season', seasonal)}
             {renderSection('Popular Anime', popular)}
             {renderSection('Top Rated Anime', topRated)}
             

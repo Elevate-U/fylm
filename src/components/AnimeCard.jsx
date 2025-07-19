@@ -36,7 +36,7 @@ const AnimeCard = ({ item, progress, duration, showDeleteButton, onDelete, onCli
         episode_name
     } = item;
 
-    const animeTitle = title?.english || title?.romaji || title || item.name;
+    const animeTitle = title?.english || title?.romaji || title || item.name || 'Unknown Anime';
     
     // Calculate progress percentage
     const progressPercent = (progress && duration > 0) ? (progress / duration) * 100 : 0;
@@ -47,7 +47,7 @@ const AnimeCard = ({ item, progress, duration, showDeleteButton, onDelete, onCli
     const { user } = useAuth();
     const { addFavorite, removeFavorite, isShowFavorited, favoritesFetched } = useStore();
     
-    const favorited = isShowFavorited(item.id, 'anime', item.season_number, item.episode_number);
+    const favorited = isShowFavorited(item.id || item.anilist_id, 'anime', item.season_number, item.episode_number);
 
     const handleFavoriteClick = (e) => {
         e.preventDefault();
@@ -56,7 +56,7 @@ const AnimeCard = ({ item, progress, duration, showDeleteButton, onDelete, onCli
         if (!user) return;
 
         if (favorited) {
-            removeFavorite(user.id, item.id, 'anime', item.season_number, item.episode_number);
+            removeFavorite(user.id, item.id || item.anilist_id, 'anime', item.season_number, item.episode_number);
         } else {
             addFavorite(user.id, { ...item, type: 'anime' });
         }
@@ -66,6 +66,8 @@ const AnimeCard = ({ item, progress, duration, showDeleteButton, onDelete, onCli
     const handleCardClick = (e) => {
         e.preventDefault();
         e.stopPropagation();
+        
+        console.log('AnimeCard clicked:', item);
         
         if (onClick) {
             onClick(item);
@@ -77,6 +79,9 @@ const AnimeCard = ({ item, progress, duration, showDeleteButton, onDelete, onCli
             // Deep linking support for specific episodes
             if (item.season_number && item.episode_number) {
                 link += `/season/${item.season_number}/episode/${item.episode_number}`;
+            } else {
+                // Default to season 1, episode 1 for anime
+                link += `/season/1/episode/1`;
             }
             
             // Get audio preference for routing
@@ -90,6 +95,7 @@ const AnimeCard = ({ item, progress, duration, showDeleteButton, onDelete, onCli
                 link += `?${urlParams.toString()}`;
             }
             
+            console.log('Routing to:', link);
             route(link);
         }
     };
@@ -215,7 +221,19 @@ const AnimeCard = ({ item, progress, duration, showDeleteButton, onDelete, onCli
 
     return (
         <div className="anime-card-container">
-            <div className="anime-card" onClick={handleCardClick}>
+            <div 
+                className="anime-card" 
+                onClick={handleCardClick}
+                style={{ cursor: 'pointer' }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        handleCardClick(e);
+                    }
+                }}
+            >
                 <div className="anime-poster-wrapper">
                     <img 
                         src={getFullImageUrl(poster_path)} 
@@ -238,9 +256,11 @@ const AnimeCard = ({ item, progress, duration, showDeleteButton, onDelete, onCli
                         </div>
                     )}
                     
-                    {/* Videasy integration indicator */}
+                    {/* Data source indicator */}
                     <div className="streaming-indicator">
-                        <span className="videasy-badge">Videasy</span>
+                        <span className={`source-badge ${(item.source || 'tmdb') === 'anilist' ? 'anilist' : 'tmdb'}`}>
+                            {(item.source || 'tmdb') === 'anilist' ? 'AniList' : 'TMDB'}
+                        </span>
                     </div>
                     
                     <div className="anime-card-info">

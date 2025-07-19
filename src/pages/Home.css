@@ -512,21 +512,18 @@
 }
 
 .search-suggestions li::before {
-    content: '';
+    content: '→';
     position: absolute;
-    top: 0;
-    left: -100%;
-    width: 100%;
-    height: 100%;
-    background: linear-gradient(90deg, 
-        transparent 0%, 
-        rgba(var(--primary-rgb), 0.1) 50%, 
-        transparent 100%);
-    transition: left 0.5s ease;
+    left: 1rem;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--primary);
+    opacity: 0;
+    transition: opacity 0.3s ease;
 }
 
 .search-suggestions li:hover::before {
-    left: 100%;
+    opacity: 1;
 }
 
 .search-suggestions li:hover {
@@ -568,6 +565,39 @@
     color: rgba(255, 255, 255, 0.7);
     font-size: 1rem;
     line-height: 1.6;
+}
+
+/* New styles for the search form */
+.search-form-container {
+    display: flex;
+    gap: 1rem;
+    margin-bottom: 2rem;
+    align-items: center;
+}
+
+.search-input-field {
+    flex-grow: 1;
+    padding: 0.75rem 1rem;
+    font-size: 1rem;
+    border-radius: 8px;
+    border: 1px solid var(--border-color);
+    background-color: var(--input-bg);
+    color: var(--text-color);
+}
+
+.search-submit-button {
+    padding: 0.75rem 1.5rem;
+    font-size: 1rem;
+    border-radius: 8px;
+    border: none;
+    background-color: var(--primary);
+    color: white;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+
+.search-submit-button:hover {
+    background-color: var(--primary-dark);
 }
 
 /* ===== RESPONSIVE GLASSMORPHIC HOME DESIGN ===== */

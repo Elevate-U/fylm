@@ -120,7 +120,7 @@
     box-shadow: 0 0 8px rgba(var(--accent-color-rgb), 0.6);
 }
 
-/* Videasy Integration Indicator */
+/* Data Source Indicator */
 .streaming-indicator {
     position: absolute;
     top: 8px;
@@ -128,17 +128,26 @@
     z-index: 3;
 }
 
-.videasy-badge {
+.source-badge {
     padding: 3px 6px;
-    background: rgba(0, 0, 0, 0.8);
-    color: #4ade80;
     font-size: 0.6rem;
     font-weight: 600;
     border-radius: 4px;
     text-transform: uppercase;
     letter-spacing: 0.5px;
-    border: 1px solid #4ade80;
     backdrop-filter: blur(5px);
+}
+
+.source-badge.anilist {
+    background: rgba(0, 0, 0, 0.8);
+    color: #ff6b6b;
+    border: 1px solid #ff6b6b;
+}
+
+.source-badge.tmdb {
+    background: rgba(0, 0, 0, 0.8);
+    color: #4ade80;
+    border: 1px solid #4ade80;
 }
 
 /* Card Information */
@@ -350,7 +359,13 @@
     transform: scale(1.05);
 }
 
-.anime-card:hover .videasy-badge {
+.anime-card:hover .source-badge.anilist {
+    background: rgba(255, 107, 107, 0.2);
+    border-color: #ff6b6b;
+    box-shadow: 0 0 8px rgba(255, 107, 107, 0.3);
+}
+
+.anime-card:hover .source-badge.tmdb {
     background: rgba(74, 222, 128, 0.2);
     border-color: #4ade80;
     box-shadow: 0 0 8px rgba(74, 222, 128, 0.3);
@@ -404,7 +419,7 @@
     
     .anime-status-badge,
     .genre-tag,
-    .videasy-badge {
+    .source-badge {
         border: 2px solid currentColor;
     }
 }
@@ -434,7 +449,7 @@
     }
     
     .anime-status-badge,
-    .videasy-badge,
+    .source-badge,
     .anime-favorite-btn,
     .anime-delete-btn {
         display: none;
