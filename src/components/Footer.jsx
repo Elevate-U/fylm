@@ -16,6 +16,7 @@ const Footer = () => (
                         <li><Link href="/" class="footer-legal-link">Home</Link></li>
                         <li><Link href="/movies" class="footer-legal-link">Movies</Link></li>
                         <li><Link href="/tv" class="footer-legal-link">TV Shows</Link></li>
+                        <li><Link href="/blog" class="footer-legal-link">Blog</Link></li>
                     </ul>
                 </div>
                 <div class="footer-section">

@@ -353,9 +353,7 @@
   outline-offset: 1px;
 }
 
-.checkmark {
-  /* This is for custom checkbox styling if needed */
-}
+/* Custom checkbox styling can be added here if needed */
 
 .terms-text {
   flex: 1;

@@ -28,6 +28,10 @@ const AsyncAnime = asyncComponent(() => import('./pages/Anime'));
 const AsyncMoviePage = asyncComponent(() => import('./movie.jsx'));
 const AsyncTermsOfService = asyncComponent(() => import('./pages/TermsOfService'));
 const AsyncPrivacyPolicy = asyncComponent(() => import('./pages/PrivacyPolicy'));
+const AsyncBlog = asyncComponent(() => import('./pages/Blog'));
+const AsyncBlogPost = asyncComponent(() => import('./pages/BlogPost'));
+const AsyncBlogAdmin = asyncComponent(() => import('./pages/BlogAdmin'));
+const AsyncAdminSetup = asyncComponent(() => import('./pages/AdminSetup'));
 
 
 const MainApp = () => {
@@ -75,6 +79,11 @@ const MainApp = () => {
                     <AsyncForgotPassword path="/forgot-password" />
                     <AsyncUpdatePassword path="/update-password" />
                     {user ? <AsyncProfile path="/profile" /> : <AsyncLogin path="/profile" />}
+                    <AsyncBlog path="/blog" />
+                    <AsyncBlogPost path="/blog/:slug" />
+                    {user ? <AsyncBlogAdmin path="/blog-admin" /> : <AsyncLogin path="/blog-admin" />}
+                    {user ? <AsyncBlogAdmin path="/blog/admin" /> : <AsyncLogin path="/blog/admin" />}
+                    {user ? <AsyncAdminSetup path="/admin-setup" /> : <AsyncLogin path="/admin-setup" />}
                     <AsyncTermsOfService path="/terms-of-service" />
                     <AsyncPrivacyPolicy path="/privacy-policy" />
                 </Router>

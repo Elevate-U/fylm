@@ -2,6 +2,7 @@ import { h } from 'preact';
 import { useState, useEffect, useRef } from 'preact/hooks';
 import { Link, route } from 'preact-router';
 import { useAuth } from '../context/Auth';
+import { BlogAPI } from '../utils/blogApi';
 import ThemeToggle from './ThemeToggle';
 import { getProxiedImageUrl } from '../config';
 import defaultAvatar from '../assets/default-avatar.png';
@@ -11,6 +12,7 @@ const Header = () => {
     const [query, setQuery] = useState('');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [isAdmin, setIsAdmin] = useState(false);
     const { user, profile, signOut } = useAuth();
     const menuRef = useRef(null);
     const hamburgerRef = useRef(null);
@@ -133,6 +135,25 @@ const Header = () => {
         };
     }, [isMenuOpen, isSearchOpen]);
 
+    // Check admin status when user changes
+    useEffect(() => {
+        const checkAdminStatus = async () => {
+            if (user) {
+                try {
+                    const adminStatus = await BlogAPI.isAdmin();
+                    setIsAdmin(adminStatus);
+                } catch (error) {
+                    console.error('Error checking admin status:', error);
+                    setIsAdmin(false);
+                }
+            } else {
+                setIsAdmin(false);
+            }
+        };
+        
+        checkAdminStatus();
+    }, [user]);
+
     // Focus management for accessibility
     useEffect(() => {
         if (isMenuOpen) {
@@ -189,7 +210,9 @@ const Header = () => {
                                 <>
                                     <li><Link activeClassName="active" href="/favorites" onClick={closeMenu}>Favorites</Link></li>
                                     <li><Link activeClassName="active" href="/history" onClick={closeMenu}>History</Link></li>
-                                    
+    
+                                        <li><Link activeClassName="active" href="/blog/admin" onClick={closeMenu}>Editor</Link></li>
+
                                 </>
                             ) : (
                                 <>
