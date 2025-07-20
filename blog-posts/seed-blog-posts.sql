@@ -404,6 +404,73 @@ INSERT INTO blog_posts (
     'Horror Movie Quiz: What Your Favorite Reveals About You',
     'Discover what your favorite horror movie reveals about your deepest fears and psychological makeup.',
     (SELECT id FROM auth.users LIMIT 1)
+),
+(
+    'The Sequel Spectrum: From Disaster to Masterpiece',
+    'sequel-spectrum-disaster-to-masterpiece',
+    'For every Godfather Part II, there\'s a Jaws: The Revenge. We\'ve ranked movie sequels on the official scale of "Why?" to "More please!"',
+    '<h2>The Sequel Spectrum: From Disaster to Masterpiece</h2>
+    <p>For every <a href="#/movie/240">Godfather Part II</a>, there\'s a Jaws: The Revenge. We\'ve ranked movie sequels on the official scale of "Why?" to "More please!"</p>
+    
+    <h3>🏆 "Better Than the Original" Tier</h3>
+    
+    <p><strong><a href="#/movie/280">Terminator 2: Judgment Day</a></strong> - James Cameron said "hold my beer" and created perfection.</p>
+    
+    <p><strong><a href="#/movie/155">The Dark Knight</a></strong> - Heath Ledger\'s Joker elevated superhero movies forever.</p>
+    
+    <p><strong><a href="#/movie/863">Toy Story 2</a></strong> - Pixar proving that sequels can have heart and soul.</p>
+    
+    <h3>🥇 "Worthy Successor" Tier</h3>
+    
+    <p><strong><a href="#/movie/679">Aliens</a></strong> - Ridley Scott made horror, James Cameron made action. Both worked.</p>
+    
+    <p><strong><a href="#/movie/558">Spider-Man 2</a></strong> - Tobey Maguire at his peak, Doc Ock at his most terrifying.</p>
+    
+    <p><strong><a href="#/movie/324552">John Wick: Chapter 2</a></strong> - More dogs, more pencils, more perfectly choreographed violence.</p>
+    
+    <h3>😐 "It\'s Fine, I Guess" Tier</h3>
+    
+    <p><strong><a href="#/movie/10138">Iron Man 2</a></strong> - Not bad, just... there. Mickey Rourke tried his best.</p>
+    
+    <p><strong><a href="#/movie/86834">The Hangover Part II</a></strong> - The exact same movie in a different location. Points for consistency?</p>
+    
+    <h3>🗑️ "Why Does This Exist?" Tier</h3>
+    
+    <p><strong>Jaws: The Revenge</strong> - A shark with a personal vendetta. We\'re not linking this one.</p>
+    
+    <p><strong><a href="#/movie/415">Batman & Robin</a></strong> - Bat-nipples. That\'s all we need to say.</p>
+    
+    <h3>🤔 "So Bad It\'s Good" Tier</h3>
+    
+    <p><strong><a href="#/movie/385687">F9: The Fast Saga</a></strong> - Physics left the chat around movie 5, but we\'re still here for it.</p>
+    
+    <h3>🎬 How to Watch Movies for Free</h3>
+    
+    <p>Looking for ways to enjoy these sequels without breaking the bank? Here are 5 legitimate ways to watch movies for free:</p>
+    
+    <h4>1. Library Digital Collections</h4>
+    <p>Most public libraries offer free streaming through services like Kanopy and Hoopla. Just need your library card!</p>
+    
+    <h4>2. Free Streaming Platforms</h4>
+    <p>Tubi, Crackle, and Pluto TV offer thousands of movies with ads - completely legal and free.</p>
+    
+    <h4>3. Studio YouTube Channels</h4>
+    <p>Many studios upload full movies to YouTube for free viewing. Check official channels regularly.</p>
+    
+    <h4>4. Free Trials</h4>
+    <p>Rotate through streaming service free trials - just remember to cancel before billing starts!</p>
+    
+    <h4>5. Community Events</h4>
+    <p>Parks, libraries, and community centers often host free movie nights, especially during summer.</p>
+    
+    <p><em>Remember: Great sequels are worth watching, terrible sequels are worth mocking. Either way, you win!</em></p>',
+    (SELECT id FROM blog_categories WHERE slug = 'lists' LIMIT 1),
+    'published',
+    'https://images.unsplash.com/photo-1489599735734-79b4169c4388?w=800',
+    ARRAY['sequels', 'movies', 'ranking', 'film-analysis', 'free-movies'],
+    'Movie Sequels Ranked: From Disaster to Masterpiece | Free Viewing Guide',
+    'Our definitive ranking of movie sequels from terrible to amazing, plus 5 ways to watch movies for free legally.',
+    (SELECT id FROM auth.users LIMIT 1)
 );
 
 -- Update the author_id to use the first admin user if available
