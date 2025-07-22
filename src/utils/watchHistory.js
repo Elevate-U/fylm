@@ -414,21 +414,51 @@ export const getContinueWatching = async (userId) => {
         console.log(`🗺️ Found ${latestEntries.length} unique media items.`);
 
         // 4. Process these latest entries to determine if they are "continuable".
-        const continueWatchingItems = latestEntries.map(entry => {
-            const { progress_seconds, duration_seconds } = entry;
-            if (progress_seconds && duration_seconds > 0) {
-                const completion = progress_seconds / duration_seconds;
-                if (completion >= 0.9) {
-                    // Item is likely finished, exclude it from "Continue Watching" for now.
-                    // The logic to find the next episode can be handled elsewhere or deferred.
-                    return null;
+        const continueWatchingItems = await Promise.all(latestEntries.map(async (entry) => {
+            const { progress_seconds, duration_seconds, media_type, season_number, episode_number } = entry;
+            
+            // For TV shows and anime, check if episode is completed and find next episode
+            if ((media_type === 'tv' || media_type === 'anime') && season_number && episode_number) {
+                if (progress_seconds && duration_seconds > 0) {
+                    const completion = progress_seconds / duration_seconds;
+                    if (completion >= 0.98) {
+                        // Episode is completed, try to find the next episode
+                        console.log(`🎯 Episode S${season_number}E${episode_number} is completed (${(completion * 100).toFixed(1)}%), finding next episode...`);
+                        const nextEpisode = await getNextEpisode(entry.media_id, season_number, episode_number, media_type);
+                        
+                        if (nextEpisode) {
+                            // Return entry with next episode info
+                            console.log(`➡️ Advancing to next episode: S${nextEpisode.season}E${nextEpisode.episode}`);
+                            return {
+                                ...entry,
+                                season_number: nextEpisode.season,
+                                episode_number: nextEpisode.episode,
+                                progress_seconds: 0, // Reset progress for new episode
+                                duration_seconds: null // Will be set when episode is played
+                            };
+                        } else {
+                            // No next episode available, series is finished
+                            console.log(`🏁 Series completed, removing from continue watching`);
+                            return null;
+                        }
+                    }
                 }
+                return entry;
+            } else {
+                // For movies, use the original logic
+                if (progress_seconds && duration_seconds > 0) {
+                    const completion = progress_seconds / duration_seconds;
+                    if (completion >= 0.95) {
+                        // Movie is likely finished, exclude it from "Continue Watching"
+                        return null;
+                    }
+                }
+                return entry;
             }
-            return entry;
-        }).filter(Boolean);
-
-        // 5. Filter out nulls (completed items).
-        const validItems = continueWatchingItems;
+        }));
+        
+        // Filter out null entries (completed series with no next episode)
+        const validItems = continueWatchingItems.filter(Boolean);
         
         // 6. Sort by `watched_at` to show the most recently watched items first.
         validItems.sort((a, b) => new Date(b.watched_at) - new Date(a.watched_at));
