@@ -139,12 +139,21 @@ const BlogPost = ({ slug }) => {
     };
 
     const formatContent = (content) => {
-        // Basic content formatting - in a real app, you might use a more sophisticated markdown/HTML processor
-        return content
+        // Basic content formatting and fix hash-based links
+        let formattedContent = content
             .replace(/\n\n/g, '</p><p>')
             .replace(/\n/g, '<br>')
             .replace(/^/, '<p>')
             .replace(/$/, '</p>');
+        
+        // Fix hash-based links to be absolute from root
+        // Handle all hash-based links that start with #/ and make them absolute
+        formattedContent = formattedContent.replace(
+            /href="#\//g, 
+            'href="/#/'
+        );
+        
+        return formattedContent;
     };
 
     if (loading) {

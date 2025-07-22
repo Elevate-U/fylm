@@ -6,6 +6,10 @@ import { imageProcessor } from './imageProcessor';
  */
 
 export class BlogAPI {
+    // Cache for admin status to avoid repeated API calls
+    static _adminCache = new Map();
+    static _cacheExpiry = 5 * 60 * 1000; // 5 minutes
+
     /**
      * Check if current user is an admin
      * @returns {Promise<boolean>} - Whether user is admin
@@ -20,6 +24,18 @@ export class BlogAPI {
                 return false;
             }
 
+            const userId = user.user.id;
+            const now = Date.now();
+            
+            // Check cache first
+            if (this._adminCache.has(userId)) {
+                const cached = this._adminCache.get(userId);
+                if (now - cached.timestamp < this._cacheExpiry) {
+                    console.log('Returning cached admin status:', cached.isAdmin);
+                    return cached.isAdmin;
+                }
+            }
+
             const { data, error } = await supabase
                 .rpc('is_admin');
 
@@ -29,11 +45,24 @@ export class BlogAPI {
                 return false;
             }
 
+            // Cache the result
+            this._adminCache.set(userId, {
+                isAdmin: data,
+                timestamp: now
+            });
+
             return data;
         } catch (error) {
             console.error('Error checking admin status:', error);
             return false;
         }
+    }
+
+    /**
+     * Clear admin cache (useful when user signs out or admin status changes)
+     */
+    static clearAdminCache() {
+        this._adminCache.clear();
     }
     /**
      * Get all blog categories

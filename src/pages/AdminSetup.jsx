@@ -1,22 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../lib/supabase';
-import { useAuth } from '../contexts/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useState, useEffect } from 'preact/hooks';
+import { route } from 'preact-router';
+import { supabase } from '../supabase';
+import { useAuth } from '../context/Auth';
 
 const AdminSetup = () => {
   const { user } = useAuth();
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [status, setStatus] = useState('');
   const [userProfile, setUserProfile] = useState(null);
 
   useEffect(() => {
     if (!user) {
-      navigate('/login');
+      route('/login', true);
       return;
     }
     checkUserStatus();
-  }, [user, navigate]);
+  }, [user]);
 
   const checkUserStatus = async () => {
     try {
@@ -82,7 +81,7 @@ const AdminSetup = () => {
 
   const signOut = async () => {
     await supabase.auth.signOut();
-    navigate('/login');
+    route('/login', true);
   };
 
   if (!user) {

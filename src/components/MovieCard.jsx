@@ -6,7 +6,7 @@ import { useAuth } from '../context/Auth';
 import './MovieCard.css';
 import { getProxiedImageUrl, IMAGE_BASE_URL } from '../config';
 
-const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete, onClick }) => {
+const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete, onClick, useFullResolution = false }) => {
     // Destructure all needed properties from item
     const {
         id,
@@ -182,15 +182,21 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete,
         return getProxiedImageUrl(`${baseUrl}${path}`);
     }, []);
 
-    const [imageUrl, setImageUrl] = useState(() => getFullImageUrl(imagePath, 'w200'));
+    const [imageUrl, setImageUrl] = useState(() => 
+        getFullImageUrl(imagePath, useFullResolution ? 'w500' : 'w200')
+    );
 
     const handleMouseEnter = useCallback(() => {
-        setImageUrl(getFullImageUrl(imagePath, 'w500'));
-    }, [imagePath, getFullImageUrl]);
+        if (!useFullResolution) {
+            setImageUrl(getFullImageUrl(imagePath, 'w500'));
+        }
+    }, [imagePath, getFullImageUrl, useFullResolution]);
 
     const handleMouseLeave = useCallback(() => {
-        setImageUrl(getFullImageUrl(imagePath, 'w200'));
-    }, [imagePath, getFullImageUrl]);
+        if (!useFullResolution) {
+            setImageUrl(getFullImageUrl(imagePath, 'w200'));
+        }
+    }, [imagePath, getFullImageUrl, useFullResolution]);
 
     // Enhanced card with anime-specific features
     const cardContent = (

@@ -3,7 +3,7 @@ import './History.css';
 import Helmet from 'preact-helmet';
 import { useState, useEffect, useCallback } from 'preact/hooks';
 // Import getWatchHistory instead of getContinueWatching for actual watch history
-import { getFullWatchHistory, deleteWatchItem } from '../utils/watchHistory';
+import { getFullWatchHistory, deleteWatchItem, getBatchedWatchHistory } from '../utils/watchHistory';
 import { useAuth } from '../context/Auth';
 import { API_BASE_URL } from '../config';
 import MovieCard from '../components/MovieCard';
@@ -50,6 +50,8 @@ const History = () => {
     const [history, setHistory] = useState([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState(null);
+    const [loadingMore, setLoadingMore] = useState(false);
+    const [hasMore, setHasMore] = useState(true);
     const { removeContinueWatchingItem, fetchContinueWatching } = useStore();
 
     const fetchHistory = useCallback(async () => {
@@ -60,11 +62,12 @@ const History = () => {
         
         setLoading(true);
         setError(null);
+        setHistory([]);
+        setHasMore(true);
         
         try {
-            // Use the new, optimized function to fetch all data in one go.
-            const fullHistory = await getFullWatchHistory(user.id);
-            setHistory(fullHistory);
+            // Use batched loading to show results progressively
+            await loadHistoryBatch(0, true);
         } catch (error) {
             console.error('Error fetching watch history:', error);
             setError('Failed to load watch history. Please try again.');
@@ -73,6 +76,47 @@ const History = () => {
             setLoading(false);
         }
     }, [user]);
+
+    const loadHistoryBatch = useCallback(async (offset = 0, isInitial = false) => {
+        if (!user || (!isInitial && !hasMore)) return;
+        
+        if (!isInitial) setLoadingMore(true);
+        
+        try {
+            const batchSize = 20;
+            const batch = await getBatchedWatchHistory(user.id, offset, batchSize);
+            
+            if (batch.length === 0) {
+                setHasMore(false);
+                return;
+            }
+            
+            setHistory(prev => {
+                // Avoid duplicates by filtering out items that already exist
+                const existingIds = new Set(prev.map(item => item.watch_id));
+                const newItems = batch.filter(item => !existingIds.has(item.watch_id));
+                return [...prev, ...newItems];
+            });
+            
+            // If we got fewer items than requested, we've reached the end
+            if (batch.length < batchSize) {
+                setHasMore(false);
+            }
+        } catch (error) {
+            console.error('Error loading history batch:', error);
+            if (isInitial) {
+                setError('Failed to load watch history. Please try again.');
+            }
+        } finally {
+            if (!isInitial) setLoadingMore(false);
+        }
+    }, [user, hasMore]);
+
+    const loadMore = useCallback(() => {
+        if (!loadingMore && hasMore) {
+            loadHistoryBatch(history.length);
+        }
+    }, [loadHistoryBatch, history.length, loadingMore, hasMore]);
 
     useEffect(() => {
         fetchHistory();
@@ -129,26 +173,40 @@ const History = () => {
             </Helmet>
             <h1>Watch History</h1>
             {history.length > 0 ? (
-                <div class="movie-grid">
-                    {history.map(item => {
-                        return (
-                            <MovieCard 
-                                key={item.watch_id} 
-                                item={item} 
-                                type={item.type}
-                                progress={item.progress_seconds}
-                                duration={item.duration_seconds}
-                                showDeleteButton={true}
-                                onDelete={handleDelete}
-                            />
-                        );
-                    })}
-                </div>
+                <>
+                    <div class="movie-grid">
+                        {history.map(item => {
+                            return (
+                                <MovieCard 
+                                    key={item.watch_id} 
+                                    item={item} 
+                                    type={item.type}
+                                    progress={item.progress_seconds}
+                                    duration={item.duration_seconds}
+                                    showDeleteButton={true}
+                                    onDelete={handleDelete}
+                                    useFullResolution={true}
+                                />
+                            );
+                        })}
+                    </div>
+                    {hasMore && (
+                        <div class="load-more-container">
+                            <button 
+                                class="load-more-btn" 
+                                onClick={loadMore}
+                                disabled={loadingMore}
+                            >
+                                {loadingMore ? 'Loading...' : 'Load More'}
+                            </button>
+                        </div>
+                    )}
+                </>
             ) : (
-                <p>Your watch history is empty.</p>
+                !loading && <p>Your watch history is empty.</p>
             )}
         </div>
     );
 };
 
-export default History; 
+export default History;

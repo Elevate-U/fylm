@@ -1,6 +1,7 @@
 import { createContext } from 'preact';
-import { useState, useEffect, useContext, useCallback } from 'preact/hooks';
+import { useContext, useState, useEffect, useCallback } from 'preact/hooks';
 import { supabase } from '../supabase';
+import { BlogAPI } from '../utils/blogApi';
 
 const AuthContext = createContext();
 
@@ -179,6 +180,8 @@ export function AuthProvider({ children }) {
       if (error) {
         console.error('Error during sign out:', error);
       }
+      // Clear admin cache when signing out
+      BlogAPI.clearAdminCache();
       setSession(null);
       setUser(null);
       setProfile(null);

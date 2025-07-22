@@ -5,6 +5,7 @@ import { BlogAPI } from '../utils/blogApi.js';
 import ImageProcessor from '../utils/imageProcessor.js';
 import { updatePageTitle, updateMetaDescription } from '../utils/seoUtils.js';
 import { supabase } from '../utils/supabase.js';
+import { useAuth } from '../context/Auth';
 import Header from '../components/Header';
 import './BlogAdmin.css';
 
@@ -48,13 +49,16 @@ const adminStyles = `
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        padding: 0.75rem 1.5rem;
+        padding: 0.875rem 1.75rem;
         border: none;
-        border-radius: 8px;
-        font-weight: 500;
+        border-radius: 12px;
+        font-weight: 600;
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         text-decoration: none;
+        font-size: 0.95rem;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
     }
 
     .refresh-btn {
@@ -66,16 +70,24 @@ const adminStyles = `
     .refresh-btn:hover {
         background: rgba(255, 255, 255, 0.2);
         transform: translateY(-2px);
+        box-shadow: 0 6px 20px rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.3);
     }
 
     .refresh-btn:disabled {
         opacity: 0.5;
         cursor: not-allowed;
         transform: none;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
 
     .refresh-btn .icon.spinning {
         animation: spin 1s linear infinite;
+    }
+
+    @keyframes spin {
+        from { transform: rotate(0deg); }
+        to { transform: rotate(360deg); }
     }
 
     .create-post-btn {
@@ -148,43 +160,60 @@ const adminStyles = `
         gap: 0.5rem;
         flex: 1;
         min-width: 250px;
+        position: relative;
     }
 
     .search-input {
         flex: 1;
         background: rgba(255, 255, 255, 0.1);
         border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 8px;
-        padding: 0.75rem 1rem;
+        border-radius: 12px;
+        padding: 0.875rem 1.25rem;
         color: white;
-        font-size: 0.9rem;
-        transition: all 0.3s ease;
+        font-size: 0.95rem;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        backdrop-filter: blur(10px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
 
     .search-input:focus {
         outline: none;
         border-color: #667eea;
-        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15), 0 4px 20px rgba(0, 0, 0, 0.2);
+        background: rgba(255, 255, 255, 0.15);
+        transform: translateY(-1px);
     }
 
     .search-input::placeholder {
         color: rgba(255, 255, 255, 0.5);
+        font-style: italic;
     }
 
     .search-btn {
         background: linear-gradient(45deg, #667eea, #764ba2);
         border: none;
-        border-radius: 8px;
-        padding: 0.75rem 1.5rem;
+        border-radius: 12px;
+        padding: 0.875rem 1.75rem;
         color: white;
-        font-weight: 500;
+        font-weight: 600;
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        font-size: 0.95rem;
     }
 
     .search-btn:hover {
-        transform: translateY(-1px);
-        box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        transform: translateY(-2px);
+        box-shadow: 0 6px 25px rgba(102, 126, 234, 0.4);
+        background: linear-gradient(45deg, #764ba2, #667eea);
+    }
+
+    .search-btn:active {
+        transform: translateY(0);
+        box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
     }
 
     .filters {
@@ -195,12 +224,29 @@ const adminStyles = `
     .filter-select {
         background: rgba(255, 255, 255, 0.1);
         border: 1px solid rgba(255, 255, 255, 0.2);
-        border-radius: 8px;
+        border-radius: 12px;
         padding: 0.75rem 1rem;
         color: white;
         font-size: 0.9rem;
         min-width: 150px;
         cursor: pointer;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        backdrop-filter: blur(10px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    }
+
+    .filter-select:hover {
+        background: rgba(255, 255, 255, 0.15);
+        border-color: rgba(255, 255, 255, 0.3);
+        transform: translateY(-1px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    }
+
+    .filter-select:focus {
+        outline: none;
+        border-color: #667eea;
+        box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.15), 0 4px 20px rgba(0, 0, 0, 0.2);
+        background: rgba(255, 255, 255, 0.2);
     }
 
     .filter-select option {
@@ -212,13 +258,14 @@ const adminStyles = `
         margin: 0 2rem;
         background: rgba(102, 126, 234, 0.1);
         border: 1px solid rgba(102, 126, 234, 0.3);
-        border-radius: 8px;
+        border-radius: 12px;
         padding: 1rem;
         display: flex;
         align-items: center;
         justify-content: space-between;
         flex-wrap: wrap;
         gap: 1rem;
+        backdrop-filter: blur(10px);
     }
 
     .bulk-info {
@@ -235,14 +282,16 @@ const adminStyles = `
     .bulk-btn {
         padding: 0.5rem 1rem;
         border: none;
-        border-radius: 6px;
+        border-radius: 12px;
         font-size: 0.85rem;
         font-weight: 500;
         cursor: pointer;
-        transition: all 0.2s ease;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         display: flex;
         align-items: center;
         gap: 0.5rem;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
     }
 
     .bulk-btn.publish-btn {
@@ -545,63 +594,100 @@ const adminStyles = `
         display: flex;
         align-items: center;
         gap: 0.5rem;
-        padding: 0.75rem 1.5rem;
+        padding: 0.875rem 1.75rem;
         border: none;
-        border-radius: 8px;
-        font-weight: 500;
+        border-radius: 12px;
+        font-weight: 600;
         cursor: pointer;
-        transition: all 0.3s ease;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
         text-decoration: none;
-        font-size: 14px;
+        font-size: 0.95rem;
+        backdrop-filter: blur(10px);
+        box-shadow: 0 4px 15px rgba(0, 0, 0, 0.1);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .auto-refresh-btn::before,
+    .analytics-btn::before,
+    .export-btn::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
+        transition: left 0.5s;
+    }
+
+    .auto-refresh-btn:hover::before,
+    .analytics-btn:hover::before,
+    .export-btn:hover::before {
+        left: 100%;
     }
 
     .auto-refresh-btn {
-        background: rgba(33, 150, 243, 0.1);
+        background: linear-gradient(135deg, rgba(33, 150, 243, 0.15), rgba(33, 150, 243, 0.05));
         color: #2196F3;
-        border: 1px solid rgba(33, 150, 243, 0.2);
+        border: 1px solid rgba(33, 150, 243, 0.3);
     }
 
     .auto-refresh-btn:hover {
-        background: rgba(33, 150, 243, 0.2);
+        background: linear-gradient(135deg, rgba(33, 150, 243, 0.25), rgba(33, 150, 243, 0.15));
         transform: translateY(-2px);
+        box-shadow: 0 6px 25px rgba(33, 150, 243, 0.3);
+        border-color: rgba(33, 150, 243, 0.4);
     }
 
     .auto-refresh-btn.active {
-        background: rgba(255, 152, 0, 0.2);
+        background: linear-gradient(135deg, rgba(255, 152, 0, 0.25), rgba(255, 152, 0, 0.15));
         color: #FF9800;
-        border-color: rgba(255, 152, 0, 0.3);
+        border-color: rgba(255, 152, 0, 0.4);
+        box-shadow: 0 4px 20px rgba(255, 152, 0, 0.3);
     }
 
     .auto-refresh-btn.active:hover {
-        background: rgba(255, 152, 0, 0.3);
+        background: linear-gradient(135deg, rgba(255, 152, 0, 0.35), rgba(255, 152, 0, 0.25));
+        box-shadow: 0 6px 30px rgba(255, 152, 0, 0.4);
     }
 
     .analytics-btn {
-        background: rgba(156, 39, 176, 0.1);
+        background: linear-gradient(135deg, rgba(156, 39, 176, 0.15), rgba(156, 39, 176, 0.05));
         color: #9C27B0;
-        border: 1px solid rgba(156, 39, 176, 0.2);
+        border: 1px solid rgba(156, 39, 176, 0.3);
     }
 
     .analytics-btn:hover {
-        background: rgba(156, 39, 176, 0.2);
+        background: linear-gradient(135deg, rgba(156, 39, 176, 0.25), rgba(156, 39, 176, 0.15));
         transform: translateY(-2px);
+        box-shadow: 0 6px 25px rgba(156, 39, 176, 0.3);
+        border-color: rgba(156, 39, 176, 0.4);
     }
 
     .export-btn {
-        background: rgba(96, 125, 139, 0.1);
+        background: linear-gradient(135deg, rgba(96, 125, 139, 0.15), rgba(96, 125, 139, 0.05));
         color: #607D8B;
-        border: 1px solid rgba(96, 125, 139, 0.2);
+        border: 1px solid rgba(96, 125, 139, 0.3);
     }
 
     .export-btn:hover {
-        background: rgba(96, 125, 139, 0.2);
+        background: linear-gradient(135deg, rgba(96, 125, 139, 0.25), rgba(96, 125, 139, 0.15));
         transform: translateY(-2px);
+        box-shadow: 0 6px 25px rgba(96, 125, 139, 0.3);
+        border-color: rgba(96, 125, 139, 0.4);
     }
 
     .last-refresh {
-        font-size: 12px;
+        font-size: 0.8rem;
         color: rgba(255, 255, 255, 0.6);
-        margin-left: 16px;
+        margin-left: 1rem;
+        padding: 0.5rem 1rem;
+        background: rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        backdrop-filter: blur(5px);
+        font-style: italic;
     }
 
     .analytics-tooltip {
@@ -840,6 +926,9 @@ const adminStyles = `
 `;
 
 const BlogAdmin = () => {
+    // Use authentication context
+    const { user, session, loading: authLoading, authReady } = useAuth();
+    
     const [posts, setPosts] = useState([]);
     const [categories, setCategories] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -855,6 +944,7 @@ const BlogAdmin = () => {
     const [sortOrder, setSortOrder] = useState('desc');
     const [isAdmin, setIsAdmin] = useState(false);
     const [checkingAdmin, setCheckingAdmin] = useState(true);
+    const [adminChecked, setAdminChecked] = useState(false);
     const [selectedPosts, setSelectedPosts] = useState([]);
     const [showBulkActions, setShowBulkActions] = useState(false);
     const [refreshing, setRefreshing] = useState(false);
@@ -866,10 +956,63 @@ const BlogAdmin = () => {
     const blogAPI = new BlogAPI();
     const imageProcessor = new ImageProcessor();
 
+    // Cache admin status to avoid repeated checks
+    const checkAdminStatus = async () => {
+        if (adminChecked) return isAdmin; // Return cached result
+        
+        try {
+            console.log('Checking admin status...');
+            setCheckingAdmin(true);
+            const adminStatus = await BlogAPI.isAdmin();
+            console.log('Admin status result:', adminStatus);
+            setIsAdmin(adminStatus);
+            setAdminChecked(true);
+            
+            if (adminStatus) {
+                console.log('User is admin, loading data...');
+                await loadInitialData();
+            } else {
+                console.log('User is not admin');
+                setError('Access denied. Admin privileges required.');
+            }
+            return adminStatus;
+        } catch (err) {
+            console.error('Error checking admin status:', err);
+            setError('Failed to verify admin access: ' + err.message);
+            return false;
+        } finally {
+            setCheckingAdmin(false);
+        }
+    };
+
     useEffect(() => {
         updatePageTitle('Blog Admin - Manage Posts');
         updateMetaDescription('Admin panel for managing blog posts, categories, and content.');
-        checkAdminStatus();
+    }, []);
+
+    // Wait for auth to be ready before checking admin status
+    useEffect(() => {
+        if (!authReady || authLoading) {
+            console.log('Auth not ready yet, waiting...', { authReady, authLoading });
+            return;
+        }
+
+        if (!user || !session) {
+            console.log('No user or session, redirecting to login');
+            setError('Please log in to access the admin panel.');
+            setCheckingAdmin(false);
+            return;
+        }
+
+        const initializeAdmin = async () => {
+            console.log('Auth ready, initializing admin with user:', user?.email);
+            const adminStatus = await checkAdminStatus();
+            if (adminStatus) {
+                await loadPosts();
+            }
+        };
+        
+        initializeAdmin();
         
         // Check for edit parameter in URL
         const urlParams = new URLSearchParams(window.location.hash.split('?')[1]);
@@ -877,36 +1020,21 @@ const BlogAdmin = () => {
         if (editPostId) {
             handleEditPostById(editPostId);
         }
-    }, []);
+    }, [authReady, authLoading, user, session]);
 
-    const checkAdminStatus = async () => {
-        try {
-            console.log('Checking admin status...');
-            setCheckingAdmin(true);
-            const adminStatus = await BlogAPI.isAdmin();
-            console.log('Admin status result:', adminStatus);
-            setIsAdmin(adminStatus);
-            if (adminStatus) {
-                console.log('User is admin, loading data...');
-                await loadInitialData();
-                await loadPosts();
-            } else {
-                console.log('User is not admin');
-                setError('Access denied. Admin privileges required.');
-            }
-        } catch (err) {
-            console.error('Error checking admin status:', err);
-            setError('Failed to verify admin access: ' + err.message);
-        } finally {
-            setCheckingAdmin(false);
-        }
-    };
-
+    // Separate effect for posts loading that only triggers when necessary
     useEffect(() => {
-        if (isAdmin) {
+        if (isAdmin && adminChecked) {
             loadPosts();
         }
-    }, [currentPage, searchTerm, selectedCategory, sortBy, sortOrder, isAdmin]);
+    }, [currentPage, searchTerm, selectedCategory, sortBy, sortOrder]);
+
+    // Separate effect for admin status changes
+    useEffect(() => {
+        if (adminChecked && isAdmin) {
+            loadPosts();
+        }
+    }, [isAdmin, adminChecked]);
 
     const loadInitialData = async () => {
         if (!isAdmin) return;
@@ -926,8 +1054,8 @@ const BlogAdmin = () => {
 
     const loadPosts = async () => {
         console.log('loadPosts called, isAdmin:', isAdmin);
-        if (!isAdmin) {
-            console.log('User is not admin, skipping loadPosts');
+        if (!isAdmin || !adminChecked) {
+            console.log('User is not admin or admin status not checked, skipping loadPosts');
             return;
         }
         
@@ -1287,14 +1415,14 @@ const BlogAdmin = () => {
         return formatDate(dateString);
     };
 
-    if (checkingAdmin) {
+    if (checkingAdmin || authLoading || !authReady) {
         return (
             <>
                 <Header />
                 <main className="blog-admin">
                     <div className="loading-spinner">
                         <div className="spinner"></div>
-                        <p>Checking admin access...</p>
+                        <p>{authLoading || !authReady ? 'Loading authentication...' : 'Checking admin access...'}</p>
                     </div>
                 </main>
             </>
@@ -1601,47 +1729,52 @@ const BlogAdmin = () => {
                                         </div>
                                     </td>
                                     <td className="actions-cell">
-                                        <div className="action-buttons">
+                                        <div className="post-actions">
                                             <button
-                                                className="edit-btn"
+                                                className="action-btn edit"
                                                 onClick={() => handleEditPost(post)}
                                                 title="Edit Post"
                                             >
-                                                ✏️
+                                                <span>✏️</span>
+                                                <span>Edit</span>
                                             </button>
                                             {post.status === 'published' && (
                                                 <a
-                                                    href={`/blog/${post.slug}`}
+                                                    href={`/#/blog/${post.slug}`}
                                                     target="_blank"
-                                                    className="view-btn"
+                                                    className="action-btn view"
                                                     title="View Post"
                                                 >
-                                                    👁️
+                                                    <span>👁️</span>
+                                                    <span>View</span>
                                                 </a>
                                             )}
                                             <button
-                                                className="duplicate-btn"
+                                                className="action-btn duplicate"
                                                 onClick={() => handleDuplicatePost(post)}
                                                 title="Duplicate Post"
                                                 disabled={loading}
                                             >
-                                                📋
+                                                <span>📋</span>
+                                                <span>Copy</span>
                                             </button>
                                             {showAnalytics && (
                                                 <button
-                                                    className="analytics-btn-small"
+                                                    className="action-btn analytics"
                                                     onClick={() => loadPostAnalytics(post.id)}
                                                     title="Load Analytics"
                                                 >
-                                                    📊
+                                                    <span>📊</span>
+                                                    <span>Stats</span>
                                                 </button>
                                             )}
                                             <button
-                                                className="delete-btn"
+                                                className="action-btn delete"
                                                 onClick={() => handleDeletePost(post.id)}
                                                 title="Delete Post"
                                             >
-                                                🗑️
+                                                <span>🗑️</span>
+                                                <span>Delete</span>
                                             </button>
                                         </div>
                                     </td>

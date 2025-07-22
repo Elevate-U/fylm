@@ -34,3 +34,52 @@
         padding: var(--spacing-sm) 0;
     }
 }
+
+/* Load More Button Styles */
+.load-more-container {
+    display: flex;
+    justify-content: center;
+    padding: 2rem 0;
+    margin-top: 1rem;
+}
+
+.load-more-btn {
+    background: var(--primary-color, #007bff);
+    color: white;
+    border: none;
+    padding: 0.75rem 2rem;
+    border-radius: 8px;
+    font-size: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    min-width: 120px;
+}
+
+.load-more-btn:hover:not(:disabled) {
+    background: var(--primary-color-hover, #0056b3);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+}
+
+.load-more-btn:disabled {
+    background: var(--text-secondary, #6c757d);
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+}
+
+.load-more-btn:active:not(:disabled) {
+    transform: translateY(0);
+}
+
+/* Dark theme support */
+@media (prefers-color-scheme: dark) {
+    .load-more-btn {
+        background: var(--primary-color-dark, #0d6efd);
+    }
+    
+    .load-more-btn:hover:not(:disabled) {
+        background: var(--primary-color-hover-dark, #0b5ed7);
+    }
+}
