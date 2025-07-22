@@ -6,7 +6,7 @@ import { useStore } from '../store';
 import MovieCard from '../components/MovieCard';
 import { getWatchProgressForMedia, saveWatchProgress, getSeriesHistory, getLastWatchedEpisode, getLastWatchedEpisodeWithProgress, syncOfflineProgress } from '../utils/watchHistory';
 import { useAuth } from '../context/Auth';
-import { addFavoriteShow, removeFavoriteShow, isShowFavorited } from '../utils/favorites';
+import { addFavoriteShow, removeFavoriteShow } from '../utils/favorites';
 import './Watch.css';
 import { API_BASE_URL, IMAGE_BASE_URL, getProxiedImageUrl } from '../config';
 
@@ -67,7 +67,7 @@ const Watch = (props) => {
     const userId = user?.id;
     const tmdbType = 'tv'; // Always use 'tv' for TMDB anime lookups
 
-    const { setCurrentMediaItem, favoritesFetched, fetchContinueWatching } = useStore();
+    const { setCurrentMediaItem, favoritesFetched, fetchContinueWatching, isShowFavorited } = useStore();
 
     // Initialize season and episode from URL parameters immediately
     useEffect(() => {

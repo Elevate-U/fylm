@@ -3,7 +3,8 @@ import { useState, useEffect } from 'preact/hooks';
 import { API_BASE_URL, IMAGE_BASE_URL, ORIGINAL_IMAGE_BASE_URL } from './config';
 import { fetchJson, setupUniversalSearch, createMovieCard } from './script';
 import { getWatchHistory, saveWatchProgress } from './utils/watchHistory';
-import { isShowFavorited, addFavoriteShow, removeFavoriteShow } from './utils/favorites';
+import { addFavoriteShow, removeFavoriteShow } from './utils/favorites';
+import { useStore } from './store';
 import MovieCard from './components/MovieCard';
 import './movie.css';
 
@@ -13,7 +14,7 @@ const MoviePage = () => {
   const [recommendations, setRecommendations] = useState([]);
   const [mediaId, setMediaId] = useState(null);
   const [mediaType, setMediaType] = useState(null);
-  const [favorited, setFavorited] = useState(false);
+  const { isShowFavorited } = useStore();
   const [selectedSeason, setSelectedSeason] = useState(null);
   const [watchHistory, setWatchHistory] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -28,7 +29,6 @@ const MoviePage = () => {
 
     setMediaId(id);
     setMediaType(type);
-    setFavorited(isShowFavorited(id));
     
     const history = getWatchHistory().find(item => item.id == id);
     if(history) {
@@ -90,12 +90,11 @@ const MoviePage = () => {
         vote_average: mediaData.vote_average
     };
 
+    const favorited = isShowFavorited(mediaData.id, mediaType);
     if (favorited) {
-        removeFavoriteShow(mediaData.id);
-        setFavorited(false);
+        removeFavoriteShow(mediaToSave);
     } else {
         addFavoriteShow(mediaToSave);
-        setFavorited(true);
     }
   };
 
@@ -162,8 +161,8 @@ const MoviePage = () => {
                 <div class="info">
                     <div class="title-container">
                         <h1>{mediaData.title || mediaData.name}</h1>
-                        <button id="favorite-btn" class={favorited ? 'favorited' : ''} onClick={handleFavoriteClick}>
-                            {favorited ? '♥ Favorited' : '♡ Add to Favorites'}
+                        <button id="favorite-btn" class={isShowFavorited(mediaData.id, mediaType) ? 'favorited' : ''} onClick={handleFavoriteClick}>
+                            {isShowFavorited(mediaData.id, mediaType) ? '♥ Favorited' : '♡ Add to Favorites'}
                         </button>
                     </div>
                     <div class="meta">
