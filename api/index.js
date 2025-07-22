@@ -1648,6 +1648,11 @@ app.get('/tmdb/*', async (req, res) => {
         
         const finalUrl = new URL(tmdbApiUrl);
         finalUrl.searchParams.append('api_key', TMDB_API_KEY);
+        
+        // Add language parameter if provided
+        if (req.query.language) {
+            finalUrl.searchParams.append('language', req.query.language);
+        }
 
         console.log(`[TMDB_PROXY] Proxying to TMDB URL: ${finalUrl}`);
         
@@ -1774,7 +1779,7 @@ app.get('/consumet/anime/:category', async (req, res) => {
 // Add a unified search endpoint that queries both AniList and TMDB
 app.get('/search/unified', async (req, res) => {
     try {
-        const { query, type = 'all' } = req.query;
+        const { query, type = 'all', language = 'en-US' } = req.query;
         
         if (!query) {
             return res.status(400).json({ error: 'Search query is required' });
@@ -1812,7 +1817,7 @@ app.get('/search/unified', async (req, res) => {
             const tmdbTypes = type === 'all' ? ['movie', 'tv'] : [type];
             
             tmdbTypes.forEach(mediaType => {
-                const tmdbUrl = `https://api.themoviedb.org/3/search/${mediaType}?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}`;
+                const tmdbUrl = `https://api.themoviedb.org/3/search/${mediaType}?api_key=${TMDB_API_KEY}&query=${encodeURIComponent(query)}&language=${encodeURIComponent(language)}`;
                 searchPromises.push(
                     fetchWithTimeout(tmdbUrl)
                         .then(response => response.ok ? response.json() : Promise.resolve({ results: [] }))

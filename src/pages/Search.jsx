@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useState, useEffect } from 'preact/hooks';
+import { useState, useEffect, useRef } from 'preact/hooks';
 import MovieCard from '../components/MovieCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import './Home.css'; // Re-use some styling
@@ -10,31 +10,48 @@ const SearchPage = (props) => {
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState('');
   const [searchFilter, setSearchFilter] = useState('all');
+  const [language, setLanguage] = useState('en-US');
   const [dataSources, setDataSources] = useState({
     anilist: false,
     tmdb: false
   });
+  const debounceRef = useRef(null);
+  const searchTimeoutRef = useRef(null);
 
   useEffect(() => {
     const urlParams = new URLSearchParams(props.url?.split('?')[1] || '');
     const q = urlParams.get('q');
     const filter = urlParams.get('filter') || 'all';
+    const lang = urlParams.get('lang') || 'en-US';
     
     setQuery(q || '');
     setSearchFilter(filter);
+    setLanguage(lang);
 
     if (q) {
-      performSearch(q, filter);
+      performSearch(q, filter, lang);
     } else {
       setResults([]);
     }
   }, [props.url]);
 
-  const performSearch = async (searchQuery, filter = 'all') => {
+  // Cleanup debounce timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) {
+        clearTimeout(debounceRef.current);
+      }
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const performSearch = async (searchQuery, filter = 'all', searchLanguage = language) => {
     setLoading(true);
     try {
-      // First try our new unified search endpoint
-      const unifiedUrl = `${API_BASE_URL}/search/unified?query=${encodeURIComponent(searchQuery)}&type=${filter}`;
+      // First try our new unified search endpoint with language support
+      const unifiedUrl = `${API_BASE_URL}/search/unified?query=${encodeURIComponent(searchQuery)}&type=${filter}&language=${encodeURIComponent(searchLanguage)}`;
       const unifiedRes = await fetch(unifiedUrl);
       
       if (unifiedRes.ok) {
@@ -63,7 +80,7 @@ const SearchPage = (props) => {
       
       // Fallback to traditional TMDB search if unified endpoint fails
       console.log('Falling back to TMDB search API');
-      const res = await fetch(`${API_BASE_URL}/tmdb/search/multi?query=${encodeURIComponent(searchQuery)}`);
+      const res = await fetch(`${API_BASE_URL}/tmdb/search/multi?query=${encodeURIComponent(searchQuery)}&language=${encodeURIComponent(searchLanguage)}`);
       const data = await res.json();
       
       if (data && data.results) {
@@ -101,28 +118,62 @@ const SearchPage = (props) => {
 
   const handleFilterChange = (newFilter) => {
     setSearchFilter(newFilter);
-    performSearch(query, newFilter);
+    if (query.trim()) {
+      performSearch(query, newFilter, language);
+    }
     
     // Update URL without reloading page
     const url = new URL(window.location);
     url.searchParams.set('q', query);
     url.searchParams.set('filter', newFilter);
+    url.searchParams.set('lang', language);
     window.history.pushState({}, '', url.toString());
+  };
+
+  const handleLanguageChange = (newLanguage) => {
+    setLanguage(newLanguage);
+    if (query.trim()) {
+      performSearch(query, searchFilter, newLanguage);
+    }
+    
+    // Update URL without reloading page
+    const url = new URL(window.location);
+    url.searchParams.set('q', query);
+    url.searchParams.set('filter', searchFilter);
+    url.searchParams.set('lang', newLanguage);
+    window.history.pushState({}, '', url.toString());
+  };
+
+  const debouncedSearch = (searchQuery, filter, searchLanguage) => {
+    // Clear existing timeout
+    if (debounceRef.current) {
+      clearTimeout(debounceRef.current);
+    }
+    
+    // Set new timeout for debounced search
+    debounceRef.current = setTimeout(() => {
+      if (searchQuery.trim()) {
+        performSearch(searchQuery.trim(), filter, searchLanguage);
+      } else {
+        setResults([]);
+        setDataSources({ anilist: false, tmdb: false });
+      }
+    }, 500); // 500ms delay
   };
 
   const handleInputChange = (e) => {
     const newQuery = e.target.value;
     setQuery(newQuery);
 
-    if (newQuery.trim() === '') {
-      setResults([]);
-    }
-
     // Update URL dynamically as user types
     const url = new URL(window.location);
     url.searchParams.set('q', newQuery);
-    url.searchParams.set('filter', searchFilter); // Keep current filter
+    url.searchParams.set('filter', searchFilter);
+    url.searchParams.set('lang', language);
     window.history.replaceState({}, '', url.toString());
+
+    // Trigger debounced search
+    debouncedSearch(newQuery, searchFilter, language);
   };
 
   // Helper to render movie/TV/anime cards with source badges
@@ -204,6 +255,33 @@ const SearchPage = (props) => {
             Anime
           </button>
         </div>
+        
+        {/* Language selector */}
+        <div className="language-selector">
+          <label htmlFor="language-select" className="language-label">Language:</label>
+          <select 
+            id="language-select"
+            value={language} 
+            onChange={(e) => handleLanguageChange(e.target.value)}
+            className="language-select"
+          >
+            <option value="en-US">English</option>
+            <option value="es-ES">Español</option>
+            <option value="fr-FR">Français</option>
+            <option value="de-DE">Deutsch</option>
+            <option value="it-IT">Italiano</option>
+            <option value="pt-BR">Português (Brasil)</option>
+            <option value="ja-JP">日本語</option>
+            <option value="ko-KR">한국어</option>
+            <option value="zh-CN">中文 (简体)</option>
+            <option value="zh-TW">中文 (繁體)</option>
+            <option value="ru-RU">Русский</option>
+            <option value="ar-SA">العربية</option>
+            <option value="hi-IN">हिन्दी</option>
+            <option value="th-TH">ไทย</option>
+            <option value="vi-VN">Tiếng Việt</option>
+          </select>
+        </div>
       </div>
       
       {loading ? (
@@ -243,4 +321,4 @@ const SearchPage = (props) => {
   );
 };
 
-export default SearchPage; 
+export default SearchPage;
