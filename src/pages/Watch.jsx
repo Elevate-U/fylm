@@ -9,6 +9,7 @@ import { useAuth } from '../context/Auth';
 import { addFavoriteShow, removeFavoriteShow } from '../utils/favorites';
 import './Watch.css';
 import { API_BASE_URL, IMAGE_BASE_URL, getProxiedImageUrl } from '../config';
+import { supabase } from '../supabase';
 
 const Watch = (props) => {
     const [mediaDetails, setMediaDetails] = useState(null);
@@ -66,6 +67,21 @@ const Watch = (props) => {
     const { user } = useAuth(); // Get authentication state
     const userId = user?.id;
     const tmdbType = 'tv'; // Always use 'tv' for TMDB anime lookups
+    
+    // Debug authentication status on component load
+    useEffect(() => {
+        const checkAuthStatus = async () => {
+            const { data: { session }, error } = await supabase.auth.getSession();
+            if (error) {
+                console.error('🔍 Auth check error:', error);
+            } else if (session) {
+                console.log('🔍 Auth status: Authenticated user', session.user.id);
+            } else {
+                console.log('🔍 Auth status: No active session');
+            }
+        };
+        checkAuthStatus();
+    }, []);
 
     const { setCurrentMediaItem, favoritesFetched, fetchContinueWatching, isShowFavorited } = useStore();
 
@@ -148,14 +164,27 @@ const Watch = (props) => {
         };
     }, [currentSeason, currentEpisode]);
 
-    // Handle fullscreen events to refresh auth when exiting fullscreen
+    // Handle fullscreen events to refresh auth when entering/exiting fullscreen
     useEffect(() => {
-        const handleFullscreenChange = () => {
+        const handleFullscreenChange = async () => {
             const isFullscreen = document.fullscreenElement || 
                                document.webkitFullscreenElement || 
                                document.mozFullScreenElement;
             
-            if (!isFullscreen) {
+            if (isFullscreen) {
+                console.log('📱 Entered fullscreen mode, refreshing session...');
+                // Refresh session to prevent authentication issues in fullscreen
+                try {
+                    const { data, error } = await supabase.auth.refreshSession();
+                    if (error) {
+                        console.warn('⚠️ Session refresh failed in fullscreen:', error.message);
+                    } else {
+                        console.log('✅ Session refreshed successfully in fullscreen');
+                    }
+                } catch (error) {
+                    console.warn('⚠️ Session refresh error in fullscreen:', error);
+                }
+            } else {
                 console.log('📱 Exited fullscreen mode, syncing progress...');
                 // Try to sync any offline progress saved during fullscreen
                 setTimeout(() => {
@@ -587,7 +616,7 @@ const Watch = (props) => {
 
             if (progressData && progressData.progress >= 0 && progressData.duration > 0) {
                 const now = Date.now();
-                if (now - lastProgressSaveTime.current < 3000) { // 1-second throttle
+                if (now - lastProgressSaveTime.current < 1000) { // 1-second throttle
                     return;
                 }
                 lastProgressSaveTime.current = now;
@@ -632,11 +661,18 @@ const Watch = (props) => {
 
                         // Update state in real-time only if the progress applies to the currently viewed item
                         if (seasonToSave === currentSeason && episodeToSave === currentEpisode) {
-                            if (type === 'movie') {
-                                setMovieProgress({
+                            // Use the actual saved progress data if available, otherwise fall back to local data
+                            const progressToUse = (typeof saveResult === 'object' && saveResult.progress_seconds !== undefined) 
+                                ? saveResult 
+                                : {
                                     progress_seconds: progressData.progress,
                                     duration_seconds: progressData.duration
-                                });
+                                };
+                            
+                            console.log('📊 Using progress data for state update:', progressToUse);
+                            
+                            if (type === 'movie') {
+                                setMovieProgress(progressToUse);
                             } else if (type === 'tv' || type === 'anime') {
                                 setSeriesWatchHistory(prevHistory => {
                                     const historyCopy = [...prevHistory];
@@ -649,8 +685,8 @@ const Watch = (props) => {
                                         media_type: type,
                                         season_number: seasonToSave,
                                         episode_number: episodeToSave,
-                                        progress_seconds: progressData.progress,
-                                        duration_seconds: progressData.duration,
+                                        progress_seconds: progressToUse.progress_seconds,
+                                        duration_seconds: progressToUse.duration_seconds,
                                     };
                                 
                                     if (index > -1) {
@@ -737,12 +773,19 @@ const Watch = (props) => {
                     if (saveResult) {
                         console.log('✅ Direct video progress saved successfully');
 
-                        // Update state in real-time
-                        if (type === 'movie') {
-                            setMovieProgress({
+                        // Use the actual saved progress data if available, otherwise fall back to local data
+                        const progressToUse = (typeof saveResult === 'object' && saveResult.progress_seconds !== undefined) 
+                            ? saveResult 
+                            : {
                                 progress_seconds: progressData.progress,
                                 duration_seconds: progressData.duration
-                            });
+                            };
+                        
+                        console.log('📊 Using direct video progress data for state update:', progressToUse);
+
+                        // Update state in real-time
+                        if (type === 'movie') {
+                            setMovieProgress(progressToUse);
                         } else if (type === 'tv' || type === 'anime') {
                             setSeriesWatchHistory(prevHistory => {
                                 const historyCopy = [...prevHistory];
@@ -755,8 +798,8 @@ const Watch = (props) => {
                                     media_type: type,
                                     season_number: currentSeason,
                                     episode_number: currentEpisode,
-                                    progress_seconds: progressData.progress,
-                                    duration_seconds: progressData.duration,
+                                    progress_seconds: progressToUse.progress_seconds,
+                                    duration_seconds: progressToUse.duration_seconds,
                                 };
                             
                                 if (index > -1) {
@@ -1092,7 +1135,7 @@ const Watch = (props) => {
                             frameBorder="0"
                             allowFullScreen
                             allow="autoplay; fullscreen; picture-in-picture"
-                            sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts allow-top-navigation"
+                            sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts allow-top-navigation allow-popups allow-popups-to-escape-sandbox"
                             title="Video Player"
                             loading="eager"
                             referrerPolicy="no-referrer-when-downgrade"

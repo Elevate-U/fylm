@@ -526,7 +526,7 @@ export const getContinueWatching = async (userId) => {
 
 export const saveWatchProgress = async (userId, item, progress, durationInSeconds, forceHistoryEntry = false) => {
     try {
-    if (!userId) {
+        if (!userId) {
             console.warn('⚠️ No authenticated user for saving progress. Storing locally...');
             // Store progress in localStorage as fallback for fullscreen mode
             try {
@@ -551,9 +551,9 @@ export const saveWatchProgress = async (userId, item, progress, durationInSecond
                 return true; // Return success even though it's just local
             } catch (localError) {
                 console.error('❌ Failed to save to localStorage:', localError);
-        return false;
+                return false;
             }
-    }
+        }
 
     if (!item || typeof progress === 'undefined' || progress < 0) {
         console.error('❌ Invalid progress data:', { item, progress, durationInSeconds });
@@ -571,20 +571,84 @@ export const saveWatchProgress = async (userId, item, progress, durationInSecond
     };
 
     console.log('🎬 Saving progress with RPC:', progressData);
-    const { error: rpcError } = await supabase.rpc('save_watch_progress', progressData);
-
-    if (rpcError) {
-        console.error(`❌ RPC failed. Error: ${rpcError.message}. Details:`, rpcError);
-        
-        // Fallback to direct DB write if RPC fails
-        console.log('⚠️ RPC method failed, attempting direct DB write fallback...');
+    
+    // Check authentication status before RPC call
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session) {
+        console.error('❌ No active session found, cannot save progress via RPC');
+        // Skip RPC and go directly to fallback
+        console.log('⚠️ No session, attempting direct DB write fallback...');
         try {
             const fallbackSuccess = await saveWatchProgressFallback(userId, item, progress, durationInSeconds, forceHistoryEntry);
             if (fallbackSuccess) {
                 console.log('✅ Watch progress saved successfully via direct DB fallback');
-                return true;
-            } else {
-                console.error('❌ Direct DB write fallback also failed.');
+                const savedProgress = await getWatchProgressForMedia(userId, item.id, item.type, item.season, item.episode);
+                return savedProgress || true;
+            }
+        } catch (fallbackError) {
+            console.error('❌ Direct DB write fallback failed:', fallbackError);
+        }
+        
+        // Store in localStorage as last resort
+        try {
+            const key = `offline_progress_${item.type}_${item.id}_${item.season || 0}_${item.episode || 0}`;
+            const progressData = {
+                media_id: item.id,
+                media_type: item.type,
+                season_number: item.season || null,
+                episode_number: item.episode || null,
+                progress_seconds: Math.round(progress),
+                duration_seconds: durationInSeconds ? Math.round(durationInSeconds) : null,
+                timestamp: new Date().toISOString()
+            };
+            localStorage.setItem(key, JSON.stringify(progressData));
+            console.log('📱 Progress saved to localStorage due to no session');
+            return true;
+        } catch (localError) {
+            console.error('❌ All progress saving methods failed');
+            return false;
+        }
+    }
+    
+    console.log('✅ Session found, proceeding with RPC call');
+    
+    try {
+        // Reduce timeout to 5 seconds to fail faster and use fallback
+        const rpcPromise = supabase.rpc('save_watch_progress', progressData);
+        const timeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('RPC timeout after 5 seconds')), 5000)
+        );
+        
+        let rpcResult;
+        try {
+            rpcResult = await Promise.race([rpcPromise, timeoutPromise]);
+            console.log('🎬 RPC call completed:', rpcResult);
+        } catch (timeoutError) {
+            console.error('❌ RPC call timed out or failed:', timeoutError);
+            rpcResult = { error: timeoutError };
+        }
+        
+        const { data: rpcData, error: rpcError } = rpcResult;
+        
+        if (rpcError) {
+            console.error(`❌ RPC failed. Error: ${rpcError.message}. Details:`, rpcError);
+            
+            // Log additional context for debugging
+            if (rpcError.message && rpcError.message.includes('timeout')) {
+                console.log('🔍 RPC timeout detected - this usually indicates authentication or network issues');
+            }
+            
+            // Fallback to direct DB write if RPC fails
+            console.log('⚠️ RPC method failed, attempting direct DB write fallback...');
+            try {
+                const fallbackSuccess = await saveWatchProgressFallback(userId, item, progress, durationInSeconds, forceHistoryEntry);
+                if (fallbackSuccess) {
+                    console.log('✅ Watch progress saved successfully via direct DB fallback');
+                    // Fetch and return the saved progress data
+                    const savedProgress = await getWatchProgressForMedia(userId, item.id, item.type, item.season, item.episode);
+                    return savedProgress || true;
+                } else {
+                    console.error('❌ Direct DB write fallback also failed.');
                     // Store in localStorage as last resort
                     try {
                         const key = `offline_progress_${item.type}_${item.id}_${item.season || 0}_${item.episode || 0}`;
@@ -604,15 +668,34 @@ export const saveWatchProgress = async (userId, item, progress, durationInSecond
                         console.error('❌ All progress saving methods failed');
                         return false;
                     }
-            }
-        } catch (fallbackError) {
-            console.error('❌ Direct DB write fallback threw an exception:', fallbackError);
+                }
+            } catch (fallbackError) {
+                console.error('❌ Direct DB write fallback threw an exception:', fallbackError);
                 return false;
             }
         }
 
+        // RPC succeeded
         console.log('✅ Watch progress saved successfully via RPC.');
-        return true;
+        
+        // Fetch and return the actual saved progress data from the database
+        try {
+            const savedProgress = await getWatchProgressForMedia(userId, item.id, item.type, item.season, item.episode);
+            if (savedProgress) {
+                console.log('📊 Retrieved saved progress data:', savedProgress);
+                return savedProgress;
+            } else {
+                console.warn('⚠️ RPC succeeded but could not retrieve saved progress data');
+                return true;
+            }
+        } catch (fetchError) {
+            console.error('❌ Error fetching saved progress after successful RPC:', fetchError);
+            return true; // RPC succeeded, so return true even if fetch failed
+        }
+    } catch (error) {
+        console.error('❌ Unexpected error in saveWatchProgress:', error);
+        return false;
+    }
     } catch (error) {
         console.error('❌ Unexpected error in saveWatchProgress:', error);
         return false;
