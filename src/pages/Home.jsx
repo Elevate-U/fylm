@@ -156,7 +156,7 @@ const Home = (props) => {
                 </section>
             )}
 
-            {mediaType === 'all' && renderSection('Trending This Week', trending, 'movie')}
+            {mediaType === 'all' && renderSection('Trending This Week', trending)}
             
             {mediaType !== 'tv' && renderSection("Popular Movies", popularMovies, 'movie')}
             {mediaType !== 'tv' && renderSection("Now Playing Movies", nowPlayingMovies, 'movie')}
