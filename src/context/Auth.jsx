@@ -176,17 +176,23 @@ export function AuthProvider({ children }) {
 
   const signOut = async () => {
     try {
+      console.log('Auth: Starting signOut process');
       const { error } = await supabase.auth.signOut();
       if (error) {
-        console.error('Error during sign out:', error);
+        console.error('Auth: Error during sign out:', error);
+        throw error; // Re-throw to let the caller handle it
       }
+      console.log('Auth: Supabase signOut successful');
       // Clear admin cache when signing out
       BlogAPI.clearAdminCache();
+      console.log('Auth: Admin cache cleared');
       setSession(null);
       setUser(null);
       setProfile(null);
+      console.log('Auth: Local state cleared');
     } catch (err) {
-      console.error('Unexpected error during sign out:', err);
+      console.error('Auth: Unexpected error during sign out:', err);
+      throw err; // Re-throw to let the caller handle it
     }
   };
 

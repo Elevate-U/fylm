@@ -13,7 +13,7 @@ const Header = () => {
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
-    const { user, profile, signOut } = useAuth();
+    const { user, profile, signOut, authReady } = useAuth();
     const menuRef = useRef(null);
     const hamburgerRef = useRef(null);
     const searchRef = useRef(null);
@@ -29,9 +29,41 @@ const Header = () => {
     };
 
     const handleLogout = async () => {
-        await signOut();
-        route('/');
-        setIsMenuOpen(false);
+        try {
+            console.log('Logout button clicked - starting logout process');
+            setIsMenuOpen(false); // Close menu immediately
+            
+            // Clear local state immediately for instant UI feedback
+            setIsAdmin(false);
+            
+            await signOut();
+            console.log('SignOut completed successfully');
+            
+            // Force a small delay to ensure state updates, then redirect
+            setTimeout(() => {
+                route('/');
+                console.log('Redirected to home page');
+                // Force a page refresh if user state doesn't update properly
+                setTimeout(() => {
+                    if (user) {
+                        console.log('User state not cleared, forcing page refresh');
+                        window.location.href = '/';
+                    }
+                }, 500);
+            }, 100);
+        } catch (error) {
+            console.error('Error during logout:', error);
+            // Clear local state even on error
+            setIsAdmin(false);
+            // Still try to redirect even if there's an error
+            setTimeout(() => {
+                route('/');
+                // Force refresh on error
+                setTimeout(() => {
+                    window.location.href = '/';
+                }, 300);
+            }, 100);
+        }
     };
 
     const toggleSearch = () => {
@@ -138,7 +170,7 @@ const Header = () => {
     // Check admin status when user changes
     useEffect(() => {
         const checkAdminStatus = async () => {
-            if (user) {
+            if (user && authReady) {
                 try {
                     const adminStatus = await BlogAPI.isAdmin();
                     setIsAdmin(adminStatus);
@@ -152,6 +184,16 @@ const Header = () => {
         };
         
         checkAdminStatus();
+    }, [user, authReady]);
+
+    // Reset states when user changes (especially on logout)
+    useEffect(() => {
+        if (!user) {
+            setIsAdmin(false);
+            setIsMenuOpen(false);
+            setIsSearchOpen(false);
+            document.body.classList.remove('menu-open');
+        }
     }, [user]);
 
     // Focus management for accessibility
@@ -192,7 +234,7 @@ const Header = () => {
     }, [isMenuOpen, isSearchOpen]);
 
     return (
-        <header class={isMenuOpen ? 'scrolled' : ''}>
+        <header key={user?.id || 'no-user'} class={isMenuOpen ? 'scrolled' : ''}>
             <div class="container">
                 <div class="header-left">
                     <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
@@ -282,7 +324,17 @@ const Header = () => {
                                         class="profile-avatar"
                                     />
                                 </Link>
-                                <button onClick={handleLogout} class="auth-button">Logout</button>
+                                <button 
+                                    onClick={(e) => {
+                                        e.preventDefault();
+                                        console.log('Logout button physically clicked');
+                                        handleLogout();
+                                    }} 
+                                    class="auth-button"
+                                    type="button"
+                                >
+                                    Logout
+                                </button>
                             </>
                         ) : (
                             <>

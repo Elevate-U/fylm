@@ -567,6 +567,7 @@ header nav a.active::before {
     align-items: center;
     transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
     border-left: 1px solid rgba(255, 255, 255, 0.1);
+    z-index: 1000;
   }
 
   header nav.active {
@@ -587,16 +588,25 @@ header nav a.active::before {
   .header-right {
     flex-direction: row;
     align-items: center;
-    gap: var(--spacing-md); /* Increased gap for less cramped feel */
+    gap: var(--spacing-sm); /* Optimized gap for mobile */
+    flex-wrap: nowrap;
+    overflow: visible;
   }
 
   .auth-links {
-    gap: var(--spacing-sm);
+    gap: var(--spacing-xs);
+    flex-wrap: nowrap;
+    min-width: 0;
   }
 
   .auth-link, .auth-button {
     font-size: var(--font-size-xs);
     padding: var(--spacing-xs) var(--spacing-sm);
+    min-width: 60px;
+    height: 32px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .logo {
@@ -628,31 +638,41 @@ header nav a.active::before {
   }
 
   .header-left {
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
+    flex-shrink: 1;
+    min-width: 0;
   }
 
   .header-right {
-    gap: var(--spacing-sm); /* Slightly reduced gap for very small screens */
+    gap: var(--spacing-xs); /* Minimal gap for very small screens */
+    flex-shrink: 0;
+    min-width: 0;
   }
 
   .logo {
     font-size: var(--font-size-base);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .auth-link, .auth-button {
     font-size: var(--font-size-xs);
     padding: var(--spacing-xs);
-    min-width: 60px; /* Ensure minimum touch target */
+    min-width: 50px; /* Smaller minimum for very small screens */
+    height: 30px;
+    border-radius: var(--radius-md);
   }
 
   .search-toggle {
-    width: 36px;
-    height: 36px;
+    width: 32px;
+    height: 32px;
+    flex-shrink: 0;
   }
 
-  /* Ensure theme toggle is accessible on very small screens */
-  .header-right {
-    min-width: 0;
+  /* Ensure auth links don't overflow */
+  .auth-links {
+    gap: 2px;
     flex-shrink: 0;
   }
 
@@ -669,12 +689,41 @@ header nav a.active::before {
     height: 44px;
     padding: var(--spacing-sm);
   }
+
+  /* Hide user email on very small screens */
+  .user-email {
+    display: none !important;
+  }
 }
 
 /* Ensure auth links stay visible until hamburger appears */
-@media (min-width: 901px) {
+@media (min-width: 861px) {
   .auth-links {
     display: flex !important;
+  }
+  
+  .hamburger {
+    display: none !important;
+  }
+}
+
+/* Improved touch targets for mobile */
+@media (max-width: 860px) {
+  .auth-link, .auth-button {
+    min-height: 44px; /* iOS recommended touch target */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  
+  .search-toggle {
+    min-width: 44px;
+    min-height: 44px;
+  }
+  
+  .hamburger {
+    min-width: 44px;
+    min-height: 44px;
   }
 }
 .header-right .profile-link {
