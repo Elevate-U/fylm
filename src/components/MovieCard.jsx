@@ -1,5 +1,5 @@
 import { h } from 'preact';
-import { useState, useCallback } from 'preact/hooks';
+import { useState, useCallback, useEffect, useRef } from 'preact/hooks';
 import { route } from 'preact-router';
 import { useStore } from '../store';
 import { useAuth } from '../context/Auth';
@@ -182,28 +182,54 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete,
         return getProxiedImageUrl(`${baseUrl}${path}`);
     }, []);
 
+    // State for visibility-based image quality
+    const [isVisible, setIsVisible] = useState(false);
     const [imageUrl, setImageUrl] = useState(() => 
         getFullImageUrl(imagePath, useFullResolution ? 'w500' : 'w200')
     );
+    const cardRef = useRef(null);
 
-    const handleMouseEnter = useCallback(() => {
-        if (!useFullResolution) {
+    // Intersection Observer for lazy loading high quality images
+    useEffect(() => {
+        if (!cardRef.current || useFullResolution) return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                entries.forEach((entry) => {
+                    if (entry.isIntersecting && !isVisible) {
+                        setIsVisible(true);
+                        setImageUrl(getFullImageUrl(imagePath, 'w500'));
+                    }
+                });
+            },
+            {
+                rootMargin: '50px', // Start loading when card is 50px away from viewport
+                threshold: 0.1 // Trigger when 10% of the card is visible
+            }
+        );
+
+        observer.observe(cardRef.current);
+
+        return () => {
+            if (cardRef.current) {
+                observer.unobserve(cardRef.current);
+            }
+        };
+    }, [imagePath, getFullImageUrl, useFullResolution, isVisible]);
+
+    // Update image URL when imagePath changes
+    useEffect(() => {
+        if (useFullResolution) {
             setImageUrl(getFullImageUrl(imagePath, 'w500'));
+        } else {
+            setImageUrl(getFullImageUrl(imagePath, isVisible ? 'w500' : 'w200'));
         }
-    }, [imagePath, getFullImageUrl, useFullResolution]);
-
-    const handleMouseLeave = useCallback(() => {
-        if (!useFullResolution) {
-            setImageUrl(getFullImageUrl(imagePath, 'w200'));
-        }
-    }, [imagePath, getFullImageUrl, useFullResolution]);
+    }, [imagePath, getFullImageUrl, useFullResolution, isVisible]);
 
     // Enhanced card with anime-specific features
     const cardContent = (
         <div
             className={`poster-wrapper ${type === 'anime' ? 'anime-card-enhanced' : ''}`}
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
         >
             <img
                 src={imageUrl}
@@ -276,7 +302,7 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete,
     );
 
     return (
-        <div className="movie-card-container">
+        <div className="movie-card-container" ref={cardRef}>
             <div className="movie-card clickable" onClick={handleCardClick}>
                 {cardContent}
             </div>

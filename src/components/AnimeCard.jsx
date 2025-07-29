@@ -1,4 +1,5 @@
 import { h } from 'preact';
+import { useState, useCallback, useEffect, useRef } from 'preact/hooks';
 import { route } from 'preact-router';
 import { useStore } from '../store';
 import { useAuth } from '../context/Auth';
@@ -6,6 +7,32 @@ import './AnimeCard.css';
 import { getProxiedImageUrl } from '../config';
 
 const AnimeCard = ({ item, progress, duration, showDeleteButton, onDelete, onClick }) => {
+    const [isVisible, setIsVisible] = useState(false);
+    const cardRef = useRef(null);
+    
+    // Intersection Observer for lazy loading high-quality images
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            ([entry]) => {
+                setIsVisible(entry.isIntersecting);
+            },
+            {
+                rootMargin: '50px',
+                threshold: 0.1
+            }
+        );
+
+        if (cardRef.current) {
+            observer.observe(cardRef.current);
+        }
+
+        return () => {
+            if (cardRef.current) {
+                observer.unobserve(cardRef.current);
+            }
+        };
+    }, []);
+    
     // Destructure anime-specific properties from AniList data
     const {
         id,
@@ -210,7 +237,7 @@ const AnimeCard = ({ item, progress, duration, showDeleteButton, onDelete, onCli
         ));
     };
 
-    // Enhanced image URL handling for AniList images
+    // Enhanced image URL handling for AniList images with lazy loading
     const getFullImageUrl = (path) => {
         if (!path) {
             return 'https://via.placeholder.com/500x750/1a1a1a/ffffff?text=No+Image';
@@ -224,6 +251,13 @@ const AnimeCard = ({ item, progress, duration, showDeleteButton, onDelete, onCli
         // For other full URLs, use the proxy directly
         if (path.startsWith('http')) {
             return getProxiedImageUrl(path);
+        }
+        
+        // For TMDB relative paths, add resolution based on visibility
+        if (path.startsWith('/')) {
+            const resolution = isVisible ? 'w500' : 'w200';
+            const IMAGE_BASE_URL = `https://image.tmdb.org/t/p/${resolution}`;
+            return getProxiedImageUrl(`${IMAGE_BASE_URL}${path}`);
         }
         
         // For relative paths (TMDB), use the proxy with the base URL added
@@ -241,7 +275,7 @@ const AnimeCard = ({ item, progress, duration, showDeleteButton, onDelete, onCli
     };
 
     return (
-        <div className="anime-card-container">
+        <div className="anime-card-container" ref={cardRef}>
             <div 
                 className="anime-card" 
                 onClick={handleCardClick}
