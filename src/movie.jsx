@@ -5,6 +5,7 @@ import { fetchJson, setupUniversalSearch, createMovieCard } from './script';
 import { getWatchHistory, saveWatchProgress } from './utils/watchHistory';
 import { addFavoriteShow, removeFavoriteShow } from './utils/favorites';
 import { useStore } from './store';
+import { useAuth } from './context/Auth';
 import MovieCard from './components/MovieCard';
 import './movie.css';
 
@@ -15,6 +16,7 @@ const MoviePage = () => {
   const [mediaId, setMediaId] = useState(null);
   const [mediaType, setMediaType] = useState(null);
   const { isShowFavorited } = useStore();
+  const { user, session } = useAuth();
   const [selectedSeason, setSelectedSeason] = useState(null);
   const [watchHistory, setWatchHistory] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -110,7 +112,17 @@ const MoviePage = () => {
       vote_average: mediaData.vote_average
     };
     
-    saveWatchProgress(mediaToSave, season, episode);
+    // Save watch progress with proper parameters
+    if (user?.id) {
+      saveWatchProgress(
+        user.id,
+        mediaToSave,
+        0, // progress (0 for just starting)
+        0, // duration (unknown at this point)
+        false, // forceHistoryEntry
+        session // Pass session from Auth context
+      );
+    }
 
     let streamUrl = '';
     if (mediaType === 'movie') {

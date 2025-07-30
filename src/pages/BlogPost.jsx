@@ -147,9 +147,18 @@ const BlogPost = ({ slug }) => {
             .replace(/$/, '</p>');
         
         // Fix hash-based links to be absolute from root
-        // Handle all hash-based links that start with #/ and make them absolute
+        // Handle links that start with /movie/ or /tv/ and make them hash-based for SPA routing
         formattedContent = formattedContent.replace(
+            /href="\/movie\//g, 
+            'href="/#/movie/'
+        ).replace(
+            /href="\/tv\//g,
+            'href="/#/tv/'
+        ).replace(
             /href="#\//g, 
+            'href="/#/'
+        ).replace(
+            /href="\/#\/#\//g,
             'href="/#/'
         );
         

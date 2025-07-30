@@ -32,6 +32,7 @@ const AsyncBlog = asyncComponent(() => import('./pages/Blog'));
 const AsyncBlogPost = asyncComponent(() => import('./pages/BlogPost'));
 const AsyncBlogAdmin = asyncComponent(() => import('./pages/BlogAdmin'));
 const AsyncAdminSetup = asyncComponent(() => import('./pages/AdminSetup'));
+const AsyncAuthCallback = asyncComponent(() => import('./pages/AuthCallback'));
 
 
 const MainApp = () => {
@@ -78,6 +79,7 @@ const MainApp = () => {
                     <AsyncSignUp path="/signup" />
                     <AsyncForgotPassword path="/forgot-password" />
                     <AsyncUpdatePassword path="/update-password" />
+                    <AsyncAuthCallback path="/auth/callback" />
                     {user ? <AsyncProfile path="/profile" /> : <AsyncLogin path="/profile" />}
                     <AsyncBlog path="/blog" />
                     <AsyncBlogPost path="/blog/:slug" />

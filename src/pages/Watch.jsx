@@ -63,8 +63,9 @@ const Watch = (props) => {
     const ignoredLegacyNavigation = useRef(null); // Track ignored legacy navigation to prevent log spam
     const lastHistoryUpdateRef = useRef({});
     const lastProgressSaveTime = useRef(0); // For throttling
+    const pendingSaveTimeout = useRef(null); // For debouncing
 
-    const { user } = useAuth(); // Get authentication state
+    const { user, session } = useAuth(); // Get authentication state
     const userId = user?.id;
     const tmdbType = 'tv'; // Always use 'tv' for TMDB anime lookups
     
@@ -172,25 +173,18 @@ const Watch = (props) => {
                                document.mozFullScreenElement;
             
             if (isFullscreen) {
-                console.log('📱 Entered fullscreen mode, refreshing session...');
-                // Refresh session to prevent authentication issues in fullscreen
-                try {
-                    const { data, error } = await supabase.auth.refreshSession();
-                    if (error) {
-                        console.warn('⚠️ Session refresh failed in fullscreen:', error.message);
-                    } else {
-                        console.log('✅ Session refreshed successfully in fullscreen');
-                    }
-                } catch (error) {
-                    console.warn('⚠️ Session refresh error in fullscreen:', error);
-                }
+                console.log('📱 Entered fullscreen mode');
+                // Note: Session management is handled by Auth context
+                // No manual session refresh needed here
             } else {
                 console.log('📱 Exited fullscreen mode, syncing progress...');
                 // Try to sync any offline progress saved during fullscreen
                 setTimeout(() => {
-                    syncOfflineProgress(userId).catch(error => {
-                        console.error('Error syncing offline progress after fullscreen:', error);
-                    });
+                    if (userId) {
+                        syncOfflineProgress(userId).catch(error => {
+                            console.error('Error syncing offline progress after fullscreen:', error);
+                        });
+                    }
                 }, 1000);
             }
         };
@@ -616,9 +610,15 @@ const Watch = (props) => {
 
             if (progressData && progressData.progress >= 0 && progressData.duration > 0) {
                 const now = Date.now();
-                if (now - lastProgressSaveTime.current < 1000) { // 1-second throttle
+                if (now - lastProgressSaveTime.current < 2000) { // Increased to 2-second throttle
                     return;
                 }
+                
+                // Clear any pending save to prevent duplicate calls
+                if (pendingSaveTimeout.current) {
+                    clearTimeout(pendingSaveTimeout.current);
+                }
+                
                 lastProgressSaveTime.current = now;
                 
                 try {
@@ -633,7 +633,9 @@ const Watch = (props) => {
                         currentUserId,
                         { ...mediaDetails, id: mediaDetails.id, type, season: seasonToSave, episode: episodeToSave },
                         progressData.progress,
-                        progressData.duration
+                        progressData.duration,
+                        false, // forceHistoryEntry
+                        session // Pass session from Auth context
                     ).catch(error => {
                         console.error('❌ Progress save error caught:', error);
                         if (error.message?.includes('timeout') || error.message?.includes('auth')) {
@@ -750,9 +752,15 @@ const Watch = (props) => {
             const handleTimeUpdate = async () => {
                 if (videoElement.currentTime > 0) {
                     const now = Date.now();
-                    if (now - lastProgressSaveTime.current < 1000) { // 5-second throttle
+                    if (now - lastProgressSaveTime.current < 2000) { // Increased to 2-second throttle
                         return;
                     }
+                    
+                    // Clear any pending save to prevent duplicate calls
+                    if (pendingSaveTimeout.current) {
+                        clearTimeout(pendingSaveTimeout.current);
+                    }
+                    
                     lastProgressSaveTime.current = now;
 
                     const progressData = {
@@ -767,7 +775,9 @@ const Watch = (props) => {
                         userId,
                         { ...mediaDetails, id: mediaDetails.id, type, season: currentSeason, episode: currentEpisode },
                         progressData.progress,
-                        progressData.duration
+                        progressData.duration,
+                        false, // forceHistoryEntry
+                        session // Pass session from Auth context
                     );
                     
                     if (saveResult) {
@@ -920,6 +930,7 @@ const Watch = (props) => {
             return () => {
                 window.removeEventListener('message', messageListener);
                 if (progressHandler) clearInterval(progressHandler);
+                if (pendingSaveTimeout.current) clearTimeout(pendingSaveTimeout.current);
             };
         }
     }, [mediaDetails, isDirectSource, videoRef, currentSeason, currentEpisode, userId]);

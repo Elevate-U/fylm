@@ -923,6 +923,688 @@ const adminStyles = `
             margin: 1rem;
         }
     }
+
+    /* Modern Markdown Editor Styles */
+    .markdown-editor {
+        border: 1px solid #e1e5e9;
+        border-radius: 12px;
+        overflow: hidden;
+        background: white;
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+    }
+
+    .markdown-editor:focus-within {
+        border-color: #007bff;
+        box-shadow: 0 4px 16px rgba(0, 123, 255, 0.15);
+    }
+
+    .markdown-editor.fullscreen {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        z-index: 1000;
+        border-radius: 0;
+        height: 100vh;
+        width: 100vw;
+    }
+
+    .editor-toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        padding: 12px 16px;
+        background: #f8f9fa;
+        border-bottom: 1px solid #e1e5e9;
+        align-items: center;
+    }
+
+    .toolbar-group {
+        display: flex;
+        gap: 4px;
+        padding-right: 12px;
+        border-right: 1px solid #dee2e6;
+    }
+
+    .toolbar-group:last-child {
+        border-right: none;
+    }
+
+    .toolbar-btn {
+        padding: 6px 10px;
+        border: 1px solid #dee2e6;
+        background: white;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        color: #495057;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 4px;
+    }
+
+    .toolbar-btn:hover {
+        background: #e9ecef;
+        border-color: #adb5bd;
+        color: #212529;
+    }
+
+    .toolbar-btn.active {
+        background: #007bff;
+        border-color: #007bff;
+        color: white;
+    }
+
+    .editor-content {
+        display: flex;
+        height: 500px;
+    }
+
+    .markdown-editor.fullscreen .editor-content {
+        height: calc(100vh - 60px);
+    }
+
+    .editor-input {
+        flex: 1;
+        border: none;
+        padding: 20px;
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        font-size: 14px;
+        line-height: 1.6;
+        resize: none;
+        outline: none;
+        background: #fafbfc;
+        color: #24292e;
+    }
+
+    .editor-preview {
+        flex: 1;
+        padding: 20px;
+        background: white;
+        border-left: 1px solid #e1e5e9;
+        overflow-y: auto;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    }
+
+    .preview-toggle {
+        display: flex;
+        background: #f8f9fa;
+        border-bottom: 1px solid #e1e5e9;
+    }
+
+    .preview-tab {
+        flex: 1;
+        padding: 12px;
+        text-align: center;
+        cursor: pointer;
+        border: none;
+        background: transparent;
+        color: #6c757d;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .preview-tab.active {
+        background: white;
+        color: #007bff;
+        border-bottom: 2px solid #007bff;
+    }
+
+    .markdown-guide {
+        background: #f8f9fa;
+        border: 1px solid #e1e5e9;
+        border-radius: 8px;
+        padding: 16px;
+        margin-top: 16px;
+        font-size: 13px;
+    }
+
+    .markdown-guide h4 {
+        margin: 0 0 12px 0;
+        color: #495057;
+        font-size: 14px;
+    }
+
+    .guide-toggle {
+        background: #007bff;
+        color: white;
+        border: none;
+        padding: 8px 16px;
+        border-radius: 6px;
+        cursor: pointer;
+        font-size: 14px;
+        font-weight: 500;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin-bottom: 16px;
+    }
+
+    .guide-toggle:hover {
+        background: #0056b3;
+        transform: translateY(-1px);
+        box-shadow: 0 2px 8px rgba(0, 123, 255, 0.3);
+    }
+
+    .guide-content {
+        border-top: 1px solid #e1e5e9;
+        padding-top: 16px;
+    }
+
+    .guide-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 12px;
+    }
+
+    .guide-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 6px 0;
+        border-bottom: 1px solid #e9ecef;
+    }
+
+    .guide-item:last-child {
+        border-bottom: none;
+    }
+
+    .guide-syntax {
+        font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+        background: #e9ecef;
+        padding: 2px 6px;
+        border-radius: 4px;
+        font-size: 12px;
+    }
+
+    /* Movie Search Modal Styles */
+    .movie-search-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        padding: 1rem;
+    }
+
+    .movie-search-content {
+        background: white;
+        border-radius: 12px;
+        padding: 1.5rem;
+        width: 100%;
+        max-width: 600px;
+        max-height: 80vh;
+        overflow-y: auto;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.3);
+    }
+
+    .movie-search-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 1rem;
+        padding-bottom: 1rem;
+        border-bottom: 1px solid #e1e5e9;
+    }
+
+    .movie-search-header h3 {
+        margin: 0;
+        color: #212529;
+        font-size: 1.25rem;
+    }
+
+    .movie-search-close {
+        background: none;
+        border: none;
+        font-size: 1.5rem;
+        color: #6c757d;
+        cursor: pointer;
+        padding: 0.25rem;
+        border-radius: 4px;
+        transition: all 0.2s ease;
+    }
+
+    .movie-search-close:hover {
+        background: #f8f9fa;
+        color: #212529;
+    }
+
+    .movie-search-form {
+        display: flex;
+        gap: 0.5rem;
+        margin-bottom: 1rem;
+    }
+
+    .movie-search-input {
+        flex: 1;
+        padding: 0.75rem;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        background: white;
+        color: #212529;
+        font-size: 1rem;
+    }
+
+    .movie-search-input:focus {
+        outline: none;
+        border-color: #007bff;
+        box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.2);
+    }
+
+    .movie-search-btn {
+        padding: 0.75rem 1.5rem;
+        background: #007bff;
+        color: white;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .movie-search-btn:hover {
+        background: #0056b3;
+        transform: translateY(-1px);
+    }
+
+    .movie-search-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+    }
+
+    .movie-results {
+        display: grid;
+        gap: 1rem;
+        max-height: 400px;
+        overflow-y: auto;
+    }
+
+    .movie-item {
+        display: flex;
+        gap: 1rem;
+        padding: 1rem;
+        border: 1px solid #dee2e6;
+        border-radius: 8px;
+        background: #f8f9fa;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .movie-item:hover {
+        border-color: #007bff;
+        background: #e7f3ff;
+        transform: translateY(-1px);
+    }
+
+    .movie-poster {
+        width: 60px;
+        height: 90px;
+        border-radius: 6px;
+        object-fit: cover;
+        background: #e9ecef;
+        flex-shrink: 0;
+    }
+
+    .movie-info {
+        flex: 1;
+        min-width: 0;
+    }
+
+    .movie-title {
+        font-weight: 600;
+        color: #212529;
+        margin: 0 0 0.25rem 0;
+        font-size: 1rem;
+    }
+
+    .movie-year {
+        color: #6c757d;
+        font-size: 0.875rem;
+        margin: 0 0 0.5rem 0;
+    }
+
+    .movie-overview {
+        color: #6c757d;
+        font-size: 0.875rem;
+        line-height: 1.4;
+        margin: 0;
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+    }
+
+    .movie-search-loading {
+        text-align: center;
+        padding: 2rem;
+        color: #6c757d;
+    }
+
+    .movie-search-empty {
+        text-align: center;
+        padding: 2rem;
+        color: #6c757d;
+    }
+
+    .movie-search-empty p {
+        margin: 0;
+    }
+
+    /* Export Modal Styles */
+    .export-modal {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(0, 0, 0, 0.5);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1000;
+        backdrop-filter: blur(4px);
+    }
+
+    .export-modal-content {
+        background: white;
+        border-radius: 12px;
+        padding: 24px;
+        width: 90%;
+        max-width: 500px;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+        animation: modalSlideIn 0.3s ease;
+    }
+
+    @keyframes modalSlideIn {
+        from {
+            opacity: 0;
+            transform: translateY(-20px) scale(0.95);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+    }
+
+    .export-modal h3 {
+        margin: 0 0 20px 0;
+        color: #212529;
+        font-size: 20px;
+        font-weight: 600;
+    }
+
+    .export-options {
+        display: grid;
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .export-option {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        padding: 16px;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .export-option:hover {
+        border-color: #007bff;
+        background: #f8f9ff;
+    }
+
+    .export-option.selected {
+        border-color: #007bff;
+        background: #e7f3ff;
+    }
+
+    .export-option input[type="radio"] {
+        margin: 0;
+    }
+
+    .export-option-info {
+        flex: 1;
+    }
+
+    .export-option-title {
+        font-weight: 600;
+        color: #212529;
+        margin-bottom: 4px;
+    }
+
+    .export-option-desc {
+        font-size: 14px;
+        color: #6c757d;
+    }
+
+    .export-modal-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+    }
+
+    .export-modal-btn {
+        padding: 10px 20px;
+        border: 1px solid #dee2e6;
+        border-radius: 6px;
+        cursor: pointer;
+        font-weight: 500;
+        transition: all 0.2s ease;
+    }
+
+    .export-modal-btn.primary {
+        background: #007bff;
+        border-color: #007bff;
+        color: white;
+    }
+
+    .export-modal-btn.primary:hover {
+        background: #0056b3;
+        border-color: #0056b3;
+    }
+
+    .export-modal-btn.secondary {
+        background: white;
+        color: #6c757d;
+    }
+
+    .export-modal-btn.secondary:hover {
+        background: #f8f9fa;
+        color: #495057;
+    }
+
+    /* Enhanced Blog Editor Styles */
+    .blog-editor {
+        background: white;
+        border-radius: 12px;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+        overflow: hidden;
+        margin: 20px 0;
+    }
+
+    .editor-header {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        padding: 20px 24px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+    }
+
+    .editor-title {
+        font-size: 20px;
+        font-weight: 600;
+        margin: 0;
+    }
+
+    .editor-form {
+        padding: 24px;
+    }
+
+    .form-row {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        margin-bottom: 20px;
+    }
+
+    .form-group {
+        margin-bottom: 20px;
+    }
+
+    .form-group.full-width {
+        grid-column: 1 / -1;
+    }
+
+    .form-label {
+        display: block;
+        margin-bottom: 8px;
+        font-weight: 600;
+        color: #495057;
+        font-size: 14px;
+    }
+
+    .form-input {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        font-size: 14px;
+        transition: all 0.2s ease;
+        background: #fafbfc;
+    }
+
+    .form-input:focus {
+        outline: none;
+        border-color: #007bff;
+        background: white;
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    }
+
+    .form-select {
+        width: 100%;
+        padding: 12px 16px;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        font-size: 14px;
+        background: #fafbfc;
+        cursor: pointer;
+        transition: all 0.2s ease;
+    }
+
+    .form-select:focus {
+        outline: none;
+        border-color: #007bff;
+        background: white;
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    }
+
+    .form-textarea {
+        width: 100%;
+        min-height: 120px;
+        padding: 12px 16px;
+        border: 2px solid #e9ecef;
+        border-radius: 8px;
+        font-size: 14px;
+        resize: vertical;
+        font-family: inherit;
+        transition: all 0.2s ease;
+        background: #fafbfc;
+    }
+
+    .form-textarea:focus {
+        outline: none;
+        border-color: #007bff;
+        background: white;
+        box-shadow: 0 0 0 3px rgba(0, 123, 255, 0.1);
+    }
+
+    .editor-actions {
+        display: flex;
+        gap: 12px;
+        justify-content: flex-end;
+        padding: 20px 24px;
+        background: #f8f9fa;
+        border-top: 1px solid #e9ecef;
+    }
+
+    .editor-btn {
+        padding: 12px 24px;
+        border: none;
+        border-radius: 8px;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+    }
+
+    .editor-btn.primary {
+        background: #007bff;
+        color: white;
+    }
+
+    .editor-btn.primary:hover {
+        background: #0056b3;
+        transform: translateY(-1px);
+        box-shadow: 0 4px 12px rgba(0, 123, 255, 0.3);
+    }
+
+    .editor-btn.secondary {
+        background: #6c757d;
+        color: white;
+    }
+
+    .editor-btn.secondary:hover {
+        background: #545b62;
+    }
+
+    .editor-btn:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
+        transform: none;
+        box-shadow: none;
+    }
+
+    /* Responsive Design */
+    @media (max-width: 768px) {
+        .form-row {
+            grid-template-columns: 1fr;
+        }
+        
+        .editor-content {
+            flex-direction: column;
+            height: auto;
+        }
+        
+        .editor-preview {
+            border-left: none;
+            border-top: 1px solid #e1e5e9;
+        }
+        
+        .toolbar-group {
+            border-right: none;
+            padding-right: 8px;
+        }
+        
+        .export-modal-content {
+            margin: 20px;
+            width: calc(100% - 40px);
+        }
+    }
 `;
 
 const BlogAdmin = () => {
@@ -952,6 +1634,7 @@ const BlogAdmin = () => {
     const [lastRefresh, setLastRefresh] = useState(new Date());
     const [postAnalytics, setPostAnalytics] = useState({});
     const [showAnalytics, setShowAnalytics] = useState(false);
+    const [showExportModal, setShowExportModal] = useState(false);
 
     const blogAPI = new BlogAPI();
     const imageProcessor = new ImageProcessor();
@@ -1134,9 +1817,23 @@ const BlogAdmin = () => {
         setShowEditor(true);
     };
 
-    const handleEditPost = (post) => {
-        setEditingPost(post);
-        setShowEditor(true);
+    const handleEditPost = async (post) => {
+        try {
+            setLoading(true);
+            // Fetch the complete post data including meta fields
+            const fullPost = await BlogAPI.getPostById(post.id);
+            if (fullPost) {
+                setEditingPost(fullPost);
+                setShowEditor(true);
+            } else {
+                setError('Post not found');
+            }
+        } catch (err) {
+            console.error('Error loading post for editing:', err);
+            setError('Failed to load post for editing');
+        } finally {
+            setLoading(false);
+        }
     };
 
     const handleEditPostById = async (postId) => {
@@ -1294,35 +1991,7 @@ const BlogAdmin = () => {
 
     // Export posts functionality
     const handleExportPosts = () => {
-        try {
-            const exportData = posts.map(post => ({
-                title: post.title,
-                slug: post.slug,
-                excerpt: post.excerpt,
-                content: post.content,
-                status: post.status,
-                category: post.category_name,
-                tags: post.tags,
-                created_at: post.created_at,
-                updated_at: post.updated_at,
-                view_count: post.view_count
-            }));
-            
-            const dataStr = JSON.stringify(exportData, null, 2);
-            const dataBlob = new Blob([dataStr], { type: 'application/json' });
-            const url = URL.createObjectURL(dataBlob);
-            
-            const link = document.createElement('a');
-            link.href = url;
-            link.download = `blog-posts-export-${new Date().toISOString().split('T')[0]}.json`;
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            URL.revokeObjectURL(url);
-        } catch (err) {
-            console.error('Error exporting posts:', err);
-            setError('Failed to export posts');
-        }
+        setShowExportModal(true);
     };
 
     // Duplicate post functionality
@@ -1867,6 +2536,15 @@ const BlogAdmin = () => {
                     </button>
                 </div>
             )}
+
+            {/* Export Modal */}
+            {showExportModal && (
+                <ExportModal
+                    isOpen={showExportModal}
+                    posts={posts}
+                    onClose={() => setShowExportModal(false)}
+                />
+            )}
             </main>
         </>
     );
@@ -1875,20 +2553,60 @@ const BlogAdmin = () => {
 // Blog Editor Component
 const BlogEditor = ({ post, categories, onClose, blogAPI, imageProcessor }) => {
     const [formData, setFormData] = useState({
-        title: post?.title || '',
-        slug: post?.slug || '',
-        excerpt: post?.excerpt || '',
-        content: post?.content || '',
-        category_id: post?.category_id || (categories[0]?.id || ''),
-        featured_image: post?.featured_image || '',
-        tags: post?.tags?.join(', ') || '',
-        status: post?.status || 'draft',
-        meta_title: post?.meta_title || '',
-        meta_description: post?.meta_description || ''
+        title: '',
+        slug: '',
+        excerpt: '',
+        content: '',
+        category_id: categories[0]?.id || '',
+        featured_image: '',
+        tags: '',
+        status: 'draft',
+        meta_title: '',
+        meta_description: ''
     });
     const [saving, setSaving] = useState(false);
     const [processingImages, setProcessingImages] = useState(false);
-    const [slugManuallyEdited, setSlugManuallyEdited] = useState(!!post?.slug);
+    const [slugManuallyEdited, setSlugManuallyEdited] = useState(false);
+    const [loading, setLoading] = useState(false);
+
+    // Load post data when editing
+    useEffect(() => {
+        if (post) {
+            console.log('Loading post data for editing:', post);
+            console.log('Post meta_title:', post.meta_title);
+            console.log('Post meta_description:', post.meta_description);
+            setLoading(true);
+            setFormData({
+                title: post.title || '',
+                slug: post.slug || '',
+                excerpt: post.excerpt || '',
+                content: post.content || '',
+                category_id: post.category_id || (categories[0]?.id || ''),
+                featured_image: post.featured_image_url || '',
+                tags: Array.isArray(post.tags) ? post.tags.join(', ') : (post.tags || ''),
+                status: post.status || 'draft',
+                meta_title: post.meta_title || '',
+                meta_description: post.meta_description || ''
+            });
+            setSlugManuallyEdited(!!post.slug);
+            setLoading(false);
+        } else {
+            // Reset form for new post
+            setFormData({
+                title: '',
+                slug: '',
+                excerpt: '',
+                content: '',
+                category_id: categories[0]?.id || '',
+                featured_image: '',
+                tags: '',
+                status: 'draft',
+                meta_title: '',
+                meta_description: ''
+            });
+            setSlugManuallyEdited(false);
+        }
+    }, [post, categories]);
 
     // Auto-generate slug from title
     useEffect(() => {
@@ -1926,194 +2644,299 @@ const BlogEditor = ({ post, categories, onClose, blogAPI, imageProcessor }) => {
     };
 
     const handleSave = async (publishNow = false) => {
+        // Validation
         if (!formData.title.trim()) {
             alert('Please enter a title');
             return;
         }
 
-        setSaving(true);
-        try {
-            const postData = {
-                ...formData,
-                tags: formData.tags.split(',').map(tag => tag.trim()).filter(Boolean),
-                status: publishNow ? 'published' : (formData.status || 'draft')
-            };
+        if (!formData.content.trim()) {
+            alert('Please enter some content');
+            return;
+        }
 
-            if (post) {
-                await BlogAPI.updatePost(post.id, postData);
-            } else {
-                await BlogAPI.createPost(postData);
+        // Prevent multiple simultaneous saves
+        if (saving) {
+            console.log('Save already in progress, ignoring duplicate request');
+            return;
+        }
+
+        setSaving(true);
+        console.log(`Starting ${publishNow ? 'publish' : 'save'} operation...`);
+        
+        try {
+            // Verify user authentication before proceeding
+            const { data: { user }, error: authError } = await supabase.auth.getUser();
+            if (authError || !user) {
+                throw new Error('Authentication required. Please sign in again.');
             }
 
+            // Verify admin status
+            const isUserAdmin = await BlogAPI.isAdmin();
+            if (!isUserAdmin) {
+                throw new Error('Admin privileges required to save posts.');
+            }
+
+            // Clean and format content
+            const cleanContent = formData.content
+                .replace(/\n{3,}/g, '\n\n') // Remove excessive line breaks
+                .trim();
+
+            const postData = {
+                ...formData,
+                content: cleanContent,
+                featured_image_url: formData.featured_image, // Map to correct database field
+                tags: formData.tags.split(',').map(tag => tag.trim()).filter(Boolean),
+                status: publishNow ? 'published' : (formData.status || 'draft'),
+                // Ensure meta fields are included
+                meta_title: formData.meta_title || formData.title,
+                meta_description: formData.meta_description || formData.excerpt
+            };
+            delete postData.featured_image; // Remove the form field name
+
+            console.log('Saving post data:', { ...postData, content: '[content truncated]' });
+
+            let result;
+            const startTime = Date.now();
+            
+            if (post) {
+                console.log('Updating existing post:', post.id);
+                result = await Promise.race([
+                    BlogAPI.updatePost(post.id, postData),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Save operation timed out')), 30000)
+                    )
+                ]);
+            } else {
+                console.log('Creating new post');
+                result = await Promise.race([
+                    BlogAPI.createPost(postData),
+                    new Promise((_, reject) => 
+                        setTimeout(() => reject(new Error('Save operation timed out')), 30000)
+                    )
+                ]);
+            }
+
+            const duration = Date.now() - startTime;
+            console.log(`Save operation completed in ${duration}ms`);
+
+            if (!result) {
+                throw new Error('No response received from server');
+            }
+
+            if (result.error) {
+                throw new Error(result.error.message || 'Failed to save post');
+            }
+
+            console.log('Post saved successfully:', result.id);
+            alert(publishNow ? 'Post published successfully!' : 'Post saved as draft!');
             onClose();
         } catch (err) {
             console.error('Error saving post:', err);
-            alert('Failed to save post');
+            
+            // Provide more specific error messages
+            let errorMessage = err.message;
+            if (err.message.includes('timeout')) {
+                errorMessage = 'The save operation timed out. Please check your connection and try again.';
+            } else if (err.message.includes('Authentication')) {
+                errorMessage = 'Please sign in again to continue.';
+            } else if (err.message.includes('Admin privileges')) {
+                errorMessage = 'You need admin privileges to save posts.';
+            }
+            
+            alert(`Failed to ${publishNow ? 'publish' : 'save'} post: ${errorMessage}`);
         } finally {
             setSaving(false);
+            console.log('Save operation finished, saving state reset');
         }
     };
 
-    return (
-        <div className="blog-editor">
-            <div className="editor-header">
-                <h2>{post ? 'Edit Post' : 'Create New Post'}</h2>
-                <div className="editor-actions">
-                    <button className="cancel-btn" onClick={onClose} disabled={saving}>
-                        Cancel
-                    </button>
-                    <button 
-                        className="save-draft-btn" 
-                        onClick={() => handleSave(false)}
-                        disabled={saving || processingImages}
-                    >
-                        {saving ? 'Saving...' : 'Save Draft'}
-                    </button>
-                    <button 
-                        className="publish-btn" 
-                        onClick={() => handleSave(true)}
-                        disabled={saving || processingImages}
-                    >
-                        {saving ? 'Publishing...' : 'Publish'}
-                    </button>
+    if (loading) {
+        return (
+            <div className="editor-modal">
+                <div className="editor-container">
+                    <div className="loading-container">
+                        <div className="loading-spinner"></div>
+                        <p>Loading post data...</p>
+                    </div>
                 </div>
             </div>
+        );
+    }
 
-            <div className="editor-content">
-                <div className="editor-main">
-                    <div className="form-group">
-                        <label htmlFor="title">Title *</label>
-                        <input
-                            id="title"
-                            type="text"
-                            value={formData.title}
-                            onChange={(e) => handleInputChange('title', e.target.value)}
-                            placeholder="Enter post title..."
-                            className="title-input"
-                        />
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="slug">URL Slug</label>
-                        <input
-                            id="slug"
-                            type="text"
-                            value={formData.slug}
-                            onChange={(e) => handleInputChange('slug', e.target.value)}
-                            placeholder="url-friendly-slug"
-                            className="slug-input"
-                        />
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="excerpt">Excerpt</label>
-                        <textarea
-                            id="excerpt"
-                            value={formData.excerpt}
-                            onChange={(e) => handleInputChange('excerpt', e.target.value)}
-                            placeholder="Brief description of the post..."
-                            className="excerpt-input"
-                            rows="3"
-                        />
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="content">Content *</label>
-                        {processingImages && (
-                            <div className="processing-notice">
-                                Processing images... Please wait.
-                            </div>
-                        )}
-                        <ContentEditor
-                            value={formData.content}
-                            onChange={handleContentChange}
-                            disabled={processingImages}
-                        />
-                    </div>
+    return (
+        <div className="editor-modal">
+            <div className="editor-container">
+                <div className="editor-header">
+                    <h2>{post ? 'Edit Post' : 'Create New Post'}</h2>
+                    <button className="close-btn" onClick={onClose} disabled={saving}>
+                        ×
+                    </button>
                 </div>
 
-                <div className="editor-sidebar">
-                    <div className="form-group">
-                        <label htmlFor="category">Category</label>
-                        <select
-                            id="category"
-                            value={formData.category_id}
-                            onChange={(e) => handleInputChange('category_id', e.target.value)}
-                            className="category-select"
+                <div className="editor-form">
+                    <div className="form-grid">
+                        <div className="form-group">
+                            <label htmlFor="title">Title *</label>
+                            <input
+                                id="title"
+                                type="text"
+                                value={formData.title}
+                                onChange={(e) => handleInputChange('title', e.target.value)}
+                                placeholder="Enter post title..."
+                                className="form-input"
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="slug">URL Slug</label>
+                            <input
+                                id="slug"
+                                type="text"
+                                value={formData.slug}
+                                onChange={(e) => handleInputChange('slug', e.target.value)}
+                                placeholder="url-friendly-slug"
+                                className="form-input"
+                            />
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="category">Category</label>
+                            <select
+                                id="category"
+                                value={formData.category_id}
+                                onChange={(e) => handleInputChange('category_id', e.target.value)}
+                                className="form-select"
+                            >
+                                {categories.map(category => (
+                                    <option key={category.id} value={category.id}>
+                                        {category.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="status">Status</label>
+                            <select
+                                id="status"
+                                value={formData.status}
+                                onChange={(e) => handleInputChange('status', e.target.value)}
+                                className="form-select status-select"
+                            >
+                                <option value="draft">Draft</option>
+                                <option value="published">Published</option>
+                            </select>
+                        </div>
+
+                        <div className="form-group full-width">
+                            <label htmlFor="excerpt">Excerpt</label>
+                            <textarea
+                                id="excerpt"
+                                value={formData.excerpt}
+                                onChange={(e) => handleInputChange('excerpt', e.target.value)}
+                                placeholder="Brief description of the post..."
+                                className="form-textarea"
+                                rows="3"
+                            />
+                        </div>
+
+                        <div className="form-group full-width">
+                            <label htmlFor="featured-image">Featured Image URL</label>
+                            <input
+                                id="featured-image"
+                                type="url"
+                                value={formData.featured_image}
+                                onChange={(e) => handleInputChange('featured_image', e.target.value)}
+                                placeholder="https://example.com/image.jpg"
+                                className="form-input"
+                            />
+                            {formData.featured_image && (
+                                <div className="image-preview" style={{marginTop: '0.5rem'}}>
+                                    <img 
+                                        src={formData.featured_image} 
+                                        alt="Featured image preview" 
+                                        style={{maxWidth: '200px', maxHeight: '120px', borderRadius: '8px', objectFit: 'cover'}}
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="tags">Tags</label>
+                            <input
+                                id="tags"
+                                type="text"
+                                value={formData.tags}
+                                onChange={(e) => handleInputChange('tags', e.target.value)}
+                                placeholder="tag1, tag2, tag3"
+                                className="form-input"
+                            />
+                            <small style={{color: 'var(--text-secondary)', fontSize: '0.8rem'}}>Separate tags with commas</small>
+                        </div>
+
+                        <div className="form-group">
+                            <label htmlFor="meta-title">SEO Title</label>
+                            <input
+                                id="meta-title"
+                                type="text"
+                                value={formData.meta_title}
+                                onChange={(e) => handleInputChange('meta_title', e.target.value)}
+                                placeholder="SEO optimized title..."
+                                className="form-input"
+                            />
+                        </div>
+
+                        <div className="form-group full-width">
+                            <label htmlFor="meta-description">SEO Description</label>
+                            <textarea
+                                id="meta-description"
+                                value={formData.meta_description}
+                                onChange={(e) => handleInputChange('meta_description', e.target.value)}
+                                placeholder="SEO meta description..."
+                                className="form-textarea"
+                                rows="2"
+                            />
+                        </div>
+
+                        <div className="form-group full-width">
+                            <label htmlFor="content">Content *</label>
+                            {processingImages && (
+                                <div style={{padding: '0.5rem', background: 'var(--bg-tertiary)', borderRadius: '8px', marginBottom: '0.5rem', color: 'var(--text-secondary)'}}>
+                                    Processing images... Please wait.
+                                </div>
+                            )}
+                            <ContentEditor
+                                value={formData.content}
+                                onChange={handleContentChange}
+                                disabled={processingImages}
+                            />
+                            <MarkdownGuide />
+                        </div>
+                    </div>
+
+                    <div className="form-actions">
+                        <button 
+                            className="form-btn secondary" 
+                            onClick={onClose} 
+                            disabled={saving}
                         >
-                            {categories.map(category => (
-                                <option key={category.id} value={category.id}>
-                                    {category.name}
-                                </option>
-                            ))}
-                        </select>
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="featured-image">Featured Image URL</label>
-                        <input
-                            id="featured-image"
-                            type="url"
-                            value={formData.featured_image}
-                            onChange={(e) => handleInputChange('featured_image', e.target.value)}
-                            placeholder="https://example.com/image.jpg"
-                            className="image-input"
-                        />
-                        {formData.featured_image && (
-                            <div className="image-preview">
-                                <img src={formData.featured_image} alt="Featured image preview" />
-                            </div>
-                        )}
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="tags">Tags</label>
-                        <input
-                            id="tags"
-                            type="text"
-                            value={formData.tags}
-                            onChange={(e) => handleInputChange('tags', e.target.value)}
-                            placeholder="tag1, tag2, tag3"
-                            className="tags-input"
-                        />
-                        <small>Separate tags with commas</small>
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="meta-title">SEO Title</label>
-                        <input
-                            id="meta-title"
-                            type="text"
-                            value={formData.meta_title}
-                            onChange={(e) => handleInputChange('meta_title', e.target.value)}
-                            placeholder="SEO optimized title..."
-                            className="meta-input"
-                        />
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="meta-description">SEO Description</label>
-                        <textarea
-                            id="meta-description"
-                            value={formData.meta_description}
-                            onChange={(e) => handleInputChange('meta_description', e.target.value)}
-                            placeholder="SEO meta description..."
-                            className="meta-input"
-                            rows="3"
-                        />
-                    </div>
-
-                    <div className="form-group">
-                        <label htmlFor="status">Status</label>
-                        <select
-                            id="status"
-                            value={formData.status}
-                            onChange={(e) => handleInputChange('status', e.target.value)}
-                            className="status-select"
+                            Cancel
+                        </button>
+                        <button 
+                            className="form-btn secondary" 
+                            onClick={() => handleSave(false)}
+                            disabled={saving || processingImages}
                         >
-                            <option value="draft">Draft</option>
-                            <option value="published">Published</option>
-                        </select>
+                            {saving ? 'Saving...' : 'Save Draft'}
+                        </button>
+                        <button 
+                            className="form-btn primary" 
+                            onClick={() => handleSave(true)}
+                            disabled={saving || processingImages}
+                        >
+                            {saving ? 'Publishing...' : 'Publish'}
+                        </button>
                     </div>
                 </div>
             </div>
@@ -2124,6 +2947,11 @@ const BlogEditor = ({ post, categories, onClose, blogAPI, imageProcessor }) => {
 // Simple Content Editor Component
 const ContentEditor = ({ value, onChange, disabled }) => {
     const [isPreview, setIsPreview] = useState(false);
+    const [fullscreen, setFullscreen] = useState(false);
+    const [showMovieSearch, setShowMovieSearch] = useState(false);
+    const [movieSearchQuery, setMovieSearchQuery] = useState('');
+    const [movieSearchResults, setMovieSearchResults] = useState([]);
+    const [searchingMovies, setSearchingMovies] = useState(false);
 
     const handleChange = (e) => {
         if (!disabled) {
@@ -2133,6 +2961,8 @@ const ContentEditor = ({ value, onChange, disabled }) => {
 
     const insertMarkdown = (before, after = '') => {
         const textarea = document.getElementById('content-editor');
+        if (!textarea) return;
+        
         const start = textarea.selectionStart;
         const end = textarea.selectionEnd;
         const selectedText = value.substring(start, end);
@@ -2146,68 +2976,543 @@ const ContentEditor = ({ value, onChange, disabled }) => {
         }, 0);
     };
 
+    const insertTemplate = (template) => {
+        const templates = {
+            table: '| Header 1 | Header 2 | Header 3 |\n|----------|----------|----------|\n| Cell 1   | Cell 2   | Cell 3   |\n| Cell 4   | Cell 5   | Cell 6   |',
+            codeblock: '```javascript\n// Your code here\nconsole.log("Hello World!");\n```',
+            quote: '> This is a blockquote\n> It can span multiple lines',
+            list: '- Item 1\n- Item 2\n- Item 3',
+            numberedList: '1. First item\n2. Second item\n3. Third item'
+        };
+        
+        const textarea = document.getElementById('content-editor');
+        if (!textarea) return;
+        
+        const start = textarea.selectionStart;
+        const newText = value.substring(0, start) + templates[template] + value.substring(start);
+        onChange(newText);
+        
+        setTimeout(() => {
+            textarea.focus();
+            textarea.setSelectionRange(start + templates[template].length, start + templates[template].length);
+        }, 0);
+    };
+
+    const searchMovies = async (query) => {
+        if (!query.trim()) return;
+        
+        setSearchingMovies(true);
+        try {
+            // Import API_BASE_URL at the top of the file
+            const { API_BASE_URL } = await import('../config.js');
+            const response = await fetch(`${API_BASE_URL}/tmdb/search/movie?query=${encodeURIComponent(query)}&language=en-US`);
+            const data = await response.json();
+            setMovieSearchResults(data.results || []);
+        } catch (error) {
+            console.error('Movie search error:', error);
+            setMovieSearchResults([]);
+        } finally {
+            setSearchingMovies(false);
+        }
+    };
+
+    const insertMovieLink = (movie) => {
+        const movieTitle = movie.title || movie.name;
+        const movieUrl = `/movie/${movie.id}`; // Remove the # to avoid duplication
+        const linkText = `[${movieTitle}](${movieUrl})`;
+        
+        const textarea = document.getElementById('content-editor');
+        if (!textarea) return;
+        
+        const start = textarea.selectionStart;
+        const newText = value.substring(0, start) + linkText + value.substring(start);
+        onChange(newText);
+        
+        // Close modal and reset
+        setShowMovieSearch(false);
+        setMovieSearchQuery('');
+        setMovieSearchResults([]);
+        
+        setTimeout(() => {
+            textarea.focus();
+            textarea.setSelectionRange(start + linkText.length, start + linkText.length);
+        }, 0);
+    };
+
     const renderPreview = (content) => {
-        // Simple markdown-like rendering
+        if (!content) return '';
+        
+        // Enhanced markdown rendering
         return content
+            // Code blocks
+            .replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>')
+            // Inline code
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            // Bold
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+            // Italic
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
+            // Headings
+            .replace(/^#### (.*$)/gim, '<h4>$1</h4>')
             .replace(/^### (.*$)/gim, '<h3>$1</h3>')
             .replace(/^## (.*$)/gim, '<h2>$1</h2>')
             .replace(/^# (.*$)/gim, '<h1>$1</h1>')
+            // Links
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+            // Images
+            .replace(/!\[([^\]]*)\]\(([^)]+)\)/g, '<img src="$2" alt="$1" style="max-width: 100%; height: auto;" />')
+            // Blockquotes
+            .replace(/^> (.*$)/gim, '<blockquote>$1</blockquote>')
+            // Unordered lists
+            .replace(/^- (.*$)/gim, '<li>$1</li>')
+            .replace(/(<li>.*<\/li>)/s, '<ul>$1</ul>')
+            // Ordered lists
+            .replace(/^\d+\. (.*$)/gim, '<li>$1</li>')
+            // Horizontal rule
+            .replace(/^---$/gim, '<hr>')
+            // Line breaks
             .replace(/\n/g, '<br>');
     };
 
     return (
-        <div className="content-editor">
+        <div className={`content-editor ${fullscreen ? 'fullscreen' : ''}`}>
             <div className="editor-toolbar">
-                <button type="button" onClick={() => insertMarkdown('**', '**')} title="Bold">
-                    <strong>B</strong>
-                </button>
-                <button type="button" onClick={() => insertMarkdown('*', '*')} title="Italic">
-                    <em>I</em>
-                </button>
-                <button type="button" onClick={() => insertMarkdown('# ')} title="Heading 1">
-                    H1
-                </button>
-                <button type="button" onClick={() => insertMarkdown('## ')} title="Heading 2">
-                    H2
-                </button>
-                <button type="button" onClick={() => insertMarkdown('### ')} title="Heading 3">
-                    H3
-                </button>
-                <button type="button" onClick={() => insertMarkdown('[', '](url)')} title="Link">
-                    🔗
-                </button>
-                <button type="button" onClick={() => insertMarkdown('![alt](', ')')} title="Image">
-                    🖼️
-                </button>
+                <div className="toolbar-group">
+                    <button type="button" className="toolbar-btn" onClick={() => insertMarkdown('**', '**')} title="Bold">
+                        <span>𝐁</span>
+                    </button>
+                    <button type="button" className="toolbar-btn" onClick={() => insertMarkdown('*', '*')} title="Italic">
+                        <span>𝐼</span>
+                    </button>
+                    <button type="button" className="toolbar-btn" onClick={() => insertMarkdown('`', '`')} title="Inline Code">
+                        <span>&lt;/&gt;</span>
+                    </button>
+                </div>
+                
                 <div className="toolbar-divider"></div>
+                
+                <div className="toolbar-group">
+                    <button type="button" className="toolbar-btn" onClick={() => insertMarkdown('# ')} title="Heading 1">
+                        <span>H1</span>
+                    </button>
+                    <button type="button" className="toolbar-btn" onClick={() => insertMarkdown('## ')} title="Heading 2">
+                        <span>H2</span>
+                    </button>
+                    <button type="button" className="toolbar-btn" onClick={() => insertMarkdown('### ')} title="Heading 3">
+                        <span>H3</span>
+                    </button>
+                </div>
+                
+                <div className="toolbar-divider"></div>
+                
+                <div className="toolbar-group">
+                    <button type="button" className="toolbar-btn" onClick={() => insertMarkdown('[', '](url)')} title="Link">
+                        <span>🔗</span>
+                    </button>
+                    <button type="button" className="toolbar-btn" onClick={() => setShowMovieSearch(true)} title="Add Movie Link">
+                        <span>🎬</span>
+                    </button>
+                    <button type="button" className="toolbar-btn" onClick={() => insertMarkdown('![alt](', ')')} title="Image">
+                        <span>🖼️</span>
+                    </button>
+                    <button type="button" className="toolbar-btn" onClick={() => insertTemplate('quote')} title="Quote">
+                        <span>❝</span>
+                    </button>
+                </div>
+                
+                <div className="toolbar-divider"></div>
+                
+                <div className="toolbar-group">
+                    <button type="button" className="toolbar-btn" onClick={() => insertTemplate('list')} title="Bullet List">
+                        <span>•</span>
+                    </button>
+                    <button type="button" className="toolbar-btn" onClick={() => insertTemplate('numberedList')} title="Numbered List">
+                        <span>1.</span>
+                    </button>
+                    <button type="button" className="toolbar-btn" onClick={() => insertTemplate('table')} title="Table">
+                        <span>⊞</span>
+                    </button>
+                    <button type="button" className="toolbar-btn" onClick={() => insertTemplate('codeblock')} title="Code Block">
+                        <span>{ }</span>
+                    </button>
+                </div>
+                
+                <div className="toolbar-divider"></div>
+                
+                <div className="toolbar-group">
+                    <button type="button" className="toolbar-btn" onClick={() => setFullscreen(!fullscreen)} title="Toggle Fullscreen">
+                        <span>{fullscreen ? '⤓' : '⤢'}</span>
+                    </button>
+                </div>
+                
+                <div className="toolbar-divider"></div>
+                
                 <button 
                     type="button" 
-                    className={isPreview ? 'active' : ''}
+                    className={`toolbar-btn ${isPreview ? 'active' : ''}`}
                     onClick={() => setIsPreview(!isPreview)}
                     title="Toggle Preview"
                 >
-                    {isPreview ? '📝' : '👁️'}
+                    <span>{isPreview ? '✏️' : '👁️'}</span>
+                    <span>{isPreview ? 'Edit' : 'Preview'}</span>
                 </button>
             </div>
-
-            {isPreview ? (
-                <div 
-                    className="content-preview"
-                    dangerouslySetInnerHTML={{ __html: renderPreview(value) }}
-                />
-            ) : (
-                <textarea
-                    id="content-editor"
-                    value={value}
-                    onChange={handleChange}
-                    placeholder="Write your post content here... You can use Markdown formatting."
-                    className="content-textarea"
-                    disabled={disabled}
-                    rows="20"
-                />
+            
+            <div className="editor-content">
+                {!isPreview ? (
+                    <textarea
+                        id="content-editor"
+                        className="editor-textarea"
+                        value={value}
+                        onChange={handleChange}
+                        disabled={disabled}
+                        placeholder="Write your blog post content in Markdown...\n\n# Example Heading\n\nThis is a paragraph with **bold** and *italic* text.\n\n- Bullet point 1\n- Bullet point 2\n\n```javascript\nconst example = 'code block';\n```\n\n> This is a blockquote"
+                    />
+                ) : (
+                    <div 
+                        className="editor-preview"
+                        dangerouslySetInnerHTML={{ __html: renderPreview(value) }}
+                    />
+                )}
+            </div>
+            
+            {/* Movie Search Modal */}
+            {showMovieSearch && (
+                <div className="movie-search-modal">
+                    <div className="movie-search-content">
+                        <div className="movie-search-header">
+                            <h3>🎬 Search Movies</h3>
+                            <button 
+                                className="close-btn" 
+                                onClick={() => {
+                                    setShowMovieSearch(false);
+                                    setMovieSearchQuery('');
+                                    setMovieSearchResults([]);
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                        
+                        <div className="movie-search-form">
+                            <input
+                                type="text"
+                                placeholder="Search for a movie..."
+                                value={movieSearchQuery}
+                                onChange={(e) => setMovieSearchQuery(e.target.value)}
+                                onKeyPress={(e) => {
+                                    if (e.key === 'Enter') {
+                                        searchMovies(movieSearchQuery);
+                                    }
+                                }}
+                                autoFocus
+                            />
+                            <button 
+                                onClick={() => searchMovies(movieSearchQuery)}
+                                disabled={searchingMovies || !movieSearchQuery.trim()}
+                            >
+                                {searchingMovies ? 'Searching...' : 'Search'}
+                            </button>
+                        </div>
+                        
+                        <div className="movie-search-results">
+                            {searchingMovies && (
+                                <div className="loading-message">Searching movies...</div>
+                            )}
+                            
+                            {movieSearchResults.length > 0 && (
+                                <div className="movie-results-list">
+                                    {movieSearchResults.map((movie) => (
+                                        <div 
+                                            key={movie.id} 
+                                            className="movie-result-item"
+                                            onClick={() => insertMovieLink(movie)}
+                                        >
+                                            <div className="movie-poster">
+                                                {movie.poster_path ? (
+                                                    <img 
+                                                        src={`https://image.tmdb.org/t/p/w92${movie.poster_path}`} 
+                                                        alt={movie.title}
+                                                    />
+                                                ) : (
+                                                    <div className="no-poster">🎬</div>
+                                                )}
+                                            </div>
+                                            <div className="movie-info">
+                                                <h4>{movie.title}</h4>
+                                                <p className="movie-year">
+                                                    {movie.release_date ? new Date(movie.release_date).getFullYear() : 'Unknown'}
+                                                </p>
+                                                <p className="movie-overview">
+                                                    {movie.overview ? movie.overview.substring(0, 150) + '...' : 'No description available'}
+                                                </p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                            
+                            {!searchingMovies && movieSearchQuery && movieSearchResults.length === 0 && (
+                                <div className="no-results">No movies found. Try a different search term.</div>
+                            )}
+                        </div>
+                    </div>
+                </div>
             )}
+        </div>
+    );
+};
+
+const MarkdownGuide = () => {
+    const [isOpen, setIsOpen] = useState(false);
+    
+    return (
+        <div className="markdown-guide">
+            <button 
+                type="button" 
+                className="guide-toggle"
+                onClick={() => setIsOpen(!isOpen)}
+            >
+                📖 Markdown Guide
+            </button>
+            
+            {isOpen && (
+                <div className="guide-content">
+                    <h3>Markdown Quick Reference</h3>
+                    <div className="guide-grid">
+                        <div className="guide-item">
+                            <strong>Headers:</strong>
+                            <code># H1 ## H2 ### H3</code>
+                        </div>
+                        <div className="guide-item">
+                            <strong>Emphasis:</strong>
+                            <code>**bold** *italic*</code>
+                        </div>
+                        <div className="guide-item">
+                            <strong>Links:</strong>
+                            <code>[text](url)</code>
+                        </div>
+                        <div className="guide-item">
+                            <strong>Images:</strong>
+                            <code>![alt](url)</code>
+                        </div>
+                        <div className="guide-item">
+                            <strong>Code:</strong>
+                            <code>`inline` ```block```</code>
+                        </div>
+                        <div className="guide-item">
+                            <strong>Lists:</strong>
+                            <code>- item or 1. item</code>
+                        </div>
+                        <div className="guide-item">
+                            <strong>Quote:</strong>
+                            <code>&gt; blockquote</code>
+                        </div>
+                        <div className="guide-item">
+                            <strong>Table:</strong>
+                            <code>| col1 | col2 |</code>
+                        </div>
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
+
+// Export functionality
+const ExportModal = ({ isOpen, onClose, posts }) => {
+    const [exportFormat, setExportFormat] = useState('json');
+    const [selectedPosts, setSelectedPosts] = useState([]);
+    const [exporting, setExporting] = useState(false);
+    
+    // Reset state when modal opens
+    useEffect(() => {
+        if (isOpen) {
+            setSelectedPosts([]);
+            setExporting(false);
+        }
+    }, [isOpen]);
+    
+    const handleExport = async () => {
+        setExporting(true);
+        try {
+            const postsToExport = selectedPosts.length > 0 
+                ? posts.filter(post => selectedPosts.includes(post.id))
+                : posts;
+            
+            let content, filename, mimeType;
+            
+            switch (exportFormat) {
+                case 'json':
+                    content = JSON.stringify(postsToExport, null, 2);
+                    filename = `blog-posts-${new Date().toISOString().split('T')[0]}.json`;
+                    mimeType = 'application/json';
+                    break;
+                case 'csv':
+                    const headers = ['Title', 'Slug', 'Status', 'Category', 'Created', 'Updated'];
+                    const rows = postsToExport.map(post => [
+                        post.title || '',
+                        post.slug || '',
+                        post.status || '',
+                        post.category_name || 'Uncategorized',
+                        post.created_at || '',
+                        post.updated_at || ''
+                    ]);
+                    content = [headers, ...rows].map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\n');
+                    filename = `blog-posts-${new Date().toISOString().split('T')[0]}.csv`;
+                    mimeType = 'text/csv';
+                    break;
+                case 'markdown':
+                    content = postsToExport.map(post => 
+                        `# ${post.title || 'Untitled'}\n\n**Status:** ${post.status || 'draft'}\n**Created:** ${post.created_at || 'Unknown'}\n**Category:** ${post.category_name || 'Uncategorized'}\n\n${post.excerpt ? `**Excerpt:** ${post.excerpt}\n\n` : ''}${post.content || 'No content'}\n\n---\n\n`
+                    ).join('');
+                    filename = `blog-posts-${new Date().toISOString().split('T')[0]}.md`;
+                    mimeType = 'text/markdown';
+                    break;
+            }
+            
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+            
+            onClose();
+        } catch (error) {
+            console.error('Export failed:', error);
+            alert('Export failed: ' + error.message);
+        } finally {
+            setExporting(false);
+        }
+    };
+    
+    if (!isOpen) return null;
+    
+    return (
+        <div className="export-modal">
+            <div className="export-content">
+                <div className="export-header">
+                    <h3>Export Blog Posts</h3>
+                    <button className="close-btn" onClick={onClose}>×</button>
+                </div>
+                
+                <div className="export-form">
+                    <div className="form-group">
+                        <label>Export Format:</label>
+                        <select 
+                            value={exportFormat} 
+                            onChange={(e) => setExportFormat(e.target.value)}
+                            className="form-select"
+                        >
+                            <option value="json">JSON</option>
+                            <option value="csv">CSV</option>
+                            <option value="markdown">Markdown</option>
+                        </select>
+                    </div>
+                    
+                    <div className="form-group">
+                        <label>Posts to Export:</label>
+                        <div className="export-options">
+                            <label className="checkbox-label">
+                                <input 
+                                    type="radio" 
+                                    name="exportSelection" 
+                                    checked={selectedPosts.length === 0}
+                                    onChange={() => setSelectedPosts([])}
+                                />
+                                All Posts ({posts.length})
+                            </label>
+                            <label className="checkbox-label">
+                                <input 
+                                    type="radio" 
+                                    name="exportSelection" 
+                                    checked={selectedPosts.length > 0}
+                                    onChange={() => setSelectedPosts(posts.map(p => p.id))}
+                                />
+                                Selected Posts
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div className="export-actions">
+                        <button 
+                            className="form-btn secondary" 
+                            onClick={onClose}
+                            disabled={exporting}
+                        >
+                            Cancel
+                        </button>
+                        <button 
+                            className="form-btn primary" 
+                            onClick={handleExport}
+                            disabled={exporting}
+                        >
+                            {exporting ? 'Exporting...' : 'Export'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Updated toolbar with export functionality
+const AdminToolbar = ({ onCreatePost, onRefresh, onExport, refreshing, stats }) => {
+    return (
+        <div className="admin-toolbar">
+            <div className="toolbar-left">
+                <div className="admin-stats">
+                    {stats && (
+                        <>
+                            <div className="stat-item">
+                                <span className="stat-number">{stats.total || 0}</span>
+                                <span className="stat-label">Total Posts</span>
+                            </div>
+                            <div className="stat-item">
+                                <span className="stat-number">{stats.published || 0}</span>
+                                <span className="stat-label">Published</span>
+                            </div>
+                            <div className="stat-item">
+                                <span className="stat-number">{stats.drafts || 0}</span>
+                                <span className="stat-label">Drafts</span>
+                            </div>
+                        </>
+                    )}
+                </div>
+            </div>
+            
+            <div className="toolbar-right">
+                <button 
+                    className="refresh-btn"
+                    onClick={onRefresh}
+                    disabled={refreshing}
+                    title="Refresh Posts"
+                >
+                    <span className={`icon ${refreshing ? 'spinning' : ''}`}>🔄</span>
+                    <span>Refresh</span>
+                </button>
+                
+                <button 
+                    className="export-btn"
+                    onClick={onExport}
+                    title="Export Posts"
+                >
+                    <span className="icon">📥</span>
+                    <span>Export</span>
+                </button>
+                
+                <button 
+                    className="create-post-btn"
+                    onClick={onCreatePost}
+                >
+                    <span className="icon">✏️</span>
+                    <span>Create Post</span>
+                </button>
+            </div>
         </div>
     );
 };

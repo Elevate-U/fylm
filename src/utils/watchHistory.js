@@ -1,6 +1,47 @@
 import { supabase } from '../supabase';
 import { API_BASE_URL } from '../config';
 
+// Circuit breaker for GoTrueClient issues
+let authFailureCount = 0;
+let lastAuthFailure = 0;
+const AUTH_FAILURE_THRESHOLD = 3;
+const AUTH_FAILURE_RESET_TIME = 30000; // 30 seconds
+
+// Helper function to recover from GoTrueClient lock issues
+const recoverFromAuthLock = async () => {
+    const now = Date.now();
+    
+    // Reset failure count if enough time has passed
+    if (now - lastAuthFailure > AUTH_FAILURE_RESET_TIME) {
+        authFailureCount = 0;
+    }
+    
+    // Skip recovery if we've failed too many times recently
+    if (authFailureCount >= AUTH_FAILURE_THRESHOLD) {
+        console.warn('🚫 Skipping auth recovery due to circuit breaker (too many recent failures)');
+        return false;
+    }
+    
+    try {
+        console.log('🔄 Attempting to recover from GoTrueClient lock...');
+        // Force a new session check with a very short timeout
+        const quickSessionPromise = supabase.auth.getSession();
+        const quickTimeoutPromise = new Promise((_, reject) => 
+            setTimeout(() => reject(new Error('Quick session check timeout')), 1000)
+        );
+        
+        await Promise.race([quickSessionPromise, quickTimeoutPromise]);
+        console.log('✅ GoTrueClient lock recovery successful');
+        authFailureCount = 0; // Reset on success
+        return true;
+    } catch (error) {
+        authFailureCount++;
+        lastAuthFailure = now;
+        console.warn(`⚠️ GoTrueClient lock recovery failed (${authFailureCount}/${AUTH_FAILURE_THRESHOLD}):`, error.message);
+        return false;
+    }
+};
+
 // The `currentSession` and `onAuthStateChange` logic is now redundant
 // because session management is handled centrally in AuthContext.
 // We will remove this to avoid conflicts and simplify the code.
@@ -524,7 +565,7 @@ export const getContinueWatching = async (userId) => {
     }
 };
 
-export const saveWatchProgress = async (userId, item, progress, durationInSeconds, forceHistoryEntry = false) => {
+export const saveWatchProgress = async (userId, item, progress, durationInSeconds, forceHistoryEntry = false, userSession = null) => {
     try {
         if (!userId) {
             console.warn('⚠️ No authenticated user for saving progress. Storing locally...');
@@ -554,6 +595,10 @@ export const saveWatchProgress = async (userId, item, progress, durationInSecond
                 return false;
             }
         }
+    } catch (error) {
+        console.error('❌ Unexpected error in saveWatchProgress initial checks:', error);
+        return false;
+    }
 
     if (!item || typeof progress === 'undefined' || progress < 0) {
         console.error('❌ Invalid progress data:', { item, progress, durationInSeconds });
@@ -572,12 +617,45 @@ export const saveWatchProgress = async (userId, item, progress, durationInSecond
 
     console.log('🎬 Saving progress with RPC:', progressData);
     
-    // Check authentication status before RPC call
-    const { data: { session } } = await supabase.auth.getSession();
+    // Use provided session or fall back to checking auth status
+    let session = userSession;
+    
     if (!session) {
-        console.error('❌ No active session found, cannot save progress via RPC');
+        console.log('🔍 No session provided, checking authentication status...');
+        try {
+            const sessionPromise = supabase.auth.getSession();
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Session check timeout after 10 seconds')), 10000)
+            );
+            
+            const { data: { session: sessionData } } = await Promise.race([sessionPromise, timeoutPromise]);
+            session = sessionData;
+        } catch (sessionError) {
+            console.error('❌ Session check failed or timed out:', sessionError);
+            
+            // Attempt to recover from GoTrueClient lock
+            console.log('🔄 Attempting GoTrueClient lock recovery...');
+            const recovered = await recoverFromAuthLock();
+            if (!recovered) {
+                console.log('⚠️ Recovery failed, proceeding with fallback methods');
+            }
+            
+            session = null;
+        }
+    } else {
+        console.log('✅ Using provided session from Auth context');
+    }
+    
+    if (!session || !session.user || !session.access_token) {
+        console.error('❌ No valid session found, cannot save progress via RPC');
+        console.log('Session details:', { 
+            hasSession: !!session, 
+            hasUser: !!(session?.user), 
+            hasToken: !!(session?.access_token),
+            userId: session?.user?.id 
+        });
         // Skip RPC and go directly to fallback
-        console.log('⚠️ No session, attempting direct DB write fallback...');
+        console.log('⚠️ No valid session, attempting direct DB write fallback...');
         try {
             const fallbackSuccess = await saveWatchProgressFallback(userId, item, progress, durationInSeconds, forceHistoryEntry);
             if (fallbackSuccess) {
@@ -610,13 +688,68 @@ export const saveWatchProgress = async (userId, item, progress, durationInSecond
         }
     }
     
-    console.log('✅ Session found, proceeding with RPC call');
+    console.log('✅ Valid session found, proceeding with RPC call');
     
     try {
-        // Reduce timeout to 5 seconds to fail faster and use fallback
-        const rpcPromise = supabase.rpc('save_watch_progress', progressData);
+        // Add network connectivity and debugging checks
+        console.log('🔍 Pre-RPC debugging info:', {
+            hasNavigator: typeof navigator !== 'undefined',
+            isOnline: typeof navigator !== 'undefined' ? navigator.onLine : 'unknown',
+            supabaseUrl: supabase.supabaseUrl,
+            hasAuth: !!supabase.auth,
+            sessionValid: !!session && !!session.access_token
+        });
+        
+        // Try RPC call with current session first, then try setting session explicitly if it fails
+        console.log('📡 Making RPC call with parameters:', progressData);
+        let rpcPromise = supabase.rpc('save_watch_progress', progressData);
+        
+        // First attempt with current session
+        let firstAttemptFailed = false;
+        try {
+            const quickTimeout = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Quick RPC timeout after 5 seconds')), 5000)
+            );
+            const quickResult = await Promise.race([rpcPromise, quickTimeout]);
+            console.log('✅ RPC call succeeded on first attempt:', quickResult);
+            
+            // If we get here, the RPC succeeded, so we can return early
+            const { data: rpcData, error: rpcError } = quickResult;
+            if (!rpcError) {
+                console.log('✅ Watch progress saved successfully via RPC (first attempt)');
+                try {
+                    const savedProgress = await getWatchProgressForMedia(userId, item.id, item.type, item.season, item.episode);
+                    return savedProgress || true;
+                } catch (fetchError) {
+                    console.error('❌ Error fetching saved progress after successful RPC:', fetchError);
+                    return true;
+                }
+            }
+        } catch (quickError) {
+            console.log('⚠️ First RPC attempt failed or timed out, trying with explicit session setting');
+            firstAttemptFailed = true;
+        }
+        
+        // If first attempt failed, try setting session explicitly
+        if (firstAttemptFailed) {
+            console.log('🔧 Setting session on Supabase client before retry');
+            const { error: sessionError } = await supabase.auth.setSession({
+                access_token: session.access_token,
+                refresh_token: session.refresh_token
+            });
+            
+            if (sessionError) {
+                console.error('❌ Failed to set session on Supabase client:', sessionError);
+            } else {
+                console.log('✅ Session successfully set on Supabase client');
+            }
+            
+            // Retry the RPC call with explicit session
+            console.log('🔄 Retrying RPC call with explicit session');
+            rpcPromise = supabase.rpc('save_watch_progress', progressData);
+        }
         const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('RPC timeout after 5 seconds')), 5000)
+            setTimeout(() => reject(new Error('RPC timeout after 10 seconds')), 10000)
         );
         
         let rpcResult;
@@ -692,10 +825,6 @@ export const saveWatchProgress = async (userId, item, progress, durationInSecond
             console.error('❌ Error fetching saved progress after successful RPC:', fetchError);
             return true; // RPC succeeded, so return true even if fetch failed
         }
-    } catch (error) {
-        console.error('❌ Unexpected error in saveWatchProgress:', error);
-        return false;
-    }
     } catch (error) {
         console.error('❌ Unexpected error in saveWatchProgress:', error);
         return false;

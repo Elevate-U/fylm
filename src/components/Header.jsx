@@ -39,30 +39,14 @@ const Header = () => {
             await signOut();
             console.log('SignOut completed successfully');
             
-            // Force a small delay to ensure state updates, then redirect
-            setTimeout(() => {
-                route('/');
-                console.log('Redirected to home page');
-                // Force a page refresh if user state doesn't update properly
-                setTimeout(() => {
-                    if (user) {
-                        console.log('User state not cleared, forcing page refresh');
-                        window.location.href = '/';
-                    }
-                }, 500);
-            }, 100);
+            // Simple redirect to home page
+            route('/', true);
         } catch (error) {
             console.error('Error during logout:', error);
             // Clear local state even on error
             setIsAdmin(false);
-            // Still try to redirect even if there's an error
-            setTimeout(() => {
-                route('/');
-                // Force refresh on error
-                setTimeout(() => {
-                    window.location.href = '/';
-                }, 300);
-            }, 100);
+            // Still redirect on error
+            route('/', true);
         }
     };
 

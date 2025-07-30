@@ -1,7 +1,7 @@
 import { h } from 'preact';
 import './History.css';
 import Helmet from 'preact-helmet';
-import { useState, useEffect, useCallback } from 'preact/hooks';
+import { useState, useEffect, useCallback, useRef } from 'preact/hooks';
 // Import getWatchHistory instead of getContinueWatching for actual watch history
 import { getFullWatchHistory, deleteWatchItem, getBatchedWatchHistory } from '../utils/watchHistory';
 import { useAuth } from '../context/Auth';
@@ -53,6 +53,18 @@ const History = () => {
     const [loadingMore, setLoadingMore] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const { removeContinueWatchingItem, fetchContinueWatching } = useStore();
+    const scrollTimeoutRef = useRef(null);
+    const loadingMoreRef = useRef(false);
+    const hasMoreRef = useRef(true);
+    
+    // Keep refs in sync with state
+    useEffect(() => {
+        loadingMoreRef.current = loadingMore;
+    }, [loadingMore]);
+    
+    useEffect(() => {
+        hasMoreRef.current = hasMore;
+    }, [hasMore]);
 
     const fetchHistory = useCallback(async () => {
         if (!user) {
@@ -78,7 +90,10 @@ const History = () => {
     }, [user]);
 
     const loadHistoryBatch = useCallback(async (offset = 0, isInitial = false) => {
-        if (!user || (!isInitial && !hasMore)) return;
+        if (!user) return;
+        
+        // Check current hasMore state using ref to avoid stale closures
+        if (!isInitial && !hasMoreRef.current) return;
         
         if (!isInitial) setLoadingMore(true);
         
@@ -88,6 +103,7 @@ const History = () => {
             
             if (batch.length === 0) {
                 setHasMore(false);
+                if (!isInitial) setLoadingMore(false);
                 return;
             }
             
@@ -110,17 +126,55 @@ const History = () => {
         } finally {
             if (!isInitial) setLoadingMore(false);
         }
-    }, [user, hasMore]);
+    }, [user]);
 
     const loadMore = useCallback(() => {
-        if (!loadingMore && hasMore) {
-            loadHistoryBatch(history.length);
+        // Use refs to get current state values and avoid stale closures
+        if (!loadingMoreRef.current && hasMoreRef.current) {
+            setHistory(currentHistory => {
+                loadHistoryBatch(currentHistory.length, false);
+                return currentHistory;
+            });
         }
-    }, [loadHistoryBatch, history.length, loadingMore, hasMore]);
+    }, [loadHistoryBatch]);
+
+    // Infinite scroll handler
+    const handleScroll = useCallback(() => {
+        // Debounce scroll events
+        if (scrollTimeoutRef.current) {
+            clearTimeout(scrollTimeoutRef.current);
+        }
+        
+        scrollTimeoutRef.current = setTimeout(() => {
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            const windowHeight = window.innerHeight;
+            const documentHeight = document.documentElement.scrollHeight;
+            
+            // Trigger load more when user is within 200px of the bottom
+            const threshold = 200;
+            const isNearBottom = scrollTop + windowHeight >= documentHeight - threshold;
+            
+            if (isNearBottom && !loadingMoreRef.current && hasMoreRef.current) {
+                loadMore();
+            }
+        }, 100); // 100ms debounce
+    }, [loadMore, loadingMore, hasMore]);
 
     useEffect(() => {
         fetchHistory();
     }, [fetchHistory, user]);
+
+    // Set up infinite scroll
+    useEffect(() => {
+        window.addEventListener('scroll', handleScroll, { passive: true });
+        
+        return () => {
+            window.removeEventListener('scroll', handleScroll);
+            if (scrollTimeoutRef.current) {
+                clearTimeout(scrollTimeoutRef.current);
+            }
+        };
+    }, [handleScroll]);
 
     const handleDelete = async (itemToDelete) => {
         // Optimistically remove the item from the UI using the unique watch_id
@@ -190,15 +244,14 @@ const History = () => {
                             );
                         })}
                     </div>
-                    {hasMore && (
-                        <div class="load-more-container">
-                            <button 
-                                class="load-more-btn" 
-                                onClick={loadMore}
-                                disabled={loadingMore}
-                            >
-                                {loadingMore ? 'Loading...' : 'Load More'}
-                            </button>
+                    {loadingMore && (
+                        <div class="loading-more-container">
+                            <p class="loading-more-text">Loading more items...</p>
+                        </div>
+                    )}
+                    {!hasMore && history.length > 0 && (
+                        <div class="end-of-list-container">
+                            <p class="end-of-list-text">You've reached the end of your watch history</p>
                         </div>
                     )}
                 </>
