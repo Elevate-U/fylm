@@ -86,7 +86,19 @@ function updateContentLinks(content) {
     '<a href="/watch/$1/$2">$3</a>'
   );
   
-  // Ensure all internal links are properly formatted
+  // Update old movie links to new watch format (without escaped slashes)
+  updatedContent = updatedContent.replace(
+    /<a href="#\/movie\/(\d+)">([^<]+)<\/a>/g,
+    '<a href="/watch/movie/$1">$2</a>'
+  );
+  
+  // Update old tv links to new watch format (without escaped slashes)
+  updatedContent = updatedContent.replace(
+    /<a href="#\/tv\/(\d+)">([^<]+)<\/a>/g,
+    '<a href="/watch/tv/$1">$2</a>'
+  );
+  
+  // Ensure all other internal links are properly formatted
   updatedContent = updatedContent.replace(
     /<a href="#\/([^"]+)">([^<]+)<\/a>/g,
     '<a href="/$1">$2</a>'

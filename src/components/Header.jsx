@@ -12,11 +12,14 @@ const Header = () => {
     const [query, setQuery] = useState('');
     const [isMenuOpen, setIsMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
+    const [isProfileDropdownOpen, setIsProfileDropdownOpen] = useState(false);
     const [isAdmin, setIsAdmin] = useState(false);
     const { user, profile, signOut, authReady } = useAuth();
     const menuRef = useRef(null);
     const hamburgerRef = useRef(null);
     const searchRef = useRef(null);
+    const profileDropdownRef = useRef(null);
+    const profileButtonRef = useRef(null);
 
     const handleSearch = (e) => {
         e.preventDefault();
@@ -77,7 +80,14 @@ const Header = () => {
     const closeMenu = () => {
         setIsMenuOpen(false);
         setIsSearchOpen(false);
+        setIsProfileDropdownOpen(false);
         document.body.classList.remove('menu-open');
+    };
+
+    const toggleProfileDropdown = () => {
+        setIsProfileDropdownOpen(!isProfileDropdownOpen);
+        setIsMenuOpen(false);
+        setIsSearchOpen(false);
     };
 
     // Close menu on route change
@@ -119,6 +129,14 @@ const Header = () => {
                 setIsSearchOpen(false);
                 document.body.classList.remove('menu-open');
             }
+
+            if (isProfileDropdownOpen && 
+                profileDropdownRef.current && 
+                !profileDropdownRef.current.contains(event.target) &&
+                profileButtonRef.current &&
+                !profileButtonRef.current.contains(event.target)) {
+                setIsProfileDropdownOpen(false);
+            }
         };
 
         const handleEscapeKey = (event) => {
@@ -128,6 +146,8 @@ const Header = () => {
                 } else if (isSearchOpen) {
                     setIsSearchOpen(false);
                     document.body.classList.remove('menu-open');
+                } else if (isProfileDropdownOpen) {
+                    setIsProfileDropdownOpen(false);
                 }
             }
         };
@@ -138,7 +158,7 @@ const Header = () => {
             }
         };
 
-        if (isMenuOpen || isSearchOpen) {
+        if (isMenuOpen || isSearchOpen || isProfileDropdownOpen) {
             document.addEventListener('mousedown', handleClickOutside);
             document.addEventListener('keydown', handleEscapeKey);
             window.addEventListener('resize', handleResize);
@@ -149,7 +169,7 @@ const Header = () => {
             document.removeEventListener('keydown', handleEscapeKey);
             window.removeEventListener('resize', handleResize);
         };
-    }, [isMenuOpen, isSearchOpen]);
+    }, [isMenuOpen, isSearchOpen, isProfileDropdownOpen]);
 
     // Check admin status when user changes
     useEffect(() => {
@@ -176,6 +196,7 @@ const Header = () => {
             setIsAdmin(false);
             setIsMenuOpen(false);
             setIsSearchOpen(false);
+            setIsProfileDropdownOpen(false);
             document.body.classList.remove('menu-open');
         }
     }, [user]);
@@ -232,20 +253,12 @@ const Header = () => {
                             <li><Link activeClassName="active" href="/movies" onClick={closeMenu}>Movies</Link></li>
                             <li><Link activeClassName="active" href="/tv" onClick={closeMenu}>TV</Link></li>
                             <li><Link activeClassName="active" href="/anime" onClick={closeMenu}>Anime</Link></li>
-                            {user ? (
-                                <>
-                                    <li><Link activeClassName="active" href="/favorites" onClick={closeMenu}>Favorites</Link></li>
-                                    <li><Link activeClassName="active" href="/history" onClick={closeMenu}>History</Link></li>
-    
-                                        <li><Link activeClassName="active" href="/blog/admin" onClick={closeMenu}>Editor</Link></li>
-
-                                </>
-                            ) : (
-                                <>
-                                    <li><a href="/login" style={{ color: '#999', fontSize: '0.9em' }} onClick={closeMenu}>Favorites</a></li>
-                                    <li><a href="/login" style={{ color: '#999', fontSize: '0.9em' }} onClick={closeMenu}>History</a></li>
-                                </>
+                            {user && isAdmin && (
+                                <li><Link activeClassName="active" href="/blog/admin" onClick={closeMenu}>Editor</Link></li>
                             )}
+                            <li class="theme-toggle-menu-item">
+                                <ThemeToggle />
+                            </li>
                         </ul>
                     </nav>
                 </div>
@@ -297,27 +310,23 @@ const Header = () => {
                         </svg>
                     </button>
                     
-                    <ThemeToggle />
-                    <div class="auth-links">
+                    <div class="header-actions">
+                        <ThemeToggle />
+                        <div class="auth-links">
                         {user ? (
                             <>
-                                <Link href="/profile" class="profile-link" onClick={closeMenu}>
+                                <button 
+                                    ref={profileButtonRef}
+                                    onClick={toggleProfileDropdown}
+                                    class="profile-button"
+                                    aria-label="Profile menu"
+                                    aria-expanded={isProfileDropdownOpen}
+                                >
                                     <img
                                         src={profile?.avatar_url ? getProxiedImageUrl(profile.avatar_url) : (user.user_metadata?.avatar_url ? getProxiedImageUrl(user.user_metadata.avatar_url) : defaultAvatar)}
                                         alt="Profile"
                                         class="profile-avatar"
                                     />
-                                </Link>
-                                <button 
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        console.log('Logout button physically clicked');
-                                        handleLogout();
-                                    }} 
-                                    class="auth-button"
-                                    type="button"
-                                >
-                                    Logout
                                 </button>
                             </>
                         ) : (
@@ -326,6 +335,7 @@ const Header = () => {
                                 <Link href="/signup" class="auth-link" onClick={closeMenu}>Sign Up</Link>
                             </>
                         )}
+                        </div>
                     </div>
                     <button 
                         ref={hamburgerRef}
@@ -341,6 +351,78 @@ const Header = () => {
                     </button>
                 </div>
             </div>
+            
+            {/* Profile Dropdown - Rendered outside header */}
+            {isProfileDropdownOpen && user && (
+                <div 
+                    ref={profileDropdownRef}
+                    class="profile-dropdown"
+                    style={{
+                        position: 'fixed',
+                        top: '60px',
+                        right: '20px',
+                        zIndex: 9999
+                    }}
+                >
+                    <ul class="dropdown-menu">
+                        <li>
+                            <Link href="/profile" onClick={closeMenu} class="dropdown-item">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                                    <circle cx="12" cy="7" r="4"></circle>
+                                </svg>
+                                Profile
+                            </Link>
+                        </li>
+                        <li>
+                            <Link href="/favorites" onClick={closeMenu} class="dropdown-item">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                                </svg>
+                                Favorites
+                            </Link>
+                        </li>
+                        <li>
+                            <Link href="/history" onClick={closeMenu} class="dropdown-item">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <polyline points="12,6 12,12 16,14"></polyline>
+                                </svg>
+                                History
+                            </Link>
+                        </li>
+                        {isAdmin && (
+                            <li>
+                                <Link href="/blog/admin" onClick={closeMenu} class="dropdown-item">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                        <path d="M18.5 2.5a2.12 2.12 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                    </svg>
+                                    Editor
+                                </Link>
+                            </li>
+                        )}
+                        <li class="dropdown-divider"></li>
+                        <li>
+                            <button 
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    handleLogout();
+                                }} 
+                                class="dropdown-item logout-item"
+                                type="button"
+                            >
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+                                    <polyline points="16,17 21,12 16,7"></polyline>
+                                    <line x1="21" y1="12" x2="9" y2="12"></line>
+                                </svg>
+                                Logout
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+            )}
         </header>
     );
 };

@@ -1,3 +1,22 @@
+/* Glassmorphic container for history page */
+.history-container {
+    background: color-mix(in srgb, var(--glass-bg) 25%, transparent);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border-radius: var(--radius-lg);
+    border: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
+    margin: var(--spacing-lg) auto;
+    padding: var(--spacing-xl);
+    max-width: 1400px;
+    box-shadow: 
+        inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 5%, transparent),
+        inset 1px 2px 0px -1px color-mix(in srgb, var(--text-primary) 12%, transparent), 
+        inset -1px -1px 0px -1px color-mix(in srgb, var(--text-primary) 8%, transparent), 
+        inset 0px 3px 6px -2px color-mix(in srgb, var(--gray-900) 10%, transparent), 
+        0px 4px 16px 0px color-mix(in srgb, var(--gray-900) 6%, transparent);
+    transition: all 0.4s cubic-bezier(1, 0.0, 0.4, 1);
+}
+
 .movie-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
@@ -50,6 +69,16 @@
     margin: 0;
     opacity: 0.8;
     animation: pulse 1.5s ease-in-out infinite;
+    background: color-mix(in srgb, var(--glass-bg) 20%, transparent);
+    backdrop-filter: blur(12px) saturate(150%);
+    -webkit-backdrop-filter: blur(12px) saturate(150%);
+    padding: var(--spacing-md) var(--spacing-lg);
+    border-radius: var(--radius-md);
+    border: 1px solid color-mix(in srgb, var(--text-primary) 6%, transparent);
+    box-shadow: 
+        inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 4%, transparent),
+        inset 0px 1px 0px -1px color-mix(in srgb, var(--text-primary) 8%, transparent), 
+        0px 2px 8px 0px color-mix(in srgb, var(--gray-900) 4%, transparent);
 }
 
 .end-of-list-container {
@@ -66,6 +95,15 @@
     margin: 0;
     opacity: 0.6;
     font-style: italic;
+    background: color-mix(in srgb, var(--glass-bg) 15%, transparent);
+    backdrop-filter: blur(8px) saturate(120%);
+    -webkit-backdrop-filter: blur(8px) saturate(120%);
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-sm);
+    border: 1px solid color-mix(in srgb, var(--text-primary) 4%, transparent);
+    box-shadow: 
+        inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 3%, transparent),
+        0px 1px 4px 0px color-mix(in srgb, var(--gray-900) 3%, transparent);
 }
 
 @keyframes pulse {

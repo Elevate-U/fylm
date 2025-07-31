@@ -99,26 +99,34 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete,
         element.src = 'https://via.placeholder.com/400x600/1a1a1a/ffffff?text=No+Image';
     }, []);
 
-    // Enhanced subtitle text for anime
+    // Standardized subtitle text for all content types
     const getSubtitleText = () => {
         if ((type === 'tv' || type === 'anime') && season_number && episode_number) {
             // This is a specific episode (from watch history/favorites)
             return `S${season_number} E${episode_number}${episode_name ? `: ${episode_name}` : ''}`;
-        } else if (type === 'anime') {
-            // Enhanced anime subtitle with episode count and status
-            const parts = [];
-            if (year) parts.push(year.toString());
-            if (episodes) parts.push(`${episodes} episodes`);
-            if (format && format !== 'TV') parts.push(format);
-            return parts.length > 0 ? parts.join(' • ') : 'Anime';
-        } else if (type === 'tv' && number_of_seasons) {
-            // This is a TV show listing - show year and season count
-            return `${year || 'Unknown'} • ${number_of_seasons} Season${number_of_seasons !== 1 ? 's' : ''}`;
-        } else if (type === 'movie' && year) {
-            // This is a movie - show just the year
-            return year.toString();
         }
-        return null;
+        
+        // Build standardized subtitle: Year • Season/Episode Count • Rating
+        const parts = [];
+        
+        // Add year (release year or start year)
+        if (year) {
+            parts.push(year.toString());
+        }
+        
+        // Add season/episode count based on content type
+        if (type === 'anime' && episodes) {
+            parts.push(`${episodes} episodes`);
+        } else if (type === 'tv') {
+            // For TV shows, use number_of_seasons from discover API
+            // Note: last_episode_to_air and seasons are only available from detailed TV series endpoint
+            if (number_of_seasons) {
+                const seasonText = number_of_seasons === 1 ? 'season' : 'seasons';
+                parts.push(`${number_of_seasons} ${seasonText}`);
+            }
+        }
+        
+        return parts.length > 0 ? parts.join(' • ') : null;
     };
 
     const subtitleText = getSubtitleText();

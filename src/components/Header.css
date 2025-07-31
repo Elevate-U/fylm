@@ -1,40 +1,61 @@
 header {
-  background: var(--glass-bg), var(--glass-highlight);
-  backdrop-filter: var(--glass-blur-heavy);
-  -webkit-backdrop-filter: var(--glass-blur-heavy);
+  background: color-mix(in srgb, var(--glass-bg) 36%, transparent);
+  backdrop-filter: blur(24px) saturate(180%);
+  -webkit-backdrop-filter: blur(24px) saturate(180%);
   padding: calc(var(--spacing-sm) * 0.60) 0;
   border: none;
-  border-bottom: var(--glass-border);
+  border-bottom: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent);
   position: fixed;
   top: 0;
   left: 0;
   right: 0;
   z-index: 1000;
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  box-shadow: var(--glass-shadow);
+  transition: all 0.4s cubic-bezier(1, 0.0, 0.4, 1);
+  box-shadow: 
+    inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 7%, transparent),
+    inset 1.8px 3px 0px -2px color-mix(in srgb, var(--text-primary) 20%, transparent), 
+    inset -2px -2px 0px -2px color-mix(in srgb, var(--text-primary) 15%, transparent), 
+    inset -3px -8px 1px -6px color-mix(in srgb, var(--text-primary) 10%, transparent), 
+    inset -0.3px -1px 4px 0px color-mix(in srgb, var(--gray-900) 12%, transparent), 
+    inset -1.5px 2.5px 0px -2px color-mix(in srgb, var(--gray-900) 20%, transparent), 
+    inset 0px 3px 4px -2px color-mix(in srgb, var(--gray-900) 20%, transparent), 
+    inset 2px -6.5px 1px -4px color-mix(in srgb, var(--gray-900) 10%, transparent), 
+    0px 1px 5px 0px color-mix(in srgb, var(--gray-900) 10%, transparent), 
+    0px 6px 16px 0px color-mix(in srgb, var(--gray-900) 8%, transparent);
 }
 
 /* Enhanced glass effect on scroll */
 header.scrolled {
-  background: var(--glass-bg-hover), var(--glass-highlight);
-  border-bottom: var(--glass-border-hover);
-  box-shadow: var(--glass-shadow-hover);
+  background: color-mix(in srgb, var(--glass-bg-hover) 45%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--text-primary) 15%, transparent);
+  box-shadow: 
+    inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 10%, transparent),
+    inset 2px 1px 0px -1px color-mix(in srgb, var(--text-primary) 25%, transparent), 
+    inset -1.5px -1px 0px -1px color-mix(in srgb, var(--text-primary) 20%, transparent), 
+    inset -2px -6px 1px -5px color-mix(in srgb, var(--text-primary) 15%, transparent), 
+    inset -1px 2px 3px -1px color-mix(in srgb, var(--gray-900) 25%, transparent), 
+    inset 0px -4px 1px -2px color-mix(in srgb, var(--gray-900) 15%, transparent), 
+    0px 3px 6px 0px color-mix(in srgb, var(--gray-900) 12%, transparent),
+    0px 8px 25px 0px color-mix(in srgb, var(--gray-900) 15%, transparent);
 }
 
 header .container {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
   padding: 0 var(--spacing-xl);
   max-width: 1400px;
   margin: 0 auto;
   position: relative;
+  gap: var(--spacing-lg);
 }
 
 .header-left {
   display: flex;
   align-items: center;
   gap: var(--spacing-xl);
+  flex-shrink: 0;
 }
 
 .logo {
@@ -134,24 +155,33 @@ header nav a.active::before {
 
 .hamburger {
   display: none;
-  flex-direction: column;
-  justify-content: space-around;
   width: 2.5rem;
   height: 2.5rem;
-  background: rgba(255, 255, 255, 0.05);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: color-mix(in srgb, var(--glass-bg) 36%, transparent);
+  backdrop-filter: blur(16px) saturate(180%);
+  -webkit-backdrop-filter: blur(16px) saturate(180%);
+  border: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent);
   border-radius: var(--radius-full);
   cursor: pointer;
   padding: 0.5rem;
-  z-index: 10;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  z-index: 1010;
+  transition: all 0.4s cubic-bezier(1, 0.0, 0.4, 1);
   box-shadow: 
-    0 4px 20px rgba(0, 0, 0, 0.1),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 7%, transparent),
+    inset 1px 1px 0px -1px color-mix(in srgb, var(--text-primary) 15%, transparent), 
+    inset -1px -1px 0px -1px color-mix(in srgb, var(--text-primary) 10%, transparent), 
+    inset 0px 2px 3px -1px color-mix(in srgb, var(--gray-900) 15%, transparent), 
+    0px 2px 8px 0px color-mix(in srgb, var(--gray-900) 8%, transparent);
   position: relative;
   overflow: hidden;
+}
+
+.hamburger.active {
+  background: color-mix(in srgb, var(--brand-primary) 20%, var(--glass-bg) 36%);
+  border-color: var(--brand-primary);
+  box-shadow: 
+    inset 0 0 0 1px color-mix(in srgb, var(--brand-primary) 30%, transparent),
+    0px 4px 12px 0px color-mix(in srgb, var(--brand-primary) 25%, transparent);
 }
 
 .hamburger::before {
@@ -169,13 +199,16 @@ header nav a.active::before {
 }
 
 .hamburger:hover {
-  background: rgba(255, 255, 255, 0.1);
+  background: color-mix(in srgb, var(--glass-bg-hover) 45%, transparent);
   transform: translateY(-2px) scale(1.05);
   box-shadow: 
-    0 8px 32px rgba(0, 0, 0, 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2),
+    inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 10%, transparent),
+    inset 1px 1px 0px -1px color-mix(in srgb, var(--text-primary) 20%, transparent), 
+    inset -1px -1px 0px -1px color-mix(in srgb, var(--text-primary) 15%, transparent), 
+    inset 0px 2px 4px -1px color-mix(in srgb, var(--gray-900) 20%, transparent), 
+    0px 4px 12px 0px color-mix(in srgb, var(--gray-900) 12%, transparent),
     0 0 25px rgba(var(--brand-primary-rgb), 0.3);
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: color-mix(in srgb, var(--text-primary) 15%, transparent);
 }
 
 .hamburger:hover::before {
@@ -183,26 +216,43 @@ header nav a.active::before {
 }
 
 .hamburger .bar {
+  position: absolute;
+  top: 50%;
+  left: 50%;
   width: 1.5rem;
   height: 0.15rem;
   background: var(--text-primary);
   border-radius: var(--radius-full);
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  position: relative;
   z-index: 2;
   box-shadow: 0 0 8px rgba(var(--brand-primary-rgb), 0.3);
 }
 
+.hamburger .bar:nth-child(1) {
+  transform: translate(-50%, -50%) translateY(-0.4rem);
+}
+
+.hamburger .bar:nth-child(2) {
+  transform: translate(-50%, -50%);
+}
+
+.hamburger .bar:nth-child(3) {
+  transform: translate(-50%, -50%) translateY(0.4rem);
+}
+
 .hamburger.active .bar:nth-child(1) {
-  transform: rotate(45deg) translate(6px, 6px);
+  transform: translate(-50%, -50%) rotate(45deg);
+  background: red;
 }
 
 .hamburger.active .bar:nth-child(2) {
   opacity: 0;
+  transform: translate(-50%, -50%) scale(0);
 }
 
 .hamburger.active .bar:nth-child(3) {
-  transform: rotate(-45deg) translate(6px, -6px);
+  transform: translate(-50%, -50%) rotate(-45deg);
+  background: red;
 }
 
 .search-toggle {
@@ -261,11 +311,23 @@ header nav a.active::before {
   display: flex;
   align-items: center;
   gap: var(--spacing-md);
+  flex: 1;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  margin-left: auto;
 }
 
 .search-container {
   margin-right: 0;
   position: relative;
+  display: flex;
+  flex: 1;
+  max-width: 500px;
+  min-width: 200px;
 }
 
 .search-container input {
@@ -276,18 +338,18 @@ header nav a.active::before {
   color: var(--text-primary);
   padding: 0 var(--spacing-md);
   border-radius: var(--radius-full);
-  width: 280px;
+  width: 100%;
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   font-size: var(--font-size-sm);
   font-weight: var(--font-weight-regular);
   height: 32px;
   display: flex;
   align-items: center;
+  flex-direction: row;
 }
 
 .search-container input:focus {
   outline: none;
-  width: 320px;
   background: var(--glass-bg-hover), var(--glass-highlight);
   border-color: var(--glass-border-hover);
   box-shadow: var(--glass-shadow-hover);
@@ -528,8 +590,13 @@ header nav a.active::before {
   gap: var(--spacing-sm);
 }
 
+/* Hide theme toggle in desktop navigation */
+.theme-toggle-menu-item {
+  display: none;
+}
+
 /* Dynamic responsive behavior - show hamburger when content overflows */
-@media (max-width: 860px) {
+@media (max-width: 1024px) {
   .hamburger {
     display: flex;
   }
@@ -545,11 +612,28 @@ header nav a.active::before {
   header nav {
     display: none;
   }
+  
+  /* Adjust search bar constraints for tablet */
+  .search-container {
+    max-width: 350px;
+    min-width: 180px;
+  }
 }
 
 @media (max-width: 768px) {
   header .container {
     padding: 0 var(--spacing-lg); /* Increased padding for less cramped feel */
+    gap: var(--spacing-sm);
+  }
+  
+  .header-left {
+    flex: 1;
+    min-width: 0;
+  }
+  
+  .header-right {
+    flex-shrink: 0;
+    gap: var(--spacing-xs);
   }
 
   header nav {
@@ -583,6 +667,20 @@ header nav a.active::before {
     font-size: var(--font-size-lg);
     padding: var(--spacing-md) var(--spacing-xl);
     border-radius: var(--radius-lg);
+  }
+
+  .theme-toggle-menu-item {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: var(--spacing-md) 0;
+    margin-top: var(--spacing-md);
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+  }
+
+  /* Show theme toggle in mobile menu */
+  header nav .theme-toggle-menu-item {
+    display: flex;
   }
 
   .header-right {
@@ -645,8 +743,9 @@ header nav a.active::before {
 
   .header-right {
     gap: var(--spacing-xs); /* Minimal gap for very small screens */
-    flex-shrink: 0;
+    flex-shrink: 1;
     min-width: 0;
+    flex-wrap: wrap; 
   }
 
   .logo {
@@ -697,7 +796,7 @@ header nav a.active::before {
 }
 
 /* Ensure auth links stay visible until hamburger appears */
-@media (min-width: 861px) {
+@media (min-width: 1025px) {
   .auth-links {
     display: flex !important;
   }
@@ -708,7 +807,7 @@ header nav a.active::before {
 }
 
 /* Improved touch targets for mobile */
-@media (max-width: 860px) {
+@media (max-width: 1024px) {
   .auth-link, .auth-button {
     min-height: 44px; /* iOS recommended touch target */
     display: flex;
@@ -722,11 +821,12 @@ header nav a.active::before {
   }
   
   .hamburger {
+    display: flex; /* Show hamburger on mobile */
     min-width: 44px;
     min-height: 44px;
   }
 }
-.header-right .profile-link {
+.profile-button {
     display: flex;
     align-items: center;
     margin-right: 1rem;
@@ -740,9 +840,10 @@ header nav a.active::before {
     box-shadow: 
       0 4px 20px rgba(0, 0, 0, 0.1),
       inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    cursor: pointer;
 }
 
-.header-right .profile-link:hover {
+.profile-button:hover {
     background: rgba(255, 255, 255, 0.1);
     transform: translateY(-2px) scale(1.05);
     box-shadow: 
@@ -767,4 +868,110 @@ header nav a.active::before {
     box-shadow: 
       0 4px 16px rgba(0, 0, 0, 0.3),
       0 0 20px rgba(var(--brand-primary-rgb), 0.5);
+}
+
+/* Profile Dropdown Styles */
+.profile-dropdown {
+    min-width: 200px;
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border: var(--glass-border);
+    border-radius: 12px;
+    box-shadow: var(--glass-shadow);
+    overflow: hidden;
+    animation: dropdownFadeIn 0.2s ease-out;
+}
+
+[data-theme="dark"] .profile-dropdown {
+    background: rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(20px) saturate(180%);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 
+      0 20px 40px rgba(0, 0, 0, 0.4),
+      0 8px 16px rgba(0, 0, 0, 0.3),
+      inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+@keyframes dropdownFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+.dropdown-menu {
+    list-style: none;
+    margin: 0;
+    padding: 8px 0;
+}
+
+.dropdown-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    color: var(--text-primary);
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+    cursor: pointer;
+}
+
+.dropdown-item:hover {
+    background: rgba(var(--brand-primary-rgb), 0.1);
+    color: var(--brand-primary);
+}
+
+.dropdown-item svg {
+    flex-shrink: 0;
+    opacity: 0.7;
+    transition: opacity 0.2s ease;
+}
+
+.dropdown-item:hover svg {
+    opacity: 1;
+}
+
+.dropdown-divider {
+    height: 1px;
+    background: rgba(255, 255, 255, 0.1);
+    margin: 8px 0;
+    border: none;
+}
+
+[data-theme="dark"] .dropdown-divider {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.logout-item {
+    color: #ef4444;
+}
+
+.logout-item:hover {
+    background: rgba(239, 68, 68, 0.1);
+    color: #ef4444;
+}
+
+/* Mobile adjustments for dropdown */
+@media (max-width: 1024px) {
+    .profile-dropdown {
+        right: 10px !important;
+        min-width: 180px;
+    }
+    
+    .dropdown-item {
+        padding: 14px 16px;
+        font-size: 16px;
+    }
 }

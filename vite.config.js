@@ -19,6 +19,11 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       strictPort: true,
       proxy: {
+        '/api': {
+          target: 'http://localhost:3001',
+          changeOrigin: true,
+          rewrite: (path) => path.replace(/^\/api/, ''),
+        },
         '/api/tmdb': {
           target: 'https://api.themoviedb.org/3',
           changeOrigin: true,
@@ -48,4 +53,4 @@ export default defineConfig(({ mode }) => {
       },
     },
   };
-}); 
+});

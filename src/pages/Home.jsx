@@ -8,6 +8,7 @@ import { API_BASE_URL } from '../config';
 import FeaturesShowcase from '../components/FeaturesShowcase';
 import LoadingSpinner from '../components/LoadingSpinner';
 import WelcomeMessage from '../components/WelcomeMessage';
+import SkeletonCard from '../components/SkeletonCard';
 import './Home.css';
 
 const Home = (props) => {
@@ -33,7 +34,15 @@ const Home = (props) => {
         fetchContinueWatching,
         fetchFavorites,
         favoritesFetched,
-    isFavorited
+        isFavorited,
+        trendingLoading,
+        popularMoviesLoading,
+        popularTvLoading,
+        topRatedMoviesLoading,
+        topRatedTvLoading,
+        upcomingMoviesLoading,
+        nowPlayingMoviesLoading,
+        airingTodayTvLoading
     } = useStore();
     
     const { user } = useAuth(); // Add auth context
@@ -99,8 +108,20 @@ const Home = (props) => {
         }
     }, [user, favoritesFetched, fetchFavorites]);
 
-    const renderSection = (title, items, media_type) => {
-        // A loading placeholder can be shown here if you have a generic loading state
+    const renderSection = (title, items, media_type, loading) => {
+        if (loading) {
+            return (
+                <section class="home-section">
+                    <h2>{title}</h2>
+                    <div class="scrolling-row">
+                        {Array.from({ length: 10 }).map((_, index) => (
+                            <SkeletonCard key={`skeleton-${title}-${index}`} />
+                        ))}
+                    </div>
+                </section>
+            );
+        }
+
         if (!items || items.length === 0) {
             return null;
         }
@@ -469,17 +490,17 @@ const Home = (props) => {
                 </div>
             </section>
 
-            {mediaType === 'all' && renderSection('Trending This Week', trending)}
+            {mediaType === 'all' && renderSection('Trending This Week', trending, undefined, trendingLoading)}
             
-            {mediaType !== 'tv' && renderSection("Popular Movies", popularMovies, 'movie')}
-            {mediaType !== 'tv' && renderSection("Now Playing Movies", nowPlayingMovies, 'movie')}
-            {mediaType !== 'movie' && renderSection("Popular TV Shows", popularTv, 'tv')}
+            {mediaType !== 'tv' && renderSection("Popular Movies", popularMovies, 'movie', popularMoviesLoading)}
+            {mediaType !== 'tv' && renderSection("Now Playing Movies", nowPlayingMovies, 'movie', nowPlayingMoviesLoading)}
+            {mediaType !== 'movie' && renderSection("Popular TV Shows", popularTv, 'tv', popularTvLoading)}
             
-            {(mediaType === 'all' || mediaType === 'movie') && renderSection('Top Rated Movies', topRatedMovies, 'movie')}
-            {(mediaType === 'all' || mediaType === 'movie') && renderSection('Upcoming Movies', upcomingMovies, 'movie')}
+            {(mediaType === 'all' || mediaType === 'movie') && renderSection('Top Rated Movies', topRatedMovies, 'movie', topRatedMoviesLoading)}
+            {(mediaType === 'all' || mediaType === 'movie') && renderSection('Upcoming Movies', upcomingMovies, 'movie', upcomingMoviesLoading)}
             
-            {(mediaType === 'all' || mediaType === 'tv') && renderSection('Top Rated TV Shows', topRatedTv, 'tv')}
-            {(mediaType === 'all' || mediaType === 'tv') && renderSection('Airing Today', airingTodayTv, 'tv')}
+            {(mediaType === 'all' || mediaType === 'tv') && renderSection('Top Rated TV Shows', topRatedTv, 'tv', topRatedTvLoading)}
+            {(mediaType === 'all' || mediaType === 'tv') && renderSection('Airing Today', airingTodayTv, 'tv', airingTodayTvLoading)}
         </div>
     );
 };

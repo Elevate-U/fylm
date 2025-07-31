@@ -26,13 +26,21 @@ export const useStore = create(
     persist(
     (set, get) => ({
       trending: [],
+      trendingLoading: false,
       popularMovies: [],
+      popularMoviesLoading: false,
       popularTv: [],
+      popularTvLoading: false,
       topRatedMovies: [],
+      topRatedMoviesLoading: false,
       topRatedTv: [],
+      topRatedTvLoading: false,
       upcomingMovies: [],
+      upcomingMoviesLoading: false,
       nowPlayingMovies: [],
+      nowPlayingMoviesLoading: false,
       airingTodayTv: [],
+      airingTodayTvLoading: false,
       favorites: [],
       favoritesFetched: false,
       favoritedMedia: new Set(),
@@ -66,6 +74,7 @@ export const useStore = create(
 
       fetchTrending: async () => {
         if (get().trending.length > 0) return;
+        set({ trendingLoading: true });
         try {
             const response = await fetch(`/api/tmdb/trending/all/week`);
             if (response.ok) {
@@ -74,42 +83,79 @@ export const useStore = create(
             }
         } catch (error) {
             console.error('Error fetching trending:', error);
+        } finally {
+            set({ trendingLoading: false });
         }
       },
       fetchPopularMovies: async () => {
         if (get().popularMovies.length > 0) return;
-        const results = await fetchAllPages(`/api/tmdb/movie/popular`);
-        set({ popularMovies: results });
+        set({ popularMoviesLoading: true });
+        try {
+            const results = await fetchAllPages(`/api/tmdb/movie/popular`);
+            set({ popularMovies: results });
+        } finally {
+            set({ popularMoviesLoading: false });
+        }
       },
       fetchPopularTv: async () => {
         if (get().popularTv.length > 0) return;
-        const results = await fetchAllPages(`/api/tmdb/tv/popular`);
-        set({ popularTv: results });
+        set({ popularTvLoading: true });
+        try {
+            const results = await fetchAllPages(`/api/tmdb/tv/popular`);
+            set({ popularTv: results });
+        } finally {
+            set({ popularTvLoading: false });
+        }
       },
       fetchTopRatedMovies: async () => {
         if (get().topRatedMovies.length > 0) return;
-        const results = await fetchAllPages(`/api/tmdb/movie/top_rated`);
-        set({ topRatedMovies: results });
+        set({ topRatedMoviesLoading: true });
+        try {
+            const results = await fetchAllPages(`/api/tmdb/movie/top_rated`);
+            set({ topRatedMovies: results });
+        } finally {
+            set({ topRatedMoviesLoading: false });
+        }
       },
       fetchTopRatedTv: async () => {
         if (get().topRatedTv.length > 0) return;
-        const results = await fetchAllPages(`/api/tmdb/tv/top_rated`);
-        set({ topRatedTv: results });
+        set({ topRatedTvLoading: true });
+        try {
+            const results = await fetchAllPages(`/api/tmdb/tv/top_rated`);
+            set({ topRatedTv: results });
+        } finally {
+            set({ topRatedTvLoading: false });
+        }
       },
       fetchUpcomingMovies: async () => {
         if (get().upcomingMovies.length > 0) return;
-        const results = await fetchAllPages(`/api/tmdb/movie/upcoming`);
-        set({ upcomingMovies: results });
+        set({ upcomingMoviesLoading: true });
+        try {
+            const results = await fetchAllPages(`/api/tmdb/movie/upcoming`);
+            set({ upcomingMovies: results });
+        } finally {
+            set({ upcomingMoviesLoading: false });
+        }
       },
       fetchNowPlayingMovies: async () => {
         if (get().nowPlayingMovies.length > 0) return;
-        const results = await fetchAllPages(`/api/tmdb/movie/now_playing`);
-        set({ nowPlayingMovies: results });
+        set({ nowPlayingMoviesLoading: true });
+        try {
+            const results = await fetchAllPages(`/api/tmdb/movie/now_playing`);
+            set({ nowPlayingMovies: results });
+        } finally {
+            set({ nowPlayingMoviesLoading: false });
+        }
       },
       fetchAiringTodayTv: async () => {
         if (get().airingTodayTv.length > 0) return;
-        const results = await fetchAllPages(`/api/tmdb/tv/airing_today`);
-        set({ airingTodayTv: results });
+        set({ airingTodayTvLoading: true });
+        try {
+            const results = await fetchAllPages(`/api/tmdb/tv/airing_today`);
+            set({ airingTodayTv: results });
+        } finally {
+            set({ airingTodayTvLoading: false });
+        }
       },
 
       // Favorites
@@ -258,4 +304,4 @@ export const useStore = create(
         }),
     }
     )
-); 
+);

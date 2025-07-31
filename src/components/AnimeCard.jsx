@@ -148,21 +148,27 @@ const AnimeCard = ({ item, progress, duration, showDeleteButton, onDelete, onCli
         }
     };
 
-    // Enhanced subtitle text for anime with comprehensive metadata
+    // Standardized subtitle text for anime (consistent with MovieCard)
     const getSubtitleText = () => {
         if (season_number && episode_number) {
             // This is a specific episode (from continue watching)
             return `S${season_number} E${episode_number}${episode_name ? `: ${episode_name}` : ''}`;
         }
         
-        // Build comprehensive subtitle for anime listing
+        // Build standardized subtitle: Year • Episode Count
         const parts = [];
-        if (year) parts.push(year.toString());
-        if (episodes) parts.push(`${episodes} episodes`);
-        if (format && format !== 'TV') parts.push(format);
-        if (status === 'RELEASING') parts.push('Airing');
         
-        return parts.length > 0 ? parts.join(' • ') : 'Anime';
+        // Add year (release year or start year)
+        if (year) {
+            parts.push(year.toString());
+        }
+        
+        // Add episode count for anime
+        if (episodes) {
+            parts.push(`${episodes} episodes`);
+        }
+        
+        return parts.length > 0 ? parts.join(' • ') : null;
     };
 
     const subtitleText = getSubtitleText();
