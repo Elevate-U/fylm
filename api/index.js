@@ -1779,7 +1779,7 @@ app.get('/consumet/anime/:category', async (req, res) => {
 // Add a unified search endpoint that queries both AniList and TMDB
 app.get('/search/unified', async (req, res) => {
     try {
-        const { query, type = 'all', language = 'en-US' } = req.query;
+        const { query, type = 'all', language = 'en-US', sort_by = 'popularity.desc' } = req.query;
         
         if (!query) {
             return res.status(400).json({ error: 'Search query is required' });
@@ -1900,24 +1900,39 @@ app.get('/search/unified', async (req, res) => {
             }
         });
 
-        // Combine and sort results - prioritize TMDB over AniList
-        results.combined = [
+        // Combine and sort results
+        const combinedResults = [
             ...results.tmdb.movies,
             ...results.tmdb.tv,
             ...results.anilist
-        ].sort((a, b) => {
-            // Give TMDB results priority over AniList
-            const aPriority = a.source === 'tmdb' ? 1000 : 0;
-            const bPriority = b.source === 'tmdb' ? 1000 : 0;
-            
-            // First sort by source priority (TMDB first)
-            if (aPriority !== bPriority) {
-                return bPriority - aPriority;
+        ];
+
+        const [sortField, sortOrder] = sort_by.split('.');
+
+        combinedResults.sort((a, b) => {
+            let valA, valB;
+
+            switch (sortField) {
+                case 'release_date':
+                    valA = a.release_date || a.year ? new Date(a.release_date || `${a.year}-01-01`).getTime() : 0;
+                    valB = b.release_date || b.year ? new Date(b.release_date || `${b.year}-01-01`).getTime() : 0;
+                    break;
+                case 'vote_average':
+                    valA = a.vote_average || (a.averageScore ? a.averageScore / 10 : 0) || 0;
+                    valB = b.vote_average || (b.averageScore ? b.averageScore / 10 : 0) || 0;
+                    break;
+                default: // popularity
+                    valA = a.popularity || 0;
+                    valB = b.popularity || 0;
+                    break;
             }
-            
-            // Then sort by popularity/vote_average within each source
-            return (b.popularity || b.vote_average || 0) - (a.popularity || a.vote_average || 0);
+
+            if (valA < valB) return sortOrder === 'asc' ? -1 : 1;
+            if (valA > valB) return sortOrder === 'asc' ? 1 : -1;
+            return 0;
         });
+
+        results.combined = combinedResults;
 
         res.json(results);
     } catch (error) {

@@ -43,7 +43,7 @@ header .container {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   padding: 0 var(--spacing-xl);
   max-width: 1400px;
   margin: 0 auto;
@@ -80,6 +80,128 @@ header .container {
   transform: scale(1.05);
 }
 
+/* Desktop Navigation */
+.desktop-nav {
+  display: flex;
+}
+
+.desktop-nav ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: center;
+}
+
+.desktop-nav li {
+  position: relative;
+}
+
+/* Mobile Navigation - hidden by default */
+.mobile-nav {
+  display: none;
+  position: fixed;
+  top: 0;
+  right: -100%;
+  width: 100%;
+  height: 100vh;
+  background: rgba(30, 30, 46, 0.95);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  border-left: 1px solid rgba(255, 255, 255, 0.1);
+  z-index: 1000;
+}
+
+.mobile-menu-close {
+  position: absolute;
+  top: var(--spacing-lg);
+  right: var(--spacing-lg);
+  width: 40px;
+  height: 40px;
+  background: var(--glass-bg-hover);
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: var(--glass-border);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  z-index: 1001;
+  /* iOS Safari specific fixes */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+}
+
+.mobile-menu-close:hover {
+  background: var(--glass-bg-active);
+  transform: scale(1.05);
+}
+
+.mobile-menu-close:active {
+  transform: scale(0.95);
+}
+
+.mobile-nav.active {
+  display: flex;
+  right: 0;
+}
+
+.mobile-nav ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  flex-direction: column;
+  gap: var(--spacing-xl);
+  display: flex;
+  align-items: center;
+}
+
+.mobile-nav li {
+  position: relative;
+}
+
+/* Mobile auth section in hamburger menu */
+.mobile-nav .mobile-auth-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  width: 100%;
+  text-align: center;
+}
+
+.mobile-nav .mobile-auth-section li {
+  list-style: none;
+}
+
+.mobile-nav .mobile-auth-section a {
+  color: var(--text-primary);
+  text-decoration: none;
+  font-size: 1.1rem;
+  font-weight: 500;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--border-radius);
+  transition: all 0.2s ease;
+  display: block;
+}
+
+.mobile-nav .mobile-auth-section a:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--accent-color);
+}
+
+/* Common navigation styles */
 header nav {
   display: flex;
 }
@@ -163,7 +285,7 @@ header nav a.active::before {
   border: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent);
   border-radius: var(--radius-full);
   cursor: pointer;
-  padding: 0.5rem;
+  padding: 0;
   z-index: 1010;
   transition: all 0.4s cubic-bezier(1, 0.0, 0.4, 1);
   box-shadow: 
@@ -174,6 +296,19 @@ header nav a.active::before {
     0px 2px 8px 0px color-mix(in srgb, var(--gray-900) 8%, transparent);
   position: relative;
   overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 3px;
+  /* iOS Safari specific fixes */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+  /* Safari fallback for backdrop-filter */
+  @supports not (backdrop-filter: blur(1px)) {
+    background: color-mix(in srgb, var(--glass-bg-hover) 45%, transparent);
+  }
 }
 
 .hamburger.active {
@@ -216,43 +351,32 @@ header nav a.active::before {
 }
 
 .hamburger .bar {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  width: 1.5rem;
-  height: 0.15rem;
+  width: 1.2rem;
+  height: 0.125rem;
   background: var(--text-primary);
   border-radius: var(--radius-full);
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  z-index: 2;
-  box-shadow: 0 0 8px rgba(var(--brand-primary-rgb), 0.3);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transform-origin: center;
+  position: relative;
 }
 
-.hamburger .bar:nth-child(1) {
-  transform: translate(-50%, -50%) translateY(-0.4rem);
-}
-
-.hamburger .bar:nth-child(2) {
-  transform: translate(-50%, -50%);
-}
-
-.hamburger .bar:nth-child(3) {
-  transform: translate(-50%, -50%) translateY(0.4rem);
+.hamburger.active {
+  gap: 0;
 }
 
 .hamburger.active .bar:nth-child(1) {
-  transform: translate(-50%, -50%) rotate(45deg);
-  background: red;
+  transform: rotate(45deg) translateY(2px);
+  background: var(--brand-primary);
 }
 
 .hamburger.active .bar:nth-child(2) {
   opacity: 0;
-  transform: translate(-50%, -50%) scale(0);
+  transform: scale(0);
 }
 
 .hamburger.active .bar:nth-child(3) {
-  transform: translate(-50%, -50%) rotate(-45deg);
-  background: red;
+  transform: rotate(-45deg) translateY(-2px);
+  background: var(--brand-primary);
 }
 
 .search-toggle {
@@ -269,7 +393,6 @@ header nav a.active::before {
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
   width: 44px;
   height: 44px;
-  display: flex;
   align-items: center;
   justify-content: center;
   box-shadow: 
@@ -277,6 +400,7 @@ header nav a.active::before {
     inset 0 1px 0 rgba(255, 255, 255, 0.1);
   position: relative;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
 .search-toggle::before {
@@ -312,6 +436,7 @@ header nav a.active::before {
   align-items: center;
   gap: var(--spacing-md);
   flex: 1;
+  flex-wrap: nowrap;
 }
 
 .header-actions {
@@ -319,6 +444,26 @@ header nav a.active::before {
   align-items: center;
   gap: var(--spacing-md);
   margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* Show theme toggle only in mobile menu */
+.theme-toggle-menu-item {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: var(--spacing-md) 0;
+  margin-top: var(--spacing-md);
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Ensure auth links don't wrap */
+.auth-links {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-shrink: 0;
+  flex-wrap: nowrap;
 }
 
 .search-container {
@@ -326,8 +471,8 @@ header nav a.active::before {
   position: relative;
   display: flex;
   flex: 1;
-  max-width: 500px;
-  min-width: 200px;
+  min-width: 30px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .search-container input {
@@ -595,10 +740,126 @@ header nav a.active::before {
   display: none;
 }
 
-/* Dynamic responsive behavior - show hamburger when content overflows */
-@media (max-width: 1024px) {
-  .hamburger {
+/* Mobile menu backdrop */
+.mobile-menu-backdrop {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100vh;
+    background: rgba(0, 0, 0, 0.5);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    z-index: 999;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
+    /* iOS Safari specific fixes */
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    cursor: pointer;
+    /* Safari fallback for backdrop-filter */
+    @supports not (backdrop-filter: blur(1px)) {
+        background: rgba(0, 0, 0, 0.7);
+    }
+}
+
+.mobile-menu-backdrop.active {
+    opacity: 1;
+    visibility: visible;
+}
+
+/* Hide mobile auth section by default - only show in mobile menu */
+.mobile-auth-section {
+  display: none;
+}
+
+/* Show mobile auth section when mobile nav is active */
+.mobile-nav.active .mobile-auth-section {
+  display: flex;
+}
+
+/* Progressive responsive behavior - hide buttons one by one */
+/* First breakpoint: Hide some nav links but keep all header buttons */
+@media (max-width: 1200px) {
+  .search-container {
+    min-width: 30px;
+  }
+}
+
+/* Second breakpoint: Hide secondary auth buttons but keep search bar */
+@media (max-width: 900px) {
+  /* Hide secondary auth buttons first */
+  .auth-links .auth-link:not(.primary-auth) {
+    display: none;
+  }
+  
+  /* Adjust search bar constraints */
+  .search-container {
+    min-width: 120px;
+  }
+}
+
+/* Third breakpoint: Hide auth buttons and user email, move to hamburger menu */
+@media (max-width: 768px) {
+  .user-email {
+    display: none;
+  }
+  
+  /* Hide auth buttons from header - they'll be in hamburger menu */
+  .auth-links {
+    display: none;
+  }
+  
+  /* Keep profile button visible on all screen sizes */
+  .profile-button {
     display: flex;
+  }
+   .hamburger {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+  }
+  .search-container {
+    min-width: 100px;
+  }
+}
+
+/* Progressive navigation hiding - start at 768px */
+@media (max-width: 768px) {
+  /* Hide Anime first */
+  .desktop-nav a[href="/anime"] {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  /* Hide Editor next */
+  .desktop-nav a[href="/blog/admin"] {
+    display: none;
+  }
+}
+
+@media (max-width: 650px) {
+  /* Hide TV next */
+  .desktop-nav a[href="/tv"] {
+    display: none;
+  }
+}
+@media (max-width: 600px) {
+  /* Hide TV next */
+  .desktop-nav a[href="/movies"] {
+    display: none;
+  }
+}
+
+/* Fourth breakpoint: Hide desktop navigation on small screens */
+@media (max-width: 500px) {
+  /* Hide desktop navigation completely */
+  .desktop-nav {
+    display: none;
   }
   
   .desktop-only {
@@ -609,21 +870,15 @@ header nav a.active::before {
     display: flex;
   }
   
-  header nav {
-    display: none;
-  }
-  
-  /* Adjust search bar constraints for tablet */
-  .search-container {
-    max-width: 350px;
-    min-width: 180px;
-  }
-}
 
-@media (max-width: 768px) {
+  
+
+  
+
+  
   header .container {
-    padding: 0 var(--spacing-lg); /* Increased padding for less cramped feel */
-    gap: var(--spacing-sm);
+    padding: 0 var(--spacing-sm);
+    gap: var(--spacing-xs);
   }
   
   .header-left {
@@ -635,34 +890,36 @@ header nav a.active::before {
     flex-shrink: 0;
     gap: var(--spacing-xs);
   }
+  
+  /* Keep search bar but make it smaller */
+  .search-container {
+    max-width: 150px;
+    min-width: 80px;
+  }
+}
 
-  header nav {
+/* Fourth breakpoint: Left-align search bar at 600px */
+@media (max-width: 600px) {
+  .search-container {
+    margin-left: 0;
+    margin-right: auto;
+  }
+}
+
+/* Fifth breakpoint: Replace search bar with search toggle */
+@media (max-width: 480px) {
+  /* Show mobile search toggle when search bar gets too small */
+  .search-toggle {
     display: flex;
-    position: fixed;
-    top: 0;
-    right: -100%;
-    width: 100%;
-    height: 100vh;
-    background: rgba(30, 30, 46, 0.95);
-    backdrop-filter: blur(30px);
-    -webkit-backdrop-filter: blur(30px);
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    transition: right 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-    border-left: 1px solid rgba(255, 255, 255, 0.1);
-    z-index: 1000;
   }
-
-  header nav.active {
-    right: 0;
+  
+  .search-container {
+    display: none;
   }
+}
 
-  header nav ul {
-    flex-direction: column;
-    gap: var(--spacing-xl);
-  }
-
+/* Mobile navigation styles for smaller screens */
+@media (max-width: 480px) {
   header nav a {
     font-size: var(--font-size-lg);
     padding: var(--spacing-md) var(--spacing-xl);
@@ -679,14 +936,14 @@ header nav a.active::before {
   }
 
   /* Show theme toggle in mobile menu */
-  header nav .theme-toggle-menu-item {
+  .mobile-nav .theme-toggle-menu-item {
     display: flex;
   }
 
   .header-right {
     flex-direction: row;
     align-items: center;
-    gap: var(--spacing-sm); /* Optimized gap for mobile */
+    gap: var(--spacing-sm);
     flex-wrap: nowrap;
     overflow: visible;
   }
@@ -708,10 +965,9 @@ header nav a.active::before {
   }
 
   .logo {
-    font-size: var(--font-size-md);
+    font-size: var(--font-size-sm);
   }
 
-  /* Theme toggle mobile positioning */
   .header-right {
     flex-wrap: nowrap;
     overflow-x: auto;
@@ -723,16 +979,8 @@ header nav a.active::before {
     display: none;
   }
 
-  /* Hide user email on mobile to save space */
-  .user-email {
-    display: none;
-  }
-}
-
-/* Extra mobile optimizations */
-@media (max-width: 480px) {
   header .container {
-    padding: 0 var(--spacing-md); /* Adjusted padding for very small screens */
+    padding: 0 var(--spacing-xs);
   }
 
   .header-left {
@@ -742,14 +990,14 @@ header nav a.active::before {
   }
 
   .header-right {
-    gap: var(--spacing-xs); /* Minimal gap for very small screens */
+    gap: var(--spacing-xs);
     flex-shrink: 1;
     min-width: 0;
     flex-wrap: wrap; 
   }
 
   .logo {
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-xs);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -758,7 +1006,7 @@ header nav a.active::before {
   .auth-link, .auth-button {
     font-size: var(--font-size-xs);
     padding: var(--spacing-xs);
-    min-width: 50px; /* Smaller minimum for very small screens */
+    min-width: 50px;
     height: 30px;
     border-radius: var(--radius-md);
   }
@@ -769,10 +1017,56 @@ header nav a.active::before {
     flex-shrink: 0;
   }
 
-  /* Ensure auth links don't overflow */
   .auth-links {
     gap: 2px;
     flex-shrink: 0;
+  }
+}
+
+/* Ultra-compact layout for very small screens */
+@media (max-width: 320px) {
+  header .container {
+    padding: 0 2px; /* Absolute minimal padding */
+  }
+
+  .header-left {
+    gap: 2px;
+  }
+
+  .header-right {
+    gap: 1px; /* Minimal gap to prevent wrapping */
+  }
+
+  .auth-links {
+    gap: 1px; /* Minimal gap between auth buttons */
+  }
+
+  .auth-link, .auth-button {
+    padding: 2px 4px; /* Minimal padding */
+    min-width: 40px;
+    font-size: 11px;
+    height: 28px;
+  }
+
+  .hamburger {
+    width: 32px;
+    height: 32px;
+    padding: 0.1rem;
+  }
+
+  .search-toggle {
+    width: 28px;
+    height: 28px;
+  }
+
+  .profile-button {
+    width: 28px;
+    height: 28px;
+  }
+
+  .profile-avatar {
+    width: 24px;
+    height: 24px;
   }
 
   .mobile-search-overlay {
@@ -795,21 +1089,10 @@ header nav a.active::before {
   }
 }
 
-/* Ensure auth links stay visible until hamburger appears */
-@media (min-width: 1025px) {
-  .auth-links {
-    display: flex !important;
-  }
-  
-  .hamburger {
-    display: none !important;
-  }
-}
-
-/* Improved touch targets for mobile */
-@media (max-width: 1024px) {
+/* Improved touch targets for mobile devices */
+@media (max-width: 650px) {
   .auth-link, .auth-button {
-    min-height: 44px; /* iOS recommended touch target */
+    min-height: 44px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -821,7 +1104,6 @@ header nav a.active::before {
   }
   
   .hamburger {
-    display: flex; /* Show hamburger on mobile */
     min-width: 44px;
     min-height: 44px;
   }

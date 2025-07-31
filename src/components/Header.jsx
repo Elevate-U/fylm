@@ -248,7 +248,9 @@ const Header = () => {
                             Fylm
                         </Link>
                     </div>
-                    <nav ref={menuRef} class={isMenuOpen ? 'active' : ''} aria-hidden={!isMenuOpen}>
+                    
+                    {/* Desktop Navigation */}
+                    <nav class="desktop-nav">
                         <ul>
                             <li><Link activeClassName="active" href="/movies" onClick={closeMenu}>Movies</Link></li>
                             <li><Link activeClassName="active" href="/tv" onClick={closeMenu}>TV</Link></li>
@@ -256,6 +258,35 @@ const Header = () => {
                             {user && isAdmin && (
                                 <li><Link activeClassName="active" href="/blog/admin" onClick={closeMenu}>Editor</Link></li>
                             )}
+                        </ul>
+                    </nav>
+                    
+                    {/* Mobile Navigation */}
+                    <nav ref={menuRef} class={`mobile-nav ${isMenuOpen ? 'active' : ''}`} aria-hidden={!isMenuOpen}>
+                        {/* Mobile Menu Close Button */}
+                        <button class="mobile-menu-close" onClick={closeMenu} aria-label="Close menu">
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <line x1="18" y1="6" x2="6" y2="18"></line>
+                                <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                        </button>
+                        
+                        <ul>
+                            <li><Link activeClassName="active" href="/movies" onClick={closeMenu}>Movies</Link></li>
+                            <li><Link activeClassName="active" href="/tv" onClick={closeMenu}>TV</Link></li>
+                            <li><Link activeClassName="active" href="/anime" onClick={closeMenu}>Anime</Link></li>
+                            {user && isAdmin && (
+                                <li><Link activeClassName="active" href="/blog/admin" onClick={closeMenu}>Editor</Link></li>
+                            )}
+                            
+                            {/* Mobile Auth Links - Only for non-authenticated users */}
+                            {!user && (
+                                <div class="mobile-auth-section mobile-only">
+                                    <li><Link activeClassName="active" href="/login" onClick={closeMenu}>Login</Link></li>
+                                    <li><Link activeClassName="active" href="/signup" onClick={closeMenu}>Sign Up</Link></li>
+                                </div>
+                            )}
+                            
                             <li class="theme-toggle-menu-item">
                                 <ThemeToggle />
                             </li>
@@ -287,7 +318,7 @@ const Header = () => {
                 
                 {/* Backdrop for mobile menu */}
                 {isMenuOpen && (
-                    <div class="mobile-menu-backdrop" onClick={closeMenu}></div>
+                    <div class={`mobile-menu-backdrop ${isMenuOpen ? 'active' : ''}`} onClick={closeMenu}></div>
                 )}
                 
                 <div class="header-right">
@@ -311,30 +342,34 @@ const Header = () => {
                     </button>
                     
                     <div class="header-actions">
-                        <ThemeToggle />
-                        <div class="auth-links">
-                        {user ? (
-                            <>
-                                <button 
-                                    ref={profileButtonRef}
-                                    onClick={toggleProfileDropdown}
-                                    class="profile-button"
-                                    aria-label="Profile menu"
-                                    aria-expanded={isProfileDropdownOpen}
-                                >
-                                    <img
-                                        src={profile?.avatar_url ? getProxiedImageUrl(profile.avatar_url) : (user.user_metadata?.avatar_url ? getProxiedImageUrl(user.user_metadata.avatar_url) : defaultAvatar)}
-                                        alt="Profile"
-                                        class="profile-avatar"
+                        {/* Profile button - always visible */}
+                        {user && (
+                            <button 
+                                ref={profileButtonRef}
+                                onClick={toggleProfileDropdown}
+                                class="profile-button"
+                                aria-label="Profile menu"
+                                aria-expanded={isProfileDropdownOpen}
+                            >
+                                <img
+                                    src={profile?.avatar_url ? getProxiedImageUrl(profile.avatar_url) : (user.user_metadata?.avatar_url ? getProxiedImageUrl(user.user_metadata.avatar_url) : defaultAvatar)}
+                                    alt="Profile"
+                                    class="profile-avatar"
                                     />
                                 </button>
-                            </>
-                        ) : (
-                            <>
-                                <Link href="/login" class="auth-link" onClick={closeMenu}>Login</Link>
-                                <Link href="/signup" class="auth-link" onClick={closeMenu}>Sign Up</Link>
-                            </>
-                        )}
+                            )}
+                        
+                        {/* Auth links - hidden at 768px */}
+                        <div class="auth-links">
+                            {!user && (
+                                <>
+                                    <Link href="/login" class="auth-link primary-auth" onClick={closeMenu}>Login</Link>
+                                    <Link href="/signup" class="auth-link primary-auth" onClick={closeMenu}>Sign Up</Link>
+                                </>
+                            )}
+                        </div>
+                        <div class="desktop-only">
+                            <ThemeToggle />
                         </div>
                     </div>
                     <button 

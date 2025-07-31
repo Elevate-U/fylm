@@ -271,7 +271,7 @@ const MovieCard = ({ item, type, progress, duration, showDeleteButton, onDelete,
                             aria-label={favorited ? 'Remove from favorites' : 'Add to favorites'}
                             disabled={!favoritesFetched}
                             style={{
-                                color: favorited ? '#fca5a5' : 'var(--text-secondary)'
+                                color: favorited ? '#ff0000' : 'var(--text-secondary)'
                             }}
                         >
                             ♥︎

@@ -3,6 +3,7 @@ import { useState, useEffect, useRef } from 'preact/hooks';
 import MovieCard from '../components/MovieCard';
 import LoadingSpinner from '../components/LoadingSpinner';
 import './Home.css'; // Re-use some styling
+import './Search.css'; // Import new styles
 import { API_BASE_URL } from '../config';
 
 const SearchPage = (props) => {
@@ -11,6 +12,7 @@ const SearchPage = (props) => {
   const [query, setQuery] = useState('');
   const [searchFilter, setSearchFilter] = useState('all');
   const [language, setLanguage] = useState('en-US');
+  const [sortBy, setSortBy] = useState('popularity.desc');
   const [dataSources, setDataSources] = useState({
     anilist: false,
     tmdb: false
@@ -29,7 +31,7 @@ const SearchPage = (props) => {
     setLanguage(lang);
 
     if (q) {
-      performSearch(q, filter, lang);
+      performSearch(q, filter, lang, sortBy);
     } else {
       setResults([]);
     }
@@ -47,11 +49,11 @@ const SearchPage = (props) => {
     };
   }, []);
 
-  const performSearch = async (searchQuery, filter = 'all', searchLanguage = language) => {
+  const performSearch = async (searchQuery, filter = 'all', searchLanguage = language, sort = sortBy) => {
     setLoading(true);
     try {
       // First try our new unified search endpoint with language support
-      const unifiedUrl = `${API_BASE_URL}/search/unified?query=${encodeURIComponent(searchQuery)}&type=${filter}&language=${encodeURIComponent(searchLanguage)}`;
+      const unifiedUrl = `${API_BASE_URL}/search/unified?query=${encodeURIComponent(searchQuery)}&type=${filter}&language=${encodeURIComponent(searchLanguage)}&sort_by=${sort}`;
       const unifiedRes = await fetch(unifiedUrl);
       
       if (unifiedRes.ok) {
@@ -119,7 +121,7 @@ const SearchPage = (props) => {
   const handleFilterChange = (newFilter) => {
     setSearchFilter(newFilter);
     if (query.trim()) {
-      performSearch(query, newFilter, language);
+      performSearch(query, newFilter, language, sortBy);
     }
     
     // Update URL without reloading page
@@ -133,7 +135,7 @@ const SearchPage = (props) => {
   const handleLanguageChange = (newLanguage) => {
     setLanguage(newLanguage);
     if (query.trim()) {
-      performSearch(query, searchFilter, newLanguage);
+      performSearch(query, searchFilter, newLanguage, sortBy);
     }
     
     // Update URL without reloading page
@@ -144,7 +146,7 @@ const SearchPage = (props) => {
     window.history.pushState({}, '', url.toString());
   };
 
-  const debouncedSearch = (searchQuery, filter, searchLanguage) => {
+  const debouncedSearch = (searchQuery, filter, searchLanguage, sort) => {
     // Clear existing timeout
     if (debounceRef.current) {
       clearTimeout(debounceRef.current);
@@ -153,7 +155,7 @@ const SearchPage = (props) => {
     // Set new timeout for debounced search
     debounceRef.current = setTimeout(() => {
       if (searchQuery.trim()) {
-        performSearch(searchQuery.trim(), filter, searchLanguage);
+        performSearch(searchQuery.trim(), filter, searchLanguage, sort);
       } else {
         setResults([]);
         setDataSources({ anilist: false, tmdb: false });
@@ -173,7 +175,7 @@ const SearchPage = (props) => {
     window.history.replaceState({}, '', url.toString());
 
     // Trigger debounced search
-    debouncedSearch(newQuery, searchFilter, language);
+    debouncedSearch(newQuery, searchFilter, language, sortBy);
   };
 
   // Helper to render movie/TV/anime cards with source badges
@@ -196,8 +198,22 @@ const SearchPage = (props) => {
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     if (query.trim()) {
-      performSearch(query.trim(), searchFilter);
+      performSearch(query.trim(), searchFilter, language, sortBy);
     }
+  };
+
+  const handleSortChange = (newSort) => {
+    setSortBy(newSort);
+    if (query.trim()) {
+      performSearch(query, searchFilter, language, newSort);
+    }
+
+    const url = new URL(window.location);
+    url.searchParams.set('q', query);
+    url.searchParams.set('filter', searchFilter);
+    url.searchParams.set('lang', language);
+    url.searchParams.set('sort_by', newSort);
+    window.history.pushState({}, '', url.toString());
   };
 
   return (
@@ -257,6 +273,18 @@ const SearchPage = (props) => {
         </div>
         
         {/* Language selector */}
+        <div className="sort-controls">
+          <label htmlFor="sort-by">Sort By:</label>
+          <select id="sort-by" value={sortBy} onChange={(e) => handleSortChange(e.target.value)} className="glassmorphic-dropdown">
+            <option value="popularity.desc">Popularity Desc</option>
+            <option value="popularity.asc">Popularity Asc</option>
+            <option value="release_date.desc">Release Date Desc</option>
+            <option value="release_date.asc">Release Date Asc</option>
+            <option value="vote_average.desc">Rating Desc</option>
+            <option value="vote_average.asc">Rating Asc</option>
+          </select>
+        </div>
+
         <div className="language-selector">
           <label htmlFor="language-select" className="language-label">Language:</label>
           <select 

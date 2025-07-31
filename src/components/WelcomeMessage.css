@@ -1,20 +1,46 @@
 .welcome-message {
-    background: var(--glass-bg), var(--glass-highlight);
-    backdrop-filter: var(--glass-blur);
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur) saturate(var(--liquid-glass-saturation));
     border-radius: var(--radius-lg);
     padding: 2rem;
     margin-bottom: 2rem;
-    border: var(--glass-border);
+    border: 1px solid var(--glass-border);
     box-shadow: var(--glass-shadow);
     position: relative;
     overflow: hidden;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
+.welcome-message::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 100%), transparent) 50%,
+        transparent 100%);
+    opacity: var(--liquid-glass-reflex-light);
+    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    z-index: 2;
+}
+
 .welcome-message:hover {
-    background: var(--glass-bg-hover), var(--glass-highlight);
+    background: color-mix(in srgb, var(--glass-bg) 80%, var(--liquid-glass-light) 20%);
     box-shadow: var(--glass-shadow-hover);
     transform: translateY(-2px);
+    border-color: color-mix(in srgb, var(--glass-border) 70%, var(--liquid-glass-light) 30%);
+    backdrop-filter: var(--glass-blur) saturate(var(--liquid-glass-saturation-hover));
+}
+
+.welcome-message:hover::after {
+    opacity: calc(var(--liquid-glass-reflex-light) * 1.5);
+    background: linear-gradient(90deg,
+        transparent 0%,
+        color-mix(in srgb, var(--brand-primary) calc(var(--liquid-glass-reflex-light) * 150%), transparent) 50%,
+        transparent 100%);
 }
 
 .welcome-message::before {
@@ -165,4 +191,4 @@
     .stat-item {
         padding: 0.5rem 1rem;
     }
-} 
+}

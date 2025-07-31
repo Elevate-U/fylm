@@ -1,6 +1,6 @@
 .movie-card {
-  background: var(--glass-bg), var(--glass-highlight);
-  border: var(--glass-border);
+  background: var(--glass-bg);
+  border: 1px solid var(--glass-border);
   border-radius: var(--radius-lg);
   box-shadow: var(--glass-shadow);
   color: var(--text-primary);
@@ -10,7 +10,7 @@
   position: relative;
   text-decoration: none;
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  backdrop-filter: var(--glass-blur);
+  backdrop-filter: var(--glass-blur) saturate(var(--liquid-glass-saturation));
 }
 
 .movie-card::before {
@@ -19,13 +19,30 @@
   top: 0;
   left: 0;
   right: 0;
-  bottom: 0;
-  background: var(--glass-bg-hover), var(--glass-highlight);
-  border-radius: var(--radius-lg);
-  opacity: 0;
-  transition: opacity 0.4s ease;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 100%), transparent) 50%,
+    transparent 100%);
+  opacity: var(--liquid-glass-reflex-light);
   pointer-events: none;
   z-index: 1;
+}
+
+.movie-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--liquid-glass-light) 20%, transparent) 50%,
+    transparent 100%);
+  transition: left 0.6s ease;
+  pointer-events: none;
+  z-index: 2;
 }
 
 .movie-card:hover {
@@ -33,13 +50,22 @@
   box-shadow: 
     var(--glass-shadow-heavy),
     0 0 40px rgba(var(--brand-primary-rgb), 0.15),
-    inset 0 1px 0 rgba(255, 255, 255, 0.2);
-  border-color: var(--glass-border-hover);
-  background: var(--glass-bg-hover), var(--glass-highlight);
+    inset 0 1px 0 color-mix(in srgb, var(--liquid-glass-light) 20%, transparent);
+  border-color: color-mix(in srgb, var(--glass-border) 70%, var(--liquid-glass-light) 30%);
+  background: color-mix(in srgb, var(--glass-bg) 80%, var(--liquid-glass-light) 20%);
+  backdrop-filter: var(--glass-blur) saturate(var(--liquid-glass-saturation-hover));
 }
 
 .movie-card:hover::before {
-  opacity: 1;
+  opacity: calc(var(--liquid-glass-reflex-light) * 1.5);
+  background: linear-gradient(90deg,
+    transparent 0%,
+    color-mix(in srgb, var(--brand-primary) calc(var(--liquid-glass-reflex-light) * 150%), transparent) 50%,
+    transparent 100%);
+}
+
+.movie-card:hover::after {
+  left: 100%;
 }
 
 .poster-wrapper {
@@ -239,10 +265,10 @@
 }
 
 .favorite-btn.favorited {
-    background: linear-gradient(135deg, rgba(220, 38, 38, 0.4) 0%, rgba(220, 38, 38, 0.2) 100%), var(--glass-highlight);
-    border-color: rgba(220, 38, 38, 0.5);
-    color: #fca5a5; /* Light red for the heart icon */
-    text-shadow: 0 0 8px rgba(220, 38, 38, 0.7);
+    background: linear-gradient(135deg, rgba(220, 38, 38, 0.8) 0%, rgba(220, 38, 38, 0.6) 100%), var(--glass-highlight);
+    border-color: rgba(220, 38, 38, 0.9);
+    color: #ff0000; /* Much more intense red for the heart icon */
+    text-shadow: 0 0 15px rgba(220, 38, 38, 1), 0 0 25px rgba(255, 0, 0, 0.8);
 }
 
 .favorite-btn.favorited:hover {
@@ -359,4 +385,4 @@
   .movie-card:active {
     transform: scale(0.98);
   }
-} 
+}

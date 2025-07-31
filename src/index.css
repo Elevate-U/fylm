@@ -1,14 +1,22 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-/* ===== GLASSMORPHIC DESIGN SYSTEM 2025 ===== */
+/* ===== LIQUID GLASSMORPHIC DESIGN SYSTEM 2025 ===== */
+/* Inspired by Apple's Liquid Glass Technology */
 
 /* CSS Custom Properties for Dynamic Theming */
 :root {
-  /* New: Modern & Professional Color Palette */
-  --brand-primary: hsl(210, 100%, 50%); /* A strong, professional blue */
+  /* Enhanced: Liquid Glass Color Palette */
+  --brand-primary: hsl(210, 100%, 50%); /* Professional blue */
   --brand-primary-rgb: 0, 122, 255;
   --brand-accent: hsl(265, 80%, 60%);
   --brand-accent-rgb: 138, 77, 255;
+  
+  /* Liquid Glass Core Colors */
+  --liquid-glass-base: #bbbbbc;
+  --liquid-glass-light: #ffffff;
+  --liquid-glass-dark: #000000;
+  --liquid-glass-content: #224;
+  --liquid-glass-action: #0052f5;
 
   /* Neutrals / Grays */
   --gray-900: hsl(210, 20%, 9%);
@@ -31,35 +39,62 @@
   --text-secondary: var(--gray-400);
   --text-tertiary: var(--gray-600);
   
-  /* Advanced Glass Properties - Refined */
-  --glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02));
-  --glass-bg-hover: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
-  --glass-bg-active: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.07));
-  --glass-border: 1px solid var(--gray-700);
-  --glass-border-hover: 1px solid var(--gray-600);
-  --glass-highlight: linear-gradient(to bottom, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0) 100%);
+  /* Liquid Glass Properties - Advanced Refraction System */
+  --liquid-glass-saturation: 180%;
+  --liquid-glass-saturation-hover: 220%;
+  --liquid-glass-reflex-light: 1;
+  --liquid-glass-reflex-dark: 1;
   
-  /* Progressive Blur Levels */
-  --glass-blur: blur(16px);
-  --glass-blur-light: blur(10px);
-  --glass-blur-heavy: blur(24px);
-  --glass-blur-ultra: blur(32px);
+  --glass-bg: color-mix(in srgb, var(--liquid-glass-base) 12%, transparent);
+  --glass-bg-hover: color-mix(in srgb, var(--liquid-glass-base) 18%, transparent);
+  --glass-bg-active: color-mix(in srgb, var(--liquid-glass-base) 25%, transparent);
   
-  /* Enhanced Shadow System */
+  --glass-border: 1px solid color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 5%), transparent);
+  --glass-border-hover: 1px solid color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 8%), transparent);
+  
+  --glass-highlight: linear-gradient(to bottom, 
+    color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 20%), transparent) 0%, 
+    transparent 100%);
+  
+  /* Progressive Blur Levels with Saturation */
+  --glass-blur: blur(8px) saturate(var(--liquid-glass-saturation));
+  --glass-blur-light: blur(6px) saturate(calc(var(--liquid-glass-saturation) * 0.8));
+  --glass-blur-heavy: blur(12px) saturate(calc(var(--liquid-glass-saturation) * 1.2));
+  --glass-blur-ultra: blur(16px) saturate(calc(var(--liquid-glass-saturation) * 1.5));
+  
+  /* Liquid Glass Shadow System - Complex Refraction */
   --glass-shadow: 
-    0 0 0 1px rgba(255, 255, 255, 0.07) inset,
-    0 1px 0 0 rgba(255, 255, 255, 0.05) inset,
-    0 8px 32px rgba(0, 0, 0, 0.5);
+    inset 0 0 0 1px color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 10%), transparent),
+    inset 1.8px 3px 0px -2px color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 90%), transparent), 
+    inset -2px -2px 0px -2px color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 80%), transparent), 
+    inset -3px -8px 1px -6px color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 60%), transparent), 
+    inset -0.3px -1px 4px 0px color-mix(in srgb, var(--liquid-glass-dark) calc(var(--liquid-glass-reflex-dark) * 12%), transparent), 
+    inset -1.5px 2.5px 0px -2px color-mix(in srgb, var(--liquid-glass-dark) calc(var(--liquid-glass-reflex-dark) * 20%), transparent), 
+    inset 0px 3px 4px -2px color-mix(in srgb, var(--liquid-glass-dark) calc(var(--liquid-glass-reflex-dark) * 20%), transparent), 
+    inset 2px -6.5px 1px -4px color-mix(in srgb, var(--liquid-glass-dark) calc(var(--liquid-glass-reflex-dark) * 10%), transparent), 
+    0px 1px 5px 0px color-mix(in srgb, var(--liquid-glass-dark) 10%, transparent), 
+    0px 6px 16px 0px color-mix(in srgb, var(--liquid-glass-dark) 8%, transparent);
+    
   --glass-shadow-hover: 
-    0 0 0 1px rgba(255, 255, 255, 0.1) inset,
-    0 1px 0 0 rgba(255, 255, 255, 0.1) inset,
-    0 12px 40px rgba(0, 0, 0, 0.6);
+    inset 0 0 0 1px color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 15%), transparent),
+    inset 2px 1px 0px -1px color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 95%), transparent), 
+    inset -1.5px -1px 0px -1px color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 85%), transparent), 
+    inset -2px -6px 1px -5px color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 65%), transparent), 
+    inset -1px 2px 3px -1px color-mix(in srgb, var(--liquid-glass-dark) calc(var(--liquid-glass-reflex-dark) * 25%), transparent), 
+    inset 0px -4px 1px -2px color-mix(in srgb, var(--liquid-glass-dark) calc(var(--liquid-glass-reflex-dark) * 15%), transparent), 
+    0px 3px 6px 0px color-mix(in srgb, var(--liquid-glass-dark) 12%, transparent),
+    0px 8px 25px 0px color-mix(in srgb, var(--liquid-glass-dark) 15%, transparent);
+    
   --glass-shadow-heavy: 
-    0 20px 60px rgba(0, 0, 0, 0.6),
-    0 0 0 1px rgba(255, 255, 255, 0.1);
+    inset 0 0 0 1px color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 20%), transparent),
+    inset 3px 2px 0px -1px color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 100%), transparent), 
+    inset -2px -3px 0px -1px color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 90%), transparent), 
+    0px 12px 40px 0px color-mix(in srgb, var(--liquid-glass-dark) 25%, transparent);
+    
   --glass-shadow-heavy-hover: 
-    0 30px 80px rgba(0, 0, 0, 0.7),
-    0 0 0 1px rgba(255, 255, 255, 0.15),
+    inset 0 0 0 1px color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 25%), transparent),
+    inset 4px 3px 0px -1px color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 100%), transparent), 
+    0px 20px 60px 0px color-mix(in srgb, var(--liquid-glass-dark) 30%, transparent),
     0 0 40px rgba(var(--brand-primary-rgb), 0.2);
   
   /* Dynamic Text Gradients - Refined with new brand color */
@@ -69,8 +104,8 @@
     rgba(var(--brand-primary-rgb), 0.9) 75%, 
     var(--brand-primary) 100%);
   
-  /* Complex Background System - Simplified for a cleaner look */
-  --bg-primary: var(--gray-900);
+  /* Complex Background System - Dynamic with animated particles */
+  --bg-primary: #000000;
   --bg-secondary: var(--gray-800);
   
   /* Glass Progress Bar Colors */
@@ -112,7 +147,7 @@
   --radius-full: 9999px;
 }
 
-/* New: Light Theme Definition */
+/* Light Theme Definition - Liquid Glass Optimized */
 :root[data-theme='light'] {
   /* Light Theme Palette */
   --brand-primary: hsl(210, 100%, 45%);
@@ -139,25 +174,50 @@
   --gray-800-rgb: 239, 242, 245;
   --gray-900-rgb: 247, 249, 250;
   
+  /* Light Theme Liquid Glass Colors */
+  --liquid-glass-base: #e8e8e8;
+  --liquid-glass-light: #ffffff;
+  --liquid-glass-dark: #000000;
+  --liquid-glass-saturation: 120%;
+  --liquid-glass-saturation-hover: 150%;
+  --liquid-glass-reflex-light: 0.8;
+  --liquid-glass-reflex-dark: 0.6;
+  
   /* Text Colors */
   --text-primary: var(--gray-100);
   --text-secondary: var(--gray-300);
   --text-tertiary: var(--gray-500);
 
   /* Backgrounds */
-  --bg-primary: #ffffff;
+  --bg-primary: #f5f5f5;
   --bg-secondary: var(--gray-900);
   
-  /* Glass adapted for light theme */
-  --glass-bg: linear-gradient(135deg, rgba(255, 255, 255, 0.6), rgba(255, 255, 255, 0.3));
-  --glass-bg-hover: linear-gradient(135deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.5));
-  --glass-border: 1px solid rgba(0, 0, 0, 0.1);
-  --glass-border-hover: 1px solid rgba(0, 0, 0, 0.2);
-  --glass-highlight: linear-gradient(to bottom, rgba(255, 255, 255, 0.2) 0%, rgba(255, 255, 255, 0) 100%);
-  --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-  --glass-shadow-hover: 0 12px 40px rgba(0, 0, 0, 0.15);
-  --glass-shadow-heavy: 0 20px 60px rgba(0, 0, 0, 0.15);
-  --glass-shadow-heavy-hover: 0 30px 80px rgba(0, 0, 0, 0.2);
+  /* Light Theme Liquid Glass Properties */
+  --glass-bg: color-mix(in srgb, var(--liquid-glass-base) 25%, transparent);
+  --glass-bg-hover: color-mix(in srgb, var(--liquid-glass-base) 35%, transparent);
+  --glass-bg-active: color-mix(in srgb, var(--liquid-glass-base) 45%, transparent);
+  
+  --glass-border: 1px solid color-mix(in srgb, var(--liquid-glass-dark) calc(var(--liquid-glass-reflex-dark) * 8%), transparent);
+  --glass-border-hover: 1px solid color-mix(in srgb, var(--liquid-glass-dark) calc(var(--liquid-glass-reflex-dark) * 12%), transparent);
+  
+  --glass-highlight: linear-gradient(to bottom, 
+    color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 40%), transparent) 0%, 
+    transparent 100%);
+    
+  /* Light Theme Shadow System */
+  --glass-shadow: 
+    inset 0 0 0 1px color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 30%), transparent),
+    inset 1.8px 3px 0px -2px color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 80%), transparent), 
+    inset -2px -2px 0px -2px color-mix(in srgb, var(--liquid-glass-dark) calc(var(--liquid-glass-reflex-dark) * 15%), transparent), 
+    0px 2px 8px 0px color-mix(in srgb, var(--liquid-glass-dark) 8%, transparent), 
+    0px 4px 16px 0px color-mix(in srgb, var(--liquid-glass-dark) 5%, transparent);
+    
+  --glass-shadow-hover: 
+    inset 0 0 0 1px color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 40%), transparent),
+    inset 2px 1px 0px -1px color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 90%), transparent), 
+    inset -1.5px -1px 0px -1px color-mix(in srgb, var(--liquid-glass-dark) calc(var(--liquid-glass-reflex-dark) * 20%), transparent), 
+    0px 4px 12px 0px color-mix(in srgb, var(--liquid-glass-dark) 12%, transparent),
+    0px 8px 25px 0px color-mix(in srgb, var(--liquid-glass-dark) 8%, transparent);
   
   /* Text gradient for light theme */
   --glass-text-gradient: linear-gradient(135deg, 
@@ -298,79 +358,200 @@ body::after {
 .glass {
   background: var(--glass-bg), var(--glass-highlight);
   backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
   border: var(--glass-border);
   box-shadow: var(--glass-shadow);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Safari fallback */
+  @supports not (backdrop-filter: blur(1px)) {
+    background: var(--glass-bg-active);
+  }
 }
 
 .glass-light {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.04), rgba(255, 255, 255, 0.01)), var(--glass-highlight);
+  background: var(--glass-bg), var(--glass-highlight);
   backdrop-filter: var(--glass-blur-light);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 
-    0 0 0 1px rgba(255, 255, 255, 0.05) inset,
-    0 1px 0 0 rgba(255, 255, 255, 0.03) inset,
-    0 4px 16px rgba(0, 0, 0, 0.35);
+  -webkit-backdrop-filter: var(--glass-blur-light);
+  border: var(--glass-border);
+  box-shadow: var(--glass-shadow);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Safari fallback */
+  @supports not (backdrop-filter: blur(1px)) {
+    background: var(--glass-bg-hover);
+  }
+}
+
+.glass-light::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--glass-highlight);
+  pointer-events: none;
+  opacity: var(--liquid-glass-reflex-light);
 }
 
 .glass-heavy {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.04)), var(--glass-highlight);
+  background: var(--glass-bg-active), var(--glass-highlight);
   backdrop-filter: var(--glass-blur-heavy);
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  box-shadow: 
-    0 0 0 1px rgba(255, 255, 255, 0.08) inset,
-    0 1px 0 0 rgba(255, 255, 255, 0.08) inset,
-    0 15px 50px rgba(0, 0, 0, 0.6);
+  -webkit-backdrop-filter: var(--glass-blur-heavy);
+  border: var(--glass-border-hover);
+  box-shadow: var(--glass-shadow-heavy);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Safari fallback */
+  @supports not (backdrop-filter: blur(1px)) {
+    background: color-mix(in srgb, var(--liquid-glass-base) 35%, transparent);
+  }
+}
+
+.glass-heavy::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--glass-highlight);
+  pointer-events: none;
+  opacity: var(--liquid-glass-reflex-light);
 }
 
 .glass-primary {
-  background: linear-gradient(135deg, 
-    rgba(var(--brand-primary-rgb), 0.2) 0%, 
-    rgba(var(--brand-primary-rgb), 0.1) 100%), var(--glass-highlight);
+  background: color-mix(in srgb, var(--brand-primary) 15%, var(--glass-bg) 85%), var(--glass-highlight);
   backdrop-filter: var(--glass-blur);
-  border: 1px solid rgba(var(--brand-primary-rgb), 0.3);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 30%, transparent);
   box-shadow: 
     var(--glass-shadow),
-    0 0 20px rgba(var(--brand-primary-rgb), 0.2);
+    0 0 20px color-mix(in srgb, var(--brand-primary) 20%, transparent);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Safari fallback */
+  @supports not (backdrop-filter: blur(1px)) {
+    background: color-mix(in srgb, var(--brand-primary) 25%, var(--glass-bg-active) 75%);
+  }
+}
+
+.glass-primary::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    color-mix(in srgb, var(--brand-primary) calc(var(--liquid-glass-reflex-light) * 80%), transparent) 50%, 
+    transparent 100%);
+  pointer-events: none;
 }
 
 .glass-accent {
-  background: linear-gradient(135deg, 
-    rgba(var(--brand-accent-rgb), 0.2) 0%, 
-    rgba(var(--brand-accent-rgb), 0.1) 100%), var(--glass-highlight);
+  background: color-mix(in srgb, var(--brand-accent) 15%, var(--glass-bg) 85%), var(--glass-highlight);
   backdrop-filter: var(--glass-blur);
-  border: 1px solid rgba(var(--brand-accent-rgb), 0.3);
+  -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 30%, transparent);
   box-shadow: 
     var(--glass-shadow),
-    0 0 20px rgba(var(--brand-accent-rgb), 0.2);
+    0 0 20px color-mix(in srgb, var(--brand-accent) 20%, transparent);
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  /* Safari fallback */
+  @supports not (backdrop-filter: blur(1px)) {
+    background: color-mix(in srgb, var(--brand-accent) 25%, var(--glass-bg-active) 75%);
+  }
 }
 
-/* Enhanced Hover States */
-.glass:hover,
-.glass-light:hover,
-.glass-heavy:hover {
+.glass-accent::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    color-mix(in srgb, var(--brand-accent) calc(var(--liquid-glass-reflex-light) * 80%), transparent) 50%, 
+    transparent 100%);
+  pointer-events: none;
+}
+
+/* Enhanced Liquid Glass Hover States */
+.glass:hover {
   background: var(--glass-bg-hover), var(--glass-highlight);
   box-shadow: var(--glass-shadow-hover);
   border-color: var(--glass-border-hover);
   transform: translateY(-3px) scale(1.02);
 }
 
+.glass-light:hover {
+  background: var(--glass-bg-hover), var(--glass-highlight);
+  border: var(--glass-border-hover);
+  box-shadow: var(--glass-shadow-hover);
+  transform: translateY(-1px) scale(1.02);
+  backdrop-filter: blur(10px) saturate(calc(var(--liquid-glass-saturation) * 1.1));
+}
+
+.glass-light:hover::before {
+  opacity: calc(var(--liquid-glass-reflex-light) * 1.2);
+  height: 2px;
+}
+
+.glass-heavy:hover {
+  background: var(--glass-bg-active), var(--glass-highlight);
+  border: var(--glass-border-hover);
+  box-shadow: var(--glass-shadow-heavy-hover);
+  transform: translateY(-2px) scale(1.03);
+  backdrop-filter: blur(16px) saturate(calc(var(--liquid-glass-saturation) * 1.1));
+}
+
+.glass-heavy:hover::before {
+  opacity: calc(var(--liquid-glass-reflex-light) * 1.3);
+  height: 3px;
+}
+
 .glass-primary:hover {
-  background: linear-gradient(135deg, 
-    rgba(var(--brand-primary-rgb), 0.25) 0%, 
-    rgba(var(--brand-primary-rgb), 0.15) 100%), var(--glass-highlight);
+  background: color-mix(in srgb, var(--brand-primary) 20%, var(--glass-bg-hover) 80%), var(--glass-highlight);
+  border: 1px solid color-mix(in srgb, var(--brand-primary) 40%, transparent);
   box-shadow: 
     var(--glass-shadow-hover),
-    0 0 30px rgba(var(--brand-primary-rgb), 0.4);
+    0 0 30px color-mix(in srgb, var(--brand-primary) 30%, transparent);
+  transform: translateY(-1px) scale(1.02);
+  backdrop-filter: blur(10px) saturate(calc(var(--liquid-glass-saturation) * 1.1));
+}
+
+.glass-primary:hover::before {
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    color-mix(in srgb, var(--brand-primary) calc(var(--liquid-glass-reflex-light) * 100%), transparent) 50%, 
+    transparent 100%);
+  height: 2px;
 }
 
 .glass-accent:hover {
-  background: linear-gradient(135deg, 
-    rgba(var(--brand-accent-rgb), 0.25) 0%, 
-    rgba(var(--brand-accent-rgb), 0.15) 100%), var(--glass-highlight);
+  background: color-mix(in srgb, var(--brand-accent) 20%, var(--glass-bg-hover) 80%), var(--glass-highlight);
+  border: 1px solid color-mix(in srgb, var(--brand-accent) 40%, transparent);
   box-shadow: 
     var(--glass-shadow-hover),
-    0 0 30px rgba(var(--brand-accent-rgb), 0.4);
+    0 0 30px color-mix(in srgb, var(--brand-accent) 30%, transparent);
+  transform: translateY(-1px) scale(1.02);
+  backdrop-filter: blur(10px) saturate(calc(var(--liquid-glass-saturation) * 1.1));
+}
+
+.glass-accent:hover::before {
+  background: linear-gradient(90deg, 
+    transparent 0%, 
+    color-mix(in srgb, var(--brand-accent) calc(var(--liquid-glass-reflex-light) * 100%), transparent) 50%, 
+    transparent 100%);
+  height: 2px;
 }
 
 /* Custom Scrollbars */
@@ -613,4 +794,4 @@ select:focus-visible {
   .glass {
     backdrop-filter: var(--glass-blur-heavy);
   }
-} 
+}

@@ -5,9 +5,9 @@
     width: 50px;
     height: 50px;
     border-radius: var(--radius-full);
-    background: var(--glass-bg), var(--glass-highlight);
-    backdrop-filter: var(--glass-blur);
-    border: var(--glass-border);
+    background: var(--glass-bg);
+    backdrop-filter: var(--glass-blur) saturate(var(--liquid-glass-saturation));
+    border: 1px solid var(--glass-border);
     color: var(--text-primary);
     cursor: pointer;
     display: flex;
@@ -19,6 +19,22 @@
     visibility: hidden;
     transform: translateY(20px);
     z-index: 1000;
+    overflow: hidden;
+}
+
+.scroll-to-top::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 1px;
+    background: linear-gradient(90deg,
+        transparent 0%,
+        color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 100%), transparent) 50%,
+        transparent 100%);
+    opacity: var(--liquid-glass-reflex-light);
+    border-radius: var(--radius-full);
 }
 
 .scroll-to-top.visible {
@@ -29,14 +45,25 @@
 
 .scroll-to-top:hover {
     transform: translateY(-3px);
-    background: var(--glass-bg-hover), var(--glass-highlight);
+    background: color-mix(in srgb, var(--glass-bg) 80%, var(--liquid-glass-light) 20%);
     box-shadow: var(--glass-shadow-hover);
-    border-color: var(--glass-border-hover);
+    border-color: color-mix(in srgb, var(--glass-border) 70%, var(--liquid-glass-light) 30%);
     color: var(--brand-primary);
+    backdrop-filter: var(--glass-blur) saturate(var(--liquid-glass-saturation-hover));
+}
+
+.scroll-to-top:hover::before {
+    opacity: calc(var(--liquid-glass-reflex-light) * 1.5);
+    background: linear-gradient(90deg,
+        transparent 0%,
+        color-mix(in srgb, var(--brand-primary) calc(var(--liquid-glass-reflex-light) * 150%), transparent) 50%,
+        transparent 100%);
 }
 
 .scroll-to-top:active {
     transform: translateY(-1px);
+    background: color-mix(in srgb, var(--glass-bg) 70%, var(--liquid-glass-light) 30%);
+    backdrop-filter: var(--glass-blur) saturate(calc(var(--liquid-glass-saturation) * 1.2));
 }
 
 .scroll-to-top svg {
@@ -71,4 +98,4 @@
         width: 18px;
         height: 18px;
     }
-} 
+}

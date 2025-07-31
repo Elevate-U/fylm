@@ -11,6 +11,7 @@ import { setupErrorHandler } from './utils/errorHandler';
 import Header from './components/Header';
 import Footer from './components/Footer';
 import ScrollToTop from './components/ScrollToTop';
+import AnimatedBackground from './components/AnimatedBackground';
 import asyncComponent from './components/asyncComponent';
 import LoadingSpinner from './components/LoadingSpinner';
 
@@ -60,6 +61,7 @@ const MainApp = () => {
 
     return (
         <div class="app">
+            <AnimatedBackground />
             <Toaster position="top-right" />
             <Header />
             <main>
