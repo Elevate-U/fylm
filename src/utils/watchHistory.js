@@ -617,6 +617,33 @@ export const saveWatchProgress = async (userId, item, progress, durationInSecond
 
     console.log('🎬 Saving progress with RPC:', progressData);
     
+    // Check if we're in fullscreen mode - if so, save to localStorage and sync later
+    const isFullscreen = document.fullscreenElement || 
+                        document.webkitFullscreenElement || 
+                        document.mozFullScreenElement;
+    
+    if (isFullscreen) {
+        console.log('📱 Fullscreen mode detected - saving to localStorage for later sync');
+        try {
+            const key = `offline_progress_${item.type}_${item.id}_${item.season || 0}_${item.episode || 0}`;
+            const offlineData = {
+                media_id: item.id,
+                media_type: item.type,
+                season_number: item.season || null,
+                episode_number: item.episode || null,
+                progress_seconds: Math.round(progress),
+                duration_seconds: durationInSeconds ? Math.round(durationInSeconds) : null,
+                timestamp: new Date().toISOString()
+            };
+            localStorage.setItem(key, JSON.stringify(offlineData));
+            console.log('📱 Progress saved to localStorage during fullscreen');
+            return true; // Return success for UI consistency
+        } catch (localError) {
+            console.error('❌ Failed to save to localStorage during fullscreen:', localError);
+            return false;
+        }
+    }
+    
     // Use provided session or fall back to checking auth status
     let session = userSession;
     

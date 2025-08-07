@@ -110,6 +110,29 @@ export function AuthProvider({ children }) {
     }
   }, []); // Remove fetchProfile from dependencies to prevent infinite loops
 
+  // Centralized helper to handle 401/refresh issues across devices
+  const handleAuthFailure = useCallback(async (reason) => {
+    try {
+      console.warn('Auth: Handling auth failure, reason:', reason);
+      // Attempt a lightweight refresh; if it fails, force sign-out
+      const { error: refreshError } = await supabase.auth.refreshSession();
+      if (refreshError) {
+        console.warn('Auth: refreshSession failed, performing signOut()', refreshError);
+        await supabase.auth.signOut();
+      }
+    } catch (e) {
+      console.error('Auth: Error during handleAuthFailure:', e);
+    } finally {
+      // Clear local state so UI can prompt login
+      setSession(null);
+      setUser(null);
+      setProfile(null);
+      BlogAPI.clearAdminCache();
+      setAuthReady(true);
+      setLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     let isMounted = true;
     console.log('Auth: useEffect initiated.');
@@ -237,6 +260,11 @@ export function AuthProvider({ children }) {
               setProfile(null);
               BlogAPI.clearAdminCache();
             }
+          }
+
+          if (_event === 'TOKEN_REFRESH_FAILED') {
+            console.warn('Auth: Token refresh failed');
+            await handleAuthFailure('TOKEN_REFRESH_FAILED');
           }
         } catch (error) {
           console.error('Auth: Error in onAuthStateChange:', error);

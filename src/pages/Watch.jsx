@@ -179,13 +179,24 @@ const Watch = (props) => {
             } else {
                 console.log('📱 Exited fullscreen mode, syncing progress...');
                 // Try to sync any offline progress saved during fullscreen
-                setTimeout(() => {
-                    if (userId) {
-                        syncOfflineProgress(userId).catch(error => {
-                            console.error('Error syncing offline progress after fullscreen:', error);
-                        });
-                    }
-                }, 1000);
+                // Use multiple attempts to ensure sync happens
+                const syncAttempts = [500, 2000, 5000]; // Try at 0.5s, 2s, and 5s
+                syncAttempts.forEach((delay, index) => {
+                    setTimeout(() => {
+                        if (userId) {
+                            console.log(`🔄 Sync attempt ${index + 1} after fullscreen exit`);
+                            syncOfflineProgress(userId).then(result => {
+                                if (result) {
+                                    console.log(`✅ Fullscreen sync attempt ${index + 1} successful`);
+                                    // Refresh continue watching after successful sync
+                                    fetchContinueWatching();
+                                }
+                            }).catch(error => {
+                                console.error(`❌ Sync attempt ${index + 1} failed:`, error);
+                            });
+                        }
+                    }, delay);
+                });
             }
         };
         

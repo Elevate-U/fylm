@@ -78,66 +78,17 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
             //'Content-Type': 'application/json',
             'X-Client-Info': 'supabase-js-web'
         },
-        // Add request timeout with better error handling
-        fetch: async (url, options = {}) => {
-            const MAX_RETRIES = 3;
-            const INITIAL_DELAY_MS = 1000;
-            let retries = 0;
-
-            // Safari detection
-            const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-            if (isSafari) {
-                console.log('Safari browser detected, applying specific handling');
-            }
-
-            while (retries < MAX_RETRIES) {
+        // Transparent minimal retry for transient network hiccups
+        fetch: async (input, init) => {
+            const maxRetries = 1;
+            let attempt = 0;
+            // Do a very light retry once on network errors to reduce false refresh failures
+            while (true) {
                 try {
-                    const controller = new AbortController();
-                    // Safari sometimes has issues with long-running requests
-                    const timeout = isSafari ? 10000 : 15000; // 10-second timeout for Safari
-                    const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-                    const response = await fetch(url, {
-                        ...options,
-                        signal: controller.signal,
-                        // Safari has stricter CORS requirements
-                        credentials: 'same-origin',
-                    });
-
-                    clearTimeout(timeoutId);
-
-                    if (!response.ok && (response.status >= 500 || response.status === 429)) {
-                        // Retry on server errors or rate limiting
-                        throw new Error(`Server error: ${response.status}`);
-                    }
-
-                    return response; // Success
-
-                } catch (error) {
-                    // Special handling for Safari CORS errors
-                    if (isSafari && error.message && error.message.includes('NetworkError')) {
-                        console.warn('Safari CORS error detected:', error);
-                        // Try to detect if this is a CORS error
-                        if (retries === 0) {
-                            console.log('Attempting Safari-specific workaround for CORS issue');
-                            // Some Safari CORS workarounds might be added here
-                        }
-                    }
-
-                    if (error.name === 'AbortError' || (error.message && error.message.includes('network'))) {
-                        retries++;
-                        if (retries >= MAX_RETRIES) {
-                            console.error(`🚨 Supabase request failed after ${MAX_RETRIES} attempts:`, { url, error });
-                            throw error;
-                        }
-                        const delay = INITIAL_DELAY_MS * Math.pow(2, retries - 1);
-                        console.warn(`Supabase request failed. Retrying in ${delay}ms... (Attempt ${retries}/${MAX_RETRIES})`);
-                        await new Promise(resolve => setTimeout(resolve, delay));
-                    } else {
-                        // Don't retry on other errors (e.g., client-side errors)
-                        console.error('🚨 Supabase request failed with a non-retriable error:', { url, error });
-                        throw error;
-                    }
+                    return await fetch(input, init);
+                } catch (err) {
+                    if (attempt >= maxRetries) throw err;
+                    attempt++;
                 }
             }
         }
