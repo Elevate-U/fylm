@@ -1,52 +1,40 @@
 /* Profile page specific styles */
+/* Elevate the profile page above animated background */
 .profile-container {
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  min-height: calc(100vh - 50px); /* Account for header height */
-  padding: 2rem 1rem;
-  background: var(--bg-primary);
-}
-
-.profile-form {
-  background: color-mix(in srgb, var(--glass-bg) 32%, transparent);
-  backdrop-filter: blur(24px) saturate(180%);
-  -webkit-backdrop-filter: blur(24px) saturate(180%);
-  border: 1px solid color-mix(in srgb, var(--text-primary) 10%, transparent);
-  box-shadow: 
-    inset 0 0 0 1px color-mix(in srgb, var(--text-primary) 6%, transparent),
-    inset 1.5px 3px 0px -2px color-mix(in srgb, var(--text-primary) 18%, transparent), 
-    inset -2px -2px 0px -2px color-mix(in srgb, var(--text-primary) 12%, transparent), 
-    inset -3px -8px 1px -6px color-mix(in srgb, var(--text-primary) 8%, transparent), 
-    inset -0.5px -1px 6px 0px color-mix(in srgb, var(--gray-900) 15%, transparent), 
-    inset -2px 3px 0px -2px color-mix(in srgb, var(--gray-900) 25%, transparent), 
-    inset 0px 4px 6px -2px color-mix(in srgb, var(--gray-900) 25%, transparent), 
-    inset 3px -8px 1px -5px color-mix(in srgb, var(--gray-900) 12%, transparent), 
-    0px 2px 8px 0px color-mix(in srgb, var(--gray-900) 12%, transparent), 
-    0px 8px 24px 0px color-mix(in srgb, var(--gray-900) 10%, transparent);
-  padding: 3rem;
-  border-radius: var(--radius-lg);
-  width: 100%;
-  max-width: 450px;
   position: relative;
-  z-index: 2;
-  transition: all 0.4s cubic-bezier(1, 0.0, 0.4, 1);
-  overflow: hidden;
+  z-index: 1;
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
 }
 
+/* Glassmorphism panel */
+.profile-form {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  background: color-mix(in oklab, var(--panel-bg, rgba(255,255,255,0.14)) 100%, transparent);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  border: 1px solid color-mix(in oklab, var(--panel-border, rgba(255,255,255,0.35)) 100%, transparent);
+  border-radius: 16px;
+  box-shadow: 0 8px 30px rgba(0,0,0,0.18), inset 0 2px 8px rgba(255,255,255,0.04);
+  padding: 24px;
+  overflow: clip;
+}
+
+/* Subtle highlights to sell the glass */
 .profile-form::before {
-  content: '';
+  content: "";
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 4px;
-  background: linear-gradient(90deg, 
-    var(--brand-primary) 0%, 
-    var(--brand-accent) 50%, 
-    var(--brand-primary) 100%);
-  background-size: 200% 100%;
-  animation: shimmer 3s ease-in-out infinite;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: radial-gradient(120% 60% at 10% 0%, rgba(255,255,255,0.25), rgba(255,255,255,0) 40%),
+              linear-gradient(180deg, rgba(255,255,255,0.08), rgba(255,255,255,0) 30%);
+  mix-blend-mode: screen;
+  opacity: 0.7;
 }
 
 @keyframes shimmer {
@@ -71,6 +59,7 @@
 }
 
 /* Form elements - consistent with auth styling */
+/* Inputs */
 .input-group {
   margin-bottom: 1.5rem;
   position: relative;
@@ -78,7 +67,7 @@
 
 .input-group label {
   display: block;
-  color: var(--text-primary);
+  color: inherit;
   margin-bottom: 0.8rem;
   font-weight: var(--font-weight-semibold);
   font-size: 0.95rem;
@@ -89,12 +78,12 @@
 .input-field {
   width: 100%;
   padding: 1.2rem 1.5rem;
-  background: color-mix(in srgb, var(--glass-bg) 25%, transparent);
-  backdrop-filter: blur(16px) saturate(150%);
-  -webkit-backdrop-filter: blur(16px) saturate(150%);
-  border: 1px solid color-mix(in srgb, var(--text-primary) 8%, transparent);
-  border-radius: var(--radius-md);
-  color: var(--text-primary);
+  background: rgba(255,255,255,0.08);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.25);
+  border-radius: 12px;
+  color: inherit;
   font-size: 1rem;
   font-weight: var(--font-weight-medium);
   box-shadow: 
@@ -102,7 +91,7 @@
     inset 1px 1px 0px -1px color-mix(in srgb, var(--text-primary) 8%, transparent), 
     inset 0px 2px 4px -1px color-mix(in srgb, var(--gray-900) 8%, transparent), 
     0px 2px 6px 0px color-mix(in srgb, var(--gray-900) 4%, transparent);
-  transition: all 0.4s cubic-bezier(1, 0.0, 0.4, 1);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
   position: relative;
   z-index: 1;
 }
@@ -113,13 +102,10 @@
 }
 
 .input-field:focus {
-  outline: none;
   border-color: var(--brand-primary);
-  background: var(--glass-bg-hover), var(--glass-highlight);
-  box-shadow:
-    var(--glass-shadow-hover),
-    0 0 0 3px rgba(var(--brand-primary-rgb), 0.2),
-    0 0 20px rgba(var(--brand-primary-rgb), 0.3);
+  outline: none;
+  box-shadow: 0 0 0 4px color-mix(in oklab, var(--brand-primary) 25%, transparent);
+  background: rgba(255,255,255,0.12);
   transform: translateY(-2px);
 }
 
@@ -136,22 +122,21 @@
   cursor: not-allowed;
 }
 
+/* Buttons */
 .button {
   width: 100%;
-  padding: 1.2rem 2rem;
-  background: color-mix(in srgb, var(--brand-primary) 20%, var(--glass-bg) 80%);
-  border: 1px solid color-mix(in srgb, var(--brand-primary) 60%, transparent);
-  border-radius: var(--radius-md);
-  color: var(--text-primary);
+  padding: 10px 16px;
+  background: linear-gradient(180deg, color-mix(in oklab, var(--brand-primary) 85%, #ffffff) 0%, var(--brand-primary) 100%);
+  border: 0;
+  border-radius: 12px;
+  color: #ffffff;
   font-size: 1rem;
   font-weight: var(--font-weight-bold);
   text-transform: uppercase;
   letter-spacing: 1px;
   cursor: pointer;
   backdrop-filter: var(--glass-blur);
-  box-shadow:
-    var(--glass-shadow),
-    0 0 20px color-mix(in srgb, var(--brand-primary) 30%, transparent);
+  box-shadow: 0 8px 16px color-mix(in oklab, var(--brand-primary) 25%, transparent);
   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
@@ -220,7 +205,8 @@
   cursor: not-allowed;
   box-shadow: var(--glass-shadow);
   transform: none;
-  opacity: 0.6;
+  opacity: 0.85;
+  filter: grayscale(0.1);
 }
 
 .button:disabled::before,
@@ -268,4 +254,19 @@
     padding: 0.8rem 1rem;
     font-size: 0.9rem;
   }
+}
+
+/* Avatar ring tweak for glass look */
+img[alt="Profile avatar"] {
+  box-shadow: 0 2px 10px rgba(0,0,0,0.25), inset 0 1px 2px rgba(255,255,255,0.2);
+}
+
+/* Theme tokens for glass */
+:root[data-theme='dark'] {
+  --panel-bg: rgba(255,255,255,0.08);
+  --panel-border: rgba(255,255,255,0.22);
+}
+:root[data-theme='light'] {
+  --panel-bg: rgba(255,255,255,0.50);
+  --panel-border: rgba(0,0,0,0.06);
 }
