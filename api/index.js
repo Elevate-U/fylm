@@ -9,6 +9,53 @@ dotenv.config();
 
 const app = express();
 
+// --- In-Memory Cache Configuration ---
+const API_CACHE = new Map();
+const CACHE_DURATION = {
+  TMDB_DETAILS: 30 * 60 * 1000, // 30 minutes for movie/TV details
+  TMDB_SEARCH: 15 * 60 * 1000,  // 15 minutes for search results
+  TMDB_TRENDING: 10 * 60 * 1000, // 10 minutes for trending
+  TMDB_SEASON: 60 * 60 * 1000,   // 1 hour for season details (rarely changes)
+};
+
+// Cache utility functions
+const getCacheKey = (prefix, ...args) => `${prefix}:${args.join(':')}`;
+const getFromCache = (key) => {
+  const cached = API_CACHE.get(key);
+  if (!cached) return null;
+  
+  const now = Date.now();
+  if (now > cached.expiry) {
+    API_CACHE.delete(key);
+    return null;
+  }
+  
+  console.log(`✅ Cache HIT: ${key}`);
+  return cached.data;
+};
+const setInCache = (key, data, duration) => {
+  API_CACHE.set(key, {
+    data,
+    expiry: Date.now() + duration
+  });
+  console.log(`💾 Cached: ${key} for ${duration / 1000}s`);
+};
+
+// Clean up expired cache entries every 10 minutes
+setInterval(() => {
+  const now = Date.now();
+  let cleaned = 0;
+  for (const [key, value] of API_CACHE.entries()) {
+    if (now > value.expiry) {
+      API_CACHE.delete(key);
+      cleaned++;
+    }
+  }
+  if (cleaned > 0) {
+    console.log(`🧹 Cleaned ${cleaned} expired cache entries`);
+  }
+}, 10 * 60 * 1000);
+
 // --- Source Configuration ---
 const SOURCES_CONFIG = {
     'videasy': {
@@ -47,13 +94,25 @@ const DEFAULT_ANIME_PROVIDER = process.env.DEFAULT_ANIME_PROVIDER || API_PROVIDE
 
 // --- Environment Variable Checks ---
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
-if (!TMDB_API_KEY) {
-    console.error("🔴 Fatal: TMDB_API_KEY is not defined in the environment. The application cannot start.");
+let apiKeyWarningShown = false;
+
+const ensureTMDBKey = () => {
+  if (!TMDB_API_KEY && !apiKeyWarningShown) {
+    console.error("🔴 Fatal: TMDB_API_KEY is not defined in the environment.");
+    apiKeyWarningShown = true;
     if (process.env.NODE_ENV !== 'production') {
-        process.exit(1); // Exit if the key is missing in non-production environments
+      process.exit(1);
     }
+  }
+  return !!TMDB_API_KEY;
+};
+
+// Initialize once at startup
+if (TMDB_API_KEY) {
+  console.log("✅ TMDB API key loaded successfully");
+  console.log(`📊 Cache enabled for TMDB responses`);
 } else {
-    console.log("✅ TMDB API key loaded successfully");
+  console.error("🔴 TMDB API key missing!");
 }
 
 // Check for Shikimori API keys
@@ -1634,16 +1693,23 @@ app.get('/tmdb/anime/:anilistId/enhanced', async (req, res) => {
     }
 });
 
-// 6. Generic TMDB API Proxy (for everything else)
+// 6. Generic TMDB API Proxy (for everything else) WITH CACHING
 // IMPORTANT: This MUST come AFTER specific routes like /tmdb/anime/:id
 app.get('/tmdb/*', async (req, res) => {
-    if (!TMDB_API_KEY) {
-        console.warn('TMDB API key not configured, blocking request.');
+    if (!ensureTMDBKey()) {
         return res.status(500).json({ error: "TMDB API key not configured" });
     }
 
     try {
         let tmdbPath = req.url.substring(req.url.indexOf('/tmdb/') + 6);
+        
+        // Check cache first
+        const cacheKey = getCacheKey('tmdb', tmdbPath);
+        const cachedData = getFromCache(cacheKey);
+        if (cachedData) {
+          return res.json(cachedData);
+        }
+        
         const tmdbApiUrl = `https://api.themoviedb.org/3/${tmdbPath}`;
         
         const finalUrl = new URL(tmdbApiUrl);
@@ -1654,7 +1720,7 @@ app.get('/tmdb/*', async (req, res) => {
             finalUrl.searchParams.append('language', req.query.language);
         }
 
-        console.log(`[TMDB_PROXY] Proxying to TMDB URL: ${finalUrl}`);
+        console.log(`[TMDB_PROXY] Fetching from TMDB: ${tmdbPath}`);
         
         const response = await fetch(finalUrl);
         
@@ -1670,6 +1736,19 @@ app.get('/tmdb/*', async (req, res) => {
             ...data,
             source: 'tmdb'
         };
+        
+        // Determine cache duration based on endpoint type
+        let cacheDuration = CACHE_DURATION.TMDB_DETAILS; // Default
+        if (tmdbPath.includes('trending')) {
+          cacheDuration = CACHE_DURATION.TMDB_TRENDING;
+        } else if (tmdbPath.includes('search')) {
+          cacheDuration = CACHE_DURATION.TMDB_SEARCH;
+        } else if (tmdbPath.includes('season')) {
+          cacheDuration = CACHE_DURATION.TMDB_SEASON;
+        }
+        
+        // Cache the response
+        setInCache(cacheKey, enhancedData, cacheDuration);
         
         res.json(enhancedData);
     } catch (error) {

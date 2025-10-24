@@ -18,7 +18,7 @@
   opacity: 0.30;
   mix-blend-mode: normal;
   transform: translate3d(0,0,0);
-  will-change: transform, opacity;
+  /* will-change removed to prevent GPU memory overflow - transform3d creates compositing layer */
   animation: float-1 16s ease-in-out infinite;
   background: radial-gradient(60% 60% at 20% 30%, rgba(255, 0, 153, 0.12) 0%, rgba(255, 0, 153, 0) 60%),
               radial-gradient(50% 50% at 80% 20%, rgba(0, 174, 255, 0.12) 0%, rgba(0, 174, 255, 0) 60%),

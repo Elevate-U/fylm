@@ -12,21 +12,56 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [authReady, setAuthReady] = useState(false);
   const [authError, setAuthError] = useState(null);
+  
+  // Token refresh control to prevent CORS error loops
+  const refreshStateRef = useState({
+    isRefreshing: false,
+    lastRefreshAttempt: 0,
+    failedAttempts: 0,
+    backoffDelay: 1000 // Start with 1 second
+  })[0];
 
-  const fetchProfile = useCallback(async (user) => {
+  const fetchProfile = useCallback(async (user, timeoutMs = 25000) => { // Increased timeout for better reliability
     if (!user) {
       setProfile(null);
       // Clear admin cache when no user
       BlogAPI.clearAdminCache();
       return;
     }
+    
     try {
       console.log('Auth: Fetching profile for user:', user.id);
-      const { data, error } = await supabase
+      
+      // Create timeout promise with longer timeout
+      const timeoutPromise = new Promise((_, reject) => {
+        setTimeout(() => reject(new Error('Profile fetch timeout - please check your connection')), timeoutMs);
+      });
+      
+      // Race between fetch and timeout
+      const fetchPromise = supabase
         .from('profiles')
         .select('*')
         .eq('id', user.id)
         .single();
+      
+      let result;
+      try {
+        result = await Promise.race([fetchPromise, timeoutPromise]);
+      } catch (raceError) {
+        // If timeout or network error, try one more time without race condition
+        if (raceError.message.includes('timeout') || raceError.message.includes('fetch')) {
+          console.warn('Auth: First profile fetch failed, retrying without timeout...');
+          result = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', user.id)
+            .single();
+        } else {
+          throw raceError;
+        }
+      }
+      
+      const { data, error } = result;
       
       if (error) {
         if (error.code === 'PGRST116') {
@@ -39,34 +74,136 @@ export function AuthProvider({ children }) {
             updated_at: new Date().toISOString()
           };
 
-          const { data: createdProfile, error: createError } = await supabase
+          const createPromise = supabase
             .from('profiles')
             .insert([newProfile])
             .select()
             .single();
+          
+          const createTimeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Profile creation timeout - please check your connection')), timeoutMs);
+          });
+
+          let createResult;
+          try {
+            createResult = await Promise.race([createPromise, createTimeoutPromise]);
+          } catch (createRaceError) {
+            // Retry without timeout
+            if (createRaceError.message.includes('timeout')) {
+              console.warn('Auth: Profile creation timed out, retrying...');
+              createResult = await supabase
+                .from('profiles')
+                .insert([newProfile])
+                .select()
+                .single();
+            } else {
+              throw createRaceError;
+            }
+          }
+
+          const { data: createdProfile, error: createError } = createResult;
 
           if (createError) {
             console.error('Auth: Error creating profile:', createError);
-            throw createError;
+            // Don't throw - set basic profile from user metadata
+            setProfile({
+              id: user.id,
+              full_name: user.user_metadata?.full_name || '',
+              avatar_url: user.user_metadata?.avatar_url || ''
+            });
+            BlogAPI.clearAdminCache();
+            return;
           }
 
           setProfile(createdProfile);
-          // Clear admin cache when profile changes
           BlogAPI.clearAdminCache();
         } else {
           console.error('Auth: Error fetching profile:', error);
-          throw error;
+          // Set basic profile from user metadata instead of throwing
+          setProfile({
+            id: user.id,
+            full_name: user.user_metadata?.full_name || '',
+            avatar_url: user.user_metadata?.avatar_url || ''
+          });
+          BlogAPI.clearAdminCache();
         }
       } else {
         console.log('Auth: Profile fetched successfully:', data);
         setProfile(data);
-        // Clear admin cache when profile changes to ensure fresh admin check
         BlogAPI.clearAdminCache();
       }
     } catch (error) {
       console.error('Auth: Error in fetchProfile:', error);
-      setProfile(null);
+      // Set basic profile from user metadata but don't throw - allow app to continue
+      setProfile({
+        id: user.id,
+        full_name: user.user_metadata?.full_name || '',
+        avatar_url: user.user_metadata?.avatar_url || ''
+      });
       BlogAPI.clearAdminCache();
+    }
+  }, []);
+
+  // Controlled token refresh with exponential backoff
+  const controlledRefreshSession = useCallback(async () => {
+    const now = Date.now();
+    
+    // Prevent concurrent refresh attempts
+    if (refreshStateRef.isRefreshing) {
+      console.log('Auth: Refresh already in progress, skipping');
+      return { success: false, reason: 'already_refreshing' };
+    }
+    
+    // Check if we should back off due to previous failures
+    const timeSinceLastAttempt = now - refreshStateRef.lastRefreshAttempt;
+    if (timeSinceLastAttempt < refreshStateRef.backoffDelay) {
+      console.log(`Auth: Backing off, waiting ${refreshStateRef.backoffDelay - timeSinceLastAttempt}ms`);
+      return { success: false, reason: 'backoff' };
+    }
+    
+    // Maximum backoff reached - clear session to force re-login
+    if (refreshStateRef.failedAttempts >= 5) {
+      console.warn('Auth: Too many refresh failures, clearing session');
+      await supabase.auth.signOut();
+      return { success: false, reason: 'max_attempts' };
+    }
+    
+    refreshStateRef.isRefreshing = true;
+    refreshStateRef.lastRefreshAttempt = now;
+    
+    try {
+      console.log('Auth: Attempting controlled token refresh');
+      const { data, error } = await supabase.auth.refreshSession();
+      
+      if (error) {
+        // Check if it's a CORS or network error
+        if (error.message.includes('CORS') || error.message.includes('NetworkError') || error.message.includes('fetch')) {
+          console.error('Auth: CORS/Network error during refresh, will retry with backoff');
+          refreshStateRef.failedAttempts++;
+          // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+          refreshStateRef.backoffDelay = Math.min(refreshStateRef.backoffDelay * 2, 16000);
+          return { success: false, reason: 'network_error', error };
+        }
+        
+        // If it's an auth error (invalid token), sign out
+        console.error('Auth: Token refresh failed with auth error:', error);
+        await supabase.auth.signOut();
+        return { success: false, reason: 'auth_error', error };
+      }
+      
+      // Success - reset failure tracking
+      console.log('Auth: Token refresh successful');
+      refreshStateRef.failedAttempts = 0;
+      refreshStateRef.backoffDelay = 1000;
+      
+      return { success: true, session: data.session };
+    } catch (error) {
+      console.error('Auth: Unexpected error during token refresh:', error);
+      refreshStateRef.failedAttempts++;
+      refreshStateRef.backoffDelay = Math.min(refreshStateRef.backoffDelay * 2, 16000);
+      return { success: false, reason: 'unexpected_error', error };
+    } finally {
+      refreshStateRef.isRefreshing = false;
     }
   }, []);
 
@@ -75,13 +212,15 @@ export function AuthProvider({ children }) {
       try {
         console.log('Auth: Refreshing profile for user:', user.id);
         BlogAPI.clearAdminCache();
-        await supabase.auth.refreshSession();
-        await fetchProfile(user);
+        const result = await controlledRefreshSession();
+        if (result.success) {
+          await fetchProfile(user);
+        }
       } catch (error) {
         console.error('Failed to refresh session:', error);
       }
     }
-  }, [user, fetchProfile]);
+  }, [user, fetchProfile, controlledRefreshSession]);
 
   const forceRefreshAuth = useCallback(async () => {
     console.log('Auth: Force refreshing authentication state');
@@ -114,11 +253,20 @@ export function AuthProvider({ children }) {
   const handleAuthFailure = useCallback(async (reason) => {
     try {
       console.warn('Auth: Handling auth failure, reason:', reason);
-      // Attempt a lightweight refresh; if it fails, force sign-out
-      const { error: refreshError } = await supabase.auth.refreshSession();
-      if (refreshError) {
-        console.warn('Auth: refreshSession failed, performing signOut()', refreshError);
-        await supabase.auth.signOut();
+      
+      // Use controlled refresh to prevent CORS error loops
+      const result = await controlledRefreshSession();
+      
+      if (!result.success) {
+        console.warn('Auth: Controlled refresh failed, performing signOut()', result.reason);
+        // Only attempt signOut if it's not already a network error
+        // (to avoid more CORS errors)
+        if (result.reason !== 'network_error') {
+          await supabase.auth.signOut();
+        } else {
+          // For network errors, just clear local state
+          console.log('Auth: Clearing local state due to network error');
+        }
       }
     } catch (e) {
       console.error('Auth: Error during handleAuthFailure:', e);
@@ -131,19 +279,56 @@ export function AuthProvider({ children }) {
       setAuthReady(true);
       setLoading(false);
     }
-  }, []);
+  }, [controlledRefreshSession]);
 
   useEffect(() => {
     let isMounted = true;
+    let loadingTimeout;
     console.log('Auth: useEffect initiated.');
 
     const getSessionAndProfile = async () => {
       if (!isMounted) return;
       console.log('Auth: Starting session and profile check...');
       
+      // Check if Supabase credentials are available before attempting auth
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+      
+      if (!supabaseUrl || !supabaseAnonKey) {
+        console.error('❌ Supabase credentials missing - cannot authenticate');
+        setAuthError('Configuration error. Please contact support.');
+        setLoading(false);
+        setAuthReady(true);
+        return;
+      }
+      
+      // Reduced timeout for mobile - force complete loading after 20 seconds (was 45)
+      // Most mobile connections should complete within 10-15 seconds
+      loadingTimeout = setTimeout(() => {
+        if (isMounted && loading) {
+          console.warn('⚠️ Auth loading timeout reached - forcing completion');
+          setLoading(false);
+          setAuthReady(true);
+          if (!session && !user) {
+            setAuthError('Connection is taking too long. Please check your network and refresh the page.');
+          }
+        }
+      }, 20000); // Reduced from 45 seconds to 20 seconds
+      
       try {
         console.log('Auth: Calling supabase.auth.getSession()...');
-        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        // Reduced timeout for getSession - mobile networks need faster feedback
+        const sessionPromise = supabase.auth.getSession();
+        const timeoutPromise = new Promise((_, reject) => {
+          setTimeout(() => reject(new Error('Session fetch timeout - please check your connection')), 15000); // Reduced from 30s to 15s
+        });
+        
+        const { data: { session }, error: sessionError } = await Promise.race([
+          sessionPromise,
+          timeoutPromise
+        ]);
+        
         console.log('Auth: supabase.auth.getSession() completed.');
 
         if (sessionError) {
@@ -171,8 +356,14 @@ export function AuthProvider({ children }) {
       } catch (error) {
         console.error('Auth: Error in getSessionAndProfile:', error);
         if (isMounted) {
-          setAuthError(error.message);
-          // Clear user state on error
+          // Provide user-friendly error message
+          const errorMsg = error.message.includes('timeout') 
+            ? 'Connection timeout. Please check your network and try again.'
+            : error.message.includes('fetch')
+            ? 'Unable to connect. Please check your internet connection.'
+            : 'Authentication error. Please try again.';
+          setAuthError(errorMsg);
+          // Clear user state on error but allow app to continue
           setSession(null);
           setUser(null);
           setProfile(null);
@@ -180,6 +371,7 @@ export function AuthProvider({ children }) {
         }
       } finally {
         if (isMounted) {
+          clearTimeout(loadingTimeout);
           console.log('Auth: Finalizing auth check, setting authReady to true.');
           setLoading(false);
           setAuthReady(true);
@@ -188,6 +380,33 @@ export function AuthProvider({ children }) {
     };
 
     getSessionAndProfile();
+    
+    // Periodic token refresh check (manual replacement for autoRefreshToken)
+    // Check every 5 minutes if session needs refresh
+    const tokenCheckInterval = setInterval(async () => {
+      if (!isMounted || !session) return;
+      
+      try {
+        // Check if token is close to expiring (within 10 minutes)
+        const expiresAt = session.expires_at;
+        if (expiresAt) {
+          const now = Math.floor(Date.now() / 1000);
+          const timeUntilExpiry = expiresAt - now;
+          
+          // Refresh if less than 10 minutes until expiry
+          if (timeUntilExpiry < 600) {
+            console.log('Auth: Token expiring soon, attempting refresh');
+            const result = await controlledRefreshSession();
+            if (result.success && result.session) {
+              setSession(result.session);
+              setUser(result.session.user);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Auth: Error in token check interval:', error);
+      }
+    }, 5 * 60 * 1000); // Check every 5 minutes
 
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (_event, session) => {
@@ -275,6 +494,12 @@ export function AuthProvider({ children }) {
 
     return () => {
       console.log('Auth: Unsubscribing from auth changes.');
+      if (loadingTimeout) {
+        clearTimeout(loadingTimeout);
+      }
+      if (tokenCheckInterval) {
+        clearInterval(tokenCheckInterval);
+      }
       if (authListener?.subscription) {
         authListener.subscription.unsubscribe();
       }

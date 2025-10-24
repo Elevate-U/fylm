@@ -1,5 +1,6 @@
 import { h } from 'preact';
 import { useState, useEffect } from 'preact/hooks';
+import { route } from 'preact-router';
 import { useStore } from '../store';
 import MovieCard from '../components/MovieCard';
 import { getContinueWatching } from '../utils/watchHistory';
@@ -108,11 +109,40 @@ const Home = (props) => {
         }
     }, [user, favoritesFetched, fetchFavorites]);
 
+    const getCategoryFromTitle = (title) => {
+        const titleMap = {
+            'Trending This Week': 'trending',
+            'Trending Movies': 'trending',
+            'Popular Movies': 'popular',
+            'Top Rated Movies': 'top-rated',
+            'Upcoming Movies': 'upcoming',
+            'Now Playing Movies': 'now-playing',
+            'Trending TV Shows': 'trending',
+            'Popular TV Shows': 'popular',
+            'Top Rated TV Shows': 'top-rated',
+            'Airing Today': 'airing-today',
+            'On The Air': 'on-the-air'
+        };
+        return titleMap[title] || 'popular';
+    };
+
+    const handleSectionClick = (title, media_type) => {
+        const category = getCategoryFromTitle(title);
+        // Default to 'movie' if media_type is undefined, or use current mediaType state
+        const type = media_type || (mediaType === 'all' ? 'movie' : mediaType);
+        route(`/browse/${type}/${category}`);
+    };
+
     const renderSection = (title, items, media_type, loading) => {
         if (loading) {
             return (
                 <section class="home-section">
-                    <h2>{title}</h2>
+                    <div class="section-header">
+                        <h2>{title}</h2>
+                        <button class="view-all-btn" disabled>
+                            View All <i class="fas fa-arrow-right"></i>
+                        </button>
+                    </div>
                     <div class="scrolling-row">
                         {Array.from({ length: 10 }).map((_, index) => (
                             <SkeletonCard key={`skeleton-${title}-${index}`} />
@@ -132,7 +162,21 @@ const Home = (props) => {
 
         return (
             <section class="home-section">
-                <h2>{title}</h2>
+                <div 
+                    class="section-header clickable-header" 
+                    onClick={() => handleSectionClick(title, media_type)}
+                >
+                    <h2>{title}</h2>
+                    <button 
+                        class="view-all-btn" 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleSectionClick(title, media_type);
+                        }}
+                    >
+                        View All <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
                 <div class="scrolling-row">
                     {uniqueItems.map(item => (
                         <MovieCard 
@@ -235,11 +279,35 @@ const Home = (props) => {
             // TMDB streaming provider IDs (verified from TMDB API)
             const providerIds = {
                 netflix: '8',     // Netflix
-                prime: '9',       // Amazon Prime Video  
-                hbo: '1899',      // HBO Max
+                prime: '119',     // Amazon Prime Video  
+                hbo: '384',       // Max (formerly HBO Max)
                 disney: '337',    // Disney Plus
                 apple: '350',     // Apple TV+
                 paramount: '531'  // Paramount+
+            };
+
+            // Dynamic resolver for provider IDs in case TMDB renames/changes them
+            const resolveProviderId = async (svc, typeForProviders) => {
+                try {
+                    const listUrl = `${API_BASE_URL}/tmdb/watch/providers/${typeForProviders}?watch_region=US`;
+                    const resp = await fetch(listUrl);
+                    if (!resp.ok) return null;
+                    const data = await resp.json();
+                    const providers = data.results || [];
+                    const nameSynonyms = {
+                        netflix: ['Netflix'],
+                        prime: ['Prime Video', 'Amazon Prime Video'],
+                        hbo: ['Max', 'HBO Max'],
+                        disney: ['Disney+', 'Disney Plus'],
+                        apple: ['Apple TV+', 'Apple TV Plus'],
+                        paramount: ['Paramount+', 'Paramount Plus']
+                    };
+                    const targets = nameSynonyms[svc] || [svc];
+                    const match = providers.find(p => targets.some(t => (p.provider_name || '').toLowerCase() === t.toLowerCase()));
+                    return match ? String(match.provider_id) : null;
+                } catch (_) {
+                    return null;
+                }
             };
             
             const providerId = providerIds[service];
@@ -253,9 +321,10 @@ const Home = (props) => {
                 // For 'all' media type, try both movies and TV shows and combine results using TMDB Discover API
                 try {
                     console.log(`Fetching content for ${service} (${providerId}) - both movies and TV`);
-                    const [movieResponse, tvResponse] = await Promise.all([
-                        fetch(`${API_BASE_URL}/tmdb/discover/movie?with_watch_providers=${providerId}&watch_region=US&sort_by=popularity.desc&page=1`),
-                        fetch(`${API_BASE_URL}/tmdb/discover/tv?with_watch_providers=${providerId}&watch_region=US&sort_by=popularity.desc&page=1`)
+                    const monetization = encodeURIComponent('flatrate|ads|free');
+                    let [movieResponse, tvResponse] = await Promise.all([
+                        fetch(`${API_BASE_URL}/tmdb/discover/movie?with_watch_providers=${providerId}&with_watch_monetization_types=${monetization}&watch_region=US&sort_by=popularity.desc&page=1`),
+                        fetch(`${API_BASE_URL}/tmdb/discover/tv?with_watch_providers=${providerId}&with_watch_monetization_types=${monetization}&watch_region=US&sort_by=popularity.desc&page=1`)
                     ]);
                     
                     console.log(`Movie response status: ${movieResponse.status}, TV response status: ${tvResponse.status}`);
@@ -266,6 +335,22 @@ const Home = (props) => {
                     
                     const movieData = await movieResponse.json();
                     const tvData = await tvResponse.json();
+
+                    // If nothing found, attempt dynamic provider id resolve and refetch once
+                    if ((!movieData.results || movieData.results.length === 0) && (!tvData.results || tvData.results.length === 0)) {
+                        const dynamicMovieId = await resolveProviderId(service, 'movie');
+                        const dynamicTvId = await resolveProviderId(service, 'tv');
+                        const finalMovieId = dynamicMovieId || providerId;
+                        const finalTvId = dynamicTvId || providerId;
+                        console.log(`Retrying with resolved provider IDs movie=${finalMovieId}, tv=${finalTvId}`);
+                        [movieResponse, tvResponse] = await Promise.all([
+                            fetch(`${API_BASE_URL}/tmdb/discover/movie?with_watch_providers=${finalMovieId}&with_watch_monetization_types=${monetization}&watch_region=US&sort_by=popularity.desc&page=1`),
+                            fetch(`${API_BASE_URL}/tmdb/discover/tv?with_watch_providers=${finalTvId}&with_watch_monetization_types=${monetization}&watch_region=US&sort_by=popularity.desc&page=1`)
+                        ]);
+                        const [movieRetry, tvRetry] = await Promise.all([movieResponse.json(), tvResponse.json()]);
+                        movieData.results = movieRetry.results || [];
+                        tvData.results = tvRetry.results || [];
+                    }
                     
                     console.log(`Found ${movieData.results?.length || 0} movies and ${tvData.results?.length || 0} TV shows for ${service}`);
                     
@@ -284,7 +369,8 @@ const Home = (props) => {
             } else {
                 // For specific media type, use that type with TMDB Discover API
                 console.log(`Fetching ${mediaType} content for ${service} (${providerId})`);
-                const response = await fetch(`${API_BASE_URL}/tmdb/discover/${mediaType}?with_watch_providers=${providerId}&watch_region=US&sort_by=popularity.desc&page=1`);
+                const monetization = encodeURIComponent('flatrate|ads|free');
+                let response = await fetch(`${API_BASE_URL}/tmdb/discover/${mediaType}?with_watch_providers=${providerId}&with_watch_monetization_types=${monetization}&watch_region=US&sort_by=popularity.desc&page=1`);
                 
                 console.log(`${mediaType} response status: ${response.status}`);
                 
@@ -292,7 +378,18 @@ const Home = (props) => {
                     throw new Error(`Failed to fetch ${mediaType} content from TMDB - Status: ${response.status}`);
                 }
                 
-                const data = await response.json();
+                let data = await response.json();
+                // If empty, try dynamic provider resolution once
+                if (!data.results || data.results.length === 0) {
+                    const dynamicId = await resolveProviderId(service, mediaType);
+                    if (dynamicId && dynamicId !== providerId) {
+                        console.log(`Retrying ${mediaType} with resolved provider ID ${dynamicId}`);
+                        response = await fetch(`${API_BASE_URL}/tmdb/discover/${mediaType}?with_watch_providers=${dynamicId}&with_watch_monetization_types=${monetization}&watch_region=US&sort_by=popularity.desc&page=1`);
+                        if (response.ok) {
+                            data = await response.json();
+                        }
+                    }
+                }
                 console.log(`Found ${data.results?.length || 0} ${mediaType} items for ${service}`);
                 results = (data.results || []).map(item => ({ ...item, media_type: mediaType }));
             }
@@ -435,6 +532,15 @@ const Home = (props) => {
                 <section class="home-section streaming-services-section">
                     <div class="streaming-services-header">
                         <h2>Series on <span class="streaming-service-name">{getStreamingServiceName(activeStreamingService)}</span></h2>
+                        <button 
+                            class="view-all-btn"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                route('/browse/tv/streaming');
+                            }}
+                        >
+                            View All <i class="fas fa-arrow-right"></i>
+                        </button>
                     </div>
                     <div class="streaming-services-tabs">
                         {['netflix', 'prime', 'hbo', 'disney', 'apple', 'paramount'].map(service => (
@@ -467,6 +573,15 @@ const Home = (props) => {
                     <span class="genre-name">
                         {genres.find(g => g.id.toString() === activeGenre)?.name || 'Loading...'}
                     </span>
+                    <button 
+                        class="view-all-btn"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            route('/browse/movie/genres');
+                        }}
+                    >
+                        View All <i class="fas fa-arrow-right"></i>
+                    </button>
                 </div>
                 
                 <div class="genre-tabs-container">

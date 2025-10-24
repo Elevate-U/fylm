@@ -182,14 +182,31 @@ export const useStore = create(
         const favoritesWithDetails = await Promise.all(
           data.map(async (fav) => {
             try {
-              const response = await fetch(`/api/tmdb/${fav.media_type}/${fav.media_id}`);
+              // Add timeout and retry logic
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
+              
+              const response = await fetch(`/api/tmdb/${fav.media_type}/${fav.media_id}`, {
+                signal: controller.signal,
+                headers: {
+                  'Accept': 'application/json',
+                }
+              });
+              
+              clearTimeout(timeoutId);
+              
               if (response.ok) {
                 const details = await response.json();
                 return { ...details, type: fav.media_type };
               }
+              
+              console.warn(`Failed to fetch favorite ${fav.media_type}:${fav.media_id}, status: ${response.status}`);
               return null;
             } catch (err) {
-              console.warn(`Could not fetch details for favorited item ${fav.media_type}:${fav.media_id}. It will not appear in the favorites list.`, err);
+              // Only log error if it's not an abort error (timeout is expected for some items)
+              if (err.name !== 'AbortError') {
+                console.warn(`Could not fetch details for favorited item ${fav.media_type}:${fav.media_id}.`, err.message);
+              }
               return null;
             }
           })

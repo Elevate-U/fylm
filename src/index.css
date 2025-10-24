@@ -11,9 +11,9 @@
   --brand-accent: hsl(265, 80%, 60%);
   --brand-accent-rgb: 138, 77, 255;
   
-  /* Liquid Glass Core Colors */
+  /* Liquid Glass Core Colors - Dark Mode Optimized */
   --liquid-glass-base: #bbbbbc;
-  --liquid-glass-light: #ffffff;
+  --liquid-glass-light: rgba(255, 255, 255, 0.15); /* Reduced opacity for dark mode */
   --liquid-glass-dark: #000000;
   --liquid-glass-content: #224;
   --liquid-glass-action: #0052f5;

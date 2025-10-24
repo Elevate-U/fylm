@@ -7,6 +7,7 @@
     overflow: hidden;
     border-radius: 16px;
     backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     border: 1px solid rgba(255, 255, 255, 0.2);
     box-shadow: 
         0 8px 32px rgba(0, 0, 0, 0.3),
@@ -16,6 +17,24 @@
         rgba(0, 0, 0, 0.5) 100%);
     margin-bottom: 2rem;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    /* iOS video player optimization */
+    -webkit-transform: translateZ(0);
+    transform: translateZ(0);
+}
+
+/* iOS-specific video player fixes */
+@supports (-webkit-touch-callout: none) {
+  .player-container video {
+    /* Ensure proper video playback on iOS */
+    object-fit: contain;
+    -webkit-mask-image: -webkit-radial-gradient(white, black);
+    mask-image: radial-gradient(white, black);
+  }
+  
+  .player-container iframe {
+    /* Better iframe support on iOS */
+    -webkit-overflow-scrolling: auto;
+  }
 }
 
 .player-container:hover {

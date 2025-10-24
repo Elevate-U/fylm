@@ -61,8 +61,8 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
         storage: customStorage, // Use our custom storage implementation
-        // Reduce aggressive session refresh that can cause network errors
-        autoRefreshToken: true,
+        // Disable auto-refresh to prevent CORS error loops - we'll handle manually
+        autoRefreshToken: false,
         persistSession: true,
         detectSessionInUrl: true, // Enable to better handle iOS Safari redirects
         // Add timeout settings to prevent hanging requests
@@ -78,17 +78,52 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
             //'Content-Type': 'application/json',
             'X-Client-Info': 'supabase-js-web'
         },
-        // Transparent minimal retry for transient network hiccups
-        fetch: async (input, init) => {
+        // Enhanced fetch with timeout for mobile networks
+      fetch: async (input, init) => {
             const maxRetries = 1;
             let attempt = 0;
+            
+            // Mobile-friendly timeout (15 seconds for slower connections)
+            const MOBILE_TIMEOUT = 15000;
+            
             // Do a very light retry once on network errors to reduce false refresh failures
             while (true) {
                 try {
-                    return await fetch(input, init);
+                  // Lightweight request logging for Supabase calls to aid debugging
+                  try {
+                      const urlStr = typeof input === 'string' ? input : (input && input.url) ? input.url : '';
+                      if (urlStr && supabaseUrl && urlStr.startsWith(supabaseUrl)) {
+                          const method = (init && init.method) ? init.method : (typeof input !== 'string' && input && input.method) ? input.method : 'GET';
+                          const shortUrl = urlStr.replace(supabaseUrl, `${supabaseUrl}/`).split('?')[0];
+                          const kind = shortUrl.includes('/rest/v1/rpc/') ? 'rpc' : shortUrl.includes('/rest/v1/') ? 'rest' : 'auth';
+                          console.log(`🔌 Supabase ${kind.toUpperCase()} → ${method} ${shortUrl}`);
+                      }
+                  } catch (_) { /* ignore logging errors */ }
+                  
+                  // Add timeout to fetch for mobile networks
+                  const controller = new AbortController();
+                  const timeoutId = setTimeout(() => controller.abort(), MOBILE_TIMEOUT);
+                  
+                  try {
+                      const response = await fetch(input, {
+                          ...init,
+                          signal: controller.signal
+                      });
+                      clearTimeout(timeoutId);
+                      return response;
+                  } catch (fetchError) {
+                      clearTimeout(timeoutId);
+                      if (fetchError.name === 'AbortError') {
+                          console.warn('⚠️ Supabase request timeout after 15s');
+                          throw new Error('Request timeout - please check your connection');
+                      }
+                      throw fetchError;
+                  }
                 } catch (err) {
                     if (attempt >= maxRetries) throw err;
                     attempt++;
+                    // Small delay before retry for mobile networks
+                    await new Promise(resolve => setTimeout(resolve, 500));
                 }
             }
         }

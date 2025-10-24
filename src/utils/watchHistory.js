@@ -7,6 +7,44 @@ let lastAuthFailure = 0;
 const AUTH_FAILURE_THRESHOLD = 3;
 const AUTH_FAILURE_RESET_TIME = 30000; // 30 seconds
 
+// Serialize RPC writes per media key to avoid overlapping calls and client auth locks
+const activeSaveKeys = new Set();
+const queuedSaveByKey = new Map();
+const queuedResolversByKey = new Map();
+const saveStartMsByKey = new Map();
+
+// Low-level REST fallback for RPC when supabase-js client is locked or times out
+const callSaveProgressDirect = async (progressData, session) => {
+    try {
+        const supabaseUrl = supabase.supabaseUrl;
+        const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+        if (!supabaseUrl || !session?.access_token) {
+            throw new Error('Missing Supabase URL or access token for direct RPC');
+        }
+        const url = `${supabaseUrl}/rest/v1/rpc/save_watch_progress`;
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'apikey': anonKey || '',
+                'Authorization': `Bearer ${session.access_token}`
+            },
+            body: JSON.stringify(progressData)
+        });
+        if (!res.ok) {
+            const text = await res.text();
+            throw new Error(`Direct RPC failed: HTTP ${res.status} ${text}`);
+        }
+        let data = null;
+        try { data = await res.json(); } catch (_) {}
+        console.log('🧪 Direct RPC (fetch) succeeded');
+        return { data, error: null };
+    } catch (e) {
+        console.error('🧪 Direct RPC (fetch) error:', e);
+        return { data: null, error: e };
+    }
+};
+
 // Helper function to recover from GoTrueClient lock issues
 const recoverFromAuthLock = async () => {
     const now = Date.now();
@@ -616,34 +654,27 @@ export const saveWatchProgress = async (userId, item, progress, durationInSecond
     };
 
     console.log('🎬 Saving progress with RPC:', progressData);
+    // Previously: We skipped RPCs in fullscreen and only saved locally. This caused
+    // progress to stop syncing in fullscreen. We now always attempt the RPC first.
+    // If the RPC later fails due to auth/network, we fall back to localStorage below.
     
-    // Check if we're in fullscreen mode - if so, save to localStorage and sync later
-    const isFullscreen = document.fullscreenElement || 
-                        document.webkitFullscreenElement || 
-                        document.mozFullScreenElement;
-    
-    if (isFullscreen) {
-        console.log('📱 Fullscreen mode detected - saving to localStorage for later sync');
-        try {
-            const key = `offline_progress_${item.type}_${item.id}_${item.season || 0}_${item.episode || 0}`;
-            const offlineData = {
-                media_id: item.id,
-                media_type: item.type,
-                season_number: item.season || null,
-                episode_number: item.episode || null,
-                progress_seconds: Math.round(progress),
-                duration_seconds: durationInSeconds ? Math.round(durationInSeconds) : null,
-                timestamp: new Date().toISOString()
-            };
-            localStorage.setItem(key, JSON.stringify(offlineData));
-            console.log('📱 Progress saved to localStorage during fullscreen');
-            return true; // Return success for UI consistency
-        } catch (localError) {
-            console.error('❌ Failed to save to localStorage during fullscreen:', localError);
-            return false;
-        }
+    // Serialize per media key to avoid overlapping RPCs
+    const mediaKey = `${progressData.p_media_type}-${progressData.p_media_id}-${progressData.p_season_number || 0}-${progressData.p_episode_number || 0}`;
+    // If a save is in-flight, store/replace the queued payload and return quickly; the runner will pick latest
+    if (activeSaveKeys.has(mediaKey)) {
+        console.log('⏳ Save queued (another in-flight) for', mediaKey);
+        queuedSaveByKey.set(mediaKey, { userId, item, progress, durationInSeconds, forceHistoryEntry, userSession });
+        // Return a promise that resolves when the queued save completes so callers can await if they need to
+        return new Promise(resolve => {
+            const list = queuedResolversByKey.get(mediaKey) || [];
+            list.push(resolve);
+            queuedResolversByKey.set(mediaKey, list);
+        });
     }
-    
+    console.log('🚀 Starting progress save for', mediaKey);
+    activeSaveKeys.add(mediaKey);
+    saveStartMsByKey.set(mediaKey, Date.now());
+
     // Use provided session or fall back to checking auth status
     let session = userSession;
     
@@ -727,65 +758,20 @@ export const saveWatchProgress = async (userId, item, progress, durationInSecond
             sessionValid: !!session && !!session.access_token
         });
         
-        // Try RPC call with current session first, then try setting session explicitly if it fails
+        // Single, awaited RPC call without aggressive quick-timeout
         console.log('📡 Making RPC call with parameters:', progressData);
-        let rpcPromise = supabase.rpc('save_watch_progress', progressData);
-        
-        // First attempt with current session
-        let firstAttemptFailed = false;
-        try {
-            const quickTimeout = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Quick RPC timeout after 5 seconds')), 5000)
-            );
-            const quickResult = await Promise.race([rpcPromise, quickTimeout]);
-            console.log('✅ RPC call succeeded on first attempt:', quickResult);
-            
-            // If we get here, the RPC succeeded, so we can return early
-            const { data: rpcData, error: rpcError } = quickResult;
-            if (!rpcError) {
-                console.log('✅ Watch progress saved successfully via RPC (first attempt)');
-                try {
-                    const savedProgress = await getWatchProgressForMedia(userId, item.id, item.type, item.season, item.episode);
-                    return savedProgress || true;
-                } catch (fetchError) {
-                    console.error('❌ Error fetching saved progress after successful RPC:', fetchError);
-                    return true;
-                }
-            }
-        } catch (quickError) {
-            console.log('⚠️ First RPC attempt failed or timed out, trying with explicit session setting');
-            firstAttemptFailed = true;
-        }
-        
-        // If first attempt failed, try setting session explicitly
-        if (firstAttemptFailed) {
-            console.log('🔧 Setting session on Supabase client before retry');
-            const { error: sessionError } = await supabase.auth.setSession({
-                access_token: session.access_token,
-                refresh_token: session.refresh_token
-            });
-            
-            if (sessionError) {
-                console.error('❌ Failed to set session on Supabase client:', sessionError);
-            } else {
-                console.log('✅ Session successfully set on Supabase client');
-            }
-            
-            // Retry the RPC call with explicit session
-            console.log('🔄 Retrying RPC call with explicit session');
-            rpcPromise = supabase.rpc('save_watch_progress', progressData);
-        }
-        const timeoutPromise = new Promise((_, reject) => 
-            setTimeout(() => reject(new Error('RPC timeout after 10 seconds')), 10000)
-        );
-        
+        const rpcPromise = supabase.rpc('save_watch_progress', progressData);
+        const rpcTimeoutMs = 8000;
         let rpcResult;
         try {
-            rpcResult = await Promise.race([rpcPromise, timeoutPromise]);
+            rpcResult = await Promise.race([
+                rpcPromise,
+                new Promise((_, reject) => setTimeout(() => reject(new Error(`RPC timeout after ${rpcTimeoutMs}ms`)), rpcTimeoutMs))
+            ]);
             console.log('🎬 RPC call completed:', rpcResult);
         } catch (timeoutError) {
-            console.error('❌ RPC call timed out or failed:', timeoutError);
-            rpcResult = { error: timeoutError };
+            console.warn('❌ RPC call timed out/failed, trying direct REST fallback:', timeoutError.message);
+            rpcResult = await callSaveProgressDirect(progressData, session);
         }
         
         const { data: rpcData, error: rpcError } = rpcResult;
@@ -855,6 +841,32 @@ export const saveWatchProgress = async (userId, item, progress, durationInSecond
     } catch (error) {
         console.error('❌ Unexpected error in saveWatchProgress:', error);
         return false;
+    } finally {
+        // If a newer save was queued while this one was in-flight, run it now
+        try {
+            const mediaKey = `${item.type}-${item.id}-${item.season || 0}-${item.episode || 0}`;
+            activeSaveKeys.delete(mediaKey);
+            const startedAt = saveStartMsByKey.get(mediaKey);
+            if (startedAt) {
+                const ms = Date.now() - startedAt;
+                console.log(`🏁 Progress save finished for ${mediaKey} in ${ms}ms`);
+                saveStartMsByKey.delete(mediaKey);
+            }
+            const queued = queuedSaveByKey.get(mediaKey);
+            const resolvers = queuedResolversByKey.get(mediaKey) || [];
+            queuedResolversByKey.delete(mediaKey);
+            if (queued) {
+                queuedSaveByKey.delete(mediaKey);
+                console.log('▶️ Running queued save for', mediaKey);
+                await saveWatchProgress(queued.userId, queued.item, queued.progress, queued.durationInSeconds, queued.forceHistoryEntry, queued.userSession);
+            }
+            // Resolve any waiters
+            resolvers.forEach(r => {
+                try { r(true); } catch (_) {}
+            });
+        } catch (_) {
+            // swallow
+        }
     }
 };
 

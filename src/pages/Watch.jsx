@@ -10,6 +10,7 @@ import { addFavoriteShow, removeFavoriteShow } from '../utils/favorites';
 import './Watch.css';
 import { API_BASE_URL, IMAGE_BASE_URL, getProxiedImageUrl } from '../config';
 import { supabase } from '../supabase';
+import { optimizeVideoForIOS, isIOS } from '../utils/iosUtils';
 
 const Watch = (props) => {
     const [mediaDetails, setMediaDetails] = useState(null);
@@ -754,6 +755,11 @@ const Watch = (props) => {
             if (!videoElement) return;
 
             const handleLoadedMetadata = async () => {
+                // Optimize video for iOS
+                if (isIOS()) {
+                    optimizeVideoForIOS(videoElement);
+                }
+                
                 const history = await getWatchProgressForMedia(userId, id, type, currentSeason, currentEpisode);
                 if (history && history.progress_seconds) {
                     videoElement.currentTime = history.progress_seconds;
@@ -1146,7 +1152,18 @@ const Watch = (props) => {
                     </div>
                 )}
                 {isDirectSource ? (
-                    <video ref={videoRef} src={streamUrl} controls autoPlay width="100%"></video>
+                    <video 
+                        ref={videoRef} 
+                        src={streamUrl} 
+                        controls 
+                        autoPlay 
+                        playsInline 
+                        preload="metadata"
+                        width="100%"
+                        style={{ maxWidth: '100%', height: 'auto' }}
+                        x-webkit-airplay="allow"
+                        webkit-playsinline="true"
+                    ></video>
                 ) : (
                     streamUrl && (
                         <iframe 
@@ -1156,8 +1173,7 @@ const Watch = (props) => {
                             style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' }}
                             frameBorder="0"
                             allowFullScreen
-                            allow="autoplay; fullscreen; picture-in-picture"
-                            sandbox="allow-forms allow-pointer-lock allow-same-origin allow-scripts allow-top-navigation allow-popups allow-popups-to-escape-sandbox"
+                            allow="autoplay; fullscreen; picture-in-picture; encrypted-media; accelerometer; gyroscope; web-share"
                             title="Video Player"
                             loading="eager"
                             referrerPolicy="no-referrer-when-downgrade"

@@ -23,12 +23,14 @@ const Profile = () => {
   const [avatarFile, setAvatarFile] = useState(null);
   const [loading, setLoading] = useState(false);
   const [saveState, setSaveState] = useState('Save Changes');
+  const [avatarLoadError, setAvatarLoadError] = useState(false);
   const fileInputRef = useRef();
 
   // This effect now primarily syncs the avatar URL when the profile changes.
   // The full name input is controlled directly and updated via context.
   useEffect(() => {
     setAvatarUrl(getAvatarUrl(profile, user));
+    setAvatarLoadError(false); // Reset error state when avatar URL changes
     // Also, ensure fullName is in sync if the profile object itself is replaced
     if (profile?.full_name !== fullName) {
       setFullName(profile.full_name || '');
@@ -53,9 +55,16 @@ const Profile = () => {
       return;
     }
     setAvatarFile(file);
+    setAvatarLoadError(false);
     const reader = new FileReader();
     reader.onload = (ev) => setAvatarUrl(ev.target.result);
     reader.readAsDataURL(file);
+  };
+  
+  const handleAvatarError = () => {
+    console.warn('Avatar failed to load, using default');
+    setAvatarLoadError(true);
+    setAvatarUrl('/assets/default-avatar.png');
   };
 
   const handleSave = async (e) => {
@@ -98,20 +107,26 @@ const Profile = () => {
 
       // 3. Update the user's auth metadata.
       // This will now use the improved updateUser from AuthContext.
-      const { error: userError } = await updateUser({
+      const result = await updateUser({
         ...userUpdateData,
         id: user.id, // Ensure the user ID is passed
       });
 
-      if (userError) throw userError;
+      if (result?.error) {
+        throw result.error;
+      }
 
       // 4. State is now handled by the AuthContext, no need to refresh here.
       toast.success('Profile updated successfully!');
       setSaveState('Saved!');
       
+      console.log('Profile saved successfully, redirecting to home...');
+      
+      // Redirect to home after successful save
       setTimeout(() => {
-        setSaveState('Save Changes');
-      }, 2000);
+        console.log('Redirecting now...');
+        route('/');
+      }, 1500);
 
     } catch (err) {
       console.error("Profile update failed:", err);
@@ -129,8 +144,9 @@ const Profile = () => {
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: 24 }}>
               <label htmlFor="avatar-upload" style={{ cursor: 'pointer' }}>
                 <img
-                  src={avatarUrl}
+                  src={avatarLoadError ? '/assets/default-avatar.png' : avatarUrl}
                   alt="Profile avatar"
+                  onError={handleAvatarError}
                   style={{ width: 96, height: 96, borderRadius: '50%', objectFit: 'cover', marginBottom: 8, border: '2px solid var(--brand-primary)' }}
                 />
                 <input

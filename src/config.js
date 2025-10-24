@@ -42,6 +42,16 @@ export const API_BASE_URL = getApiBaseUrl();
 export function getProxiedImageUrl(url) {
   if (!url) return '';
   
+  // Check if this is a Supabase storage URL - don't proxy these, use directly
+  if (url.includes('supabase.co/storage')) {
+    return url;
+  }
+  
+  // Check if this is a local/relative URL (like default avatar)
+  if (url.startsWith('/') && !url.startsWith('//')) {
+    return url;
+  }
+  
   // Check if this is an AniList URL (either direct or with our special prefix)
   if (url.includes('anilist.co') || url.includes('anilistcdn') || url.includes('anili.st')) {
     return `${API_BASE_URL}/image-proxy?url=${encodeURIComponent(url)}`;

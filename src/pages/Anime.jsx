@@ -154,6 +154,21 @@ const Anime = () => {
         fetchAllAnimeData();
     }, [fetchCombinedAnimeData]);
 
+    const getCategoryFromTitle = (title) => {
+        const titleMap = {
+            'Trending Now': 'trending',
+            'This Season': 'seasonal',
+            'Popular Anime': 'popular',
+            'Top Rated Anime': 'top-rated'
+        };
+        return titleMap[title] || 'popular';
+    };
+
+    const handleSectionClick = (title) => {
+        const category = getCategoryFromTitle(title);
+        route(`/browse/anime/${category}`);
+    };
+
     const renderSection = (title, items) => {
         if (!items || items.length === 0) {
             return null;
@@ -161,7 +176,21 @@ const Anime = () => {
         
         return (
             <section class="home-section">
-                <h2>{title}</h2>
+                <div 
+                    class="section-header clickable-header" 
+                    onClick={() => handleSectionClick(title)}
+                >
+                    <h2>{title}</h2>
+                    <button 
+                        class="view-all-btn" 
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            handleSectionClick(title);
+                        }}
+                    >
+                        View All <i class="fas fa-arrow-right"></i>
+                    </button>
+                </div>
                 <div class="scrolling-row">
                     {items.map(item => (
                         <AnimeCard

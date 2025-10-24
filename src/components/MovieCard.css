@@ -9,8 +9,14 @@
   overflow: hidden;
   position: relative;
   text-decoration: none;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: 
+    transform 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    border-color 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    background 0.25s cubic-bezier(0.4, 0, 0.2, 1),
+    backdrop-filter 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   backdrop-filter: var(--glass-blur) saturate(var(--liquid-glass-saturation));
+  /* will-change removed to prevent GPU memory overflow - only transform is critical */
 }
 
 .movie-card::before {
@@ -22,9 +28,9 @@
   height: 1px;
   background: linear-gradient(90deg,
     transparent 0%,
-    color-mix(in srgb, var(--liquid-glass-light) calc(var(--liquid-glass-reflex-light) * 100%), transparent) 50%,
+    rgba(255, 255, 255, 0.1) 50%,
     transparent 100%);
-  opacity: var(--liquid-glass-reflex-light);
+  opacity: 0.5;
   pointer-events: none;
   z-index: 1;
 }
@@ -38,29 +44,30 @@
   height: 100%;
   background: linear-gradient(90deg,
     transparent 0%,
-    color-mix(in srgb, var(--liquid-glass-light) 20%, transparent) 50%,
+    rgba(255, 255, 255, 0.05) 50%,
     transparent 100%);
-  transition: left 0.6s ease;
+  transition: left 0.6s var(--ease-out-cubic);
   pointer-events: none;
   z-index: 2;
 }
 
 .movie-card:hover {
-  transform: translateY(-8px) scale(1.02);
+  transform: translateY(-6px) scale(1.015);
   box-shadow: 
     var(--glass-shadow-heavy),
-    0 0 40px rgba(var(--brand-primary-rgb), 0.15),
-    inset 0 1px 0 color-mix(in srgb, var(--liquid-glass-light) 20%, transparent);
-  border-color: color-mix(in srgb, var(--glass-border) 70%, var(--liquid-glass-light) 30%);
-  background: color-mix(in srgb, var(--glass-bg) 80%, var(--liquid-glass-light) 20%);
+    0 0 30px rgba(var(--brand-primary-rgb), 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  border-color: color-mix(in srgb, var(--glass-border) 85%, rgba(255, 255, 255, 0.15));
+  background: color-mix(in srgb, var(--glass-bg) 92%, rgba(255, 255, 255, 0.08));
   backdrop-filter: var(--glass-blur) saturate(var(--liquid-glass-saturation-hover));
+  /* will-change removed to prevent GPU memory overflow - transform already creates compositing layer */
 }
 
 .movie-card:hover::before {
-  opacity: calc(var(--liquid-glass-reflex-light) * 1.5);
+  opacity: calc(var(--liquid-glass-reflex-light) * 0.5);
   background: linear-gradient(90deg,
     transparent 0%,
-    color-mix(in srgb, var(--brand-primary) calc(var(--liquid-glass-reflex-light) * 150%), transparent) 50%,
+    rgba(var(--brand-primary-rgb), 0.3) 50%,
     transparent 100%);
 }
 
@@ -84,14 +91,16 @@
   height: 100%;
   object-fit: cover;
   display: block;
-  transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: 
+    transform 0.6s cubic-bezier(0.25, 0.46, 0.45, 0.94),
+    filter 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
   filter: brightness(0.8) contrast(1.1);
   aspect-ratio: 2/3;
 }
 
 .movie-card:hover .poster-wrapper img {
-  transform: scale(1.08);
-  filter: brightness(0.9) contrast(1.2);
+  transform: scale(1.05);
+  filter: brightness(0.9) contrast(1.15);
 }
 
 /* Enhanced gradient overlay for glassmorphic effect */
