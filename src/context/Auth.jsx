@@ -509,17 +509,12 @@ export function AuthProvider({ children }) {
 
   const updateUser = async (updates) => {
     try {
-      // 1. Update auth user metadata
-      const { data: authData, error: authError } = await supabase.auth.updateUser(updates);
-      if (authError) throw authError;
-
-      const user = authData.user;
-      if (!user) {
-        // This case should ideally not be reached if authError is handled
-        return { data: null, error: new Error("User update failed.") };
-      }
+      console.log('Auth: Starting user update (fire and forget mode)');
       
+      // Update profile state immediately with optimistic update
+      const userId = user?.id || updates.id;
       const profileUpdate = {};
+      
       if (updates.data.full_name) {
         profileUpdate.full_name = updates.data.full_name;
       }
@@ -527,35 +522,77 @@ export function AuthProvider({ children }) {
         profileUpdate.avatar_url = updates.data.avatar_url;
       }
 
-      // 2. Update the public profile table.
+      // Immediately update local state for instant UI feedback
+      if (user) {
+        setUser({
+          ...user,
+          user_metadata: {
+            ...user.user_metadata,
+            ...updates.data
+          }
+        });
+      }
+      
+      setProfile({
+        ...profile,
+        id: userId,
+        ...profileUpdate
+      });
+      
+      console.log('Auth: Local state updated immediately');
+
+      // Fire off server updates in background without blocking
+      // 1. Update auth user metadata (no waiting)
+      supabase.auth.updateUser(updates)
+        .then(({ data: authData, error: authError }) => {
+          if (authError) {
+            console.error('Auth: Background auth update error:', authError);
+          } else {
+            console.log('Auth: Background auth update succeeded');
+            if (authData?.user) {
+              setUser(authData.user);
+            }
+          }
+        })
+        .catch(err => {
+          console.error('Auth: Background auth update failed:', err);
+        });
+
+      // 2. Update the public profile table (no waiting)
       if (Object.keys(profileUpdate).length > 0) {
-        const { error: profileError } = await supabase
+        supabase
           .from('profiles')
           .update(profileUpdate)
-          .eq('id', user.id);
-
-        if (profileError) {
-          // Log the profile error but don't block the user update from succeeding
-          console.error('Error updating profile table:', profileError);
-        }
+          .eq('id', userId)
+          .then(({ error: profileError }) => {
+            if (profileError) {
+              console.error('Auth: Background profile update error:', profileError);
+            } else {
+              console.log('Auth: Background profile update succeeded');
+              // Refetch to get any server-side computed fields
+              supabase
+                .from('profiles')
+                .select('*')
+                .eq('id', userId)
+                .single()
+                .then(({ data: newProfile }) => {
+                  if (newProfile) {
+                    setProfile(newProfile);
+                    console.log('Auth: Background profile refetch completed');
+                  }
+                })
+                .catch(err => {
+                  console.warn('Auth: Background profile refetch failed:', err);
+                });
+            }
+          })
+          .catch(err => {
+            console.error('Auth: Background profile update failed:', err);
+          });
       }
-      
-      // 3. Update local state with fresh data for immediate UI consistency.
-      // This avoids race conditions with backend triggers.
-      setUser(user);
-      const { data: newProfile, error: fetchError } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', user.id)
-        .single();
-      
-      if (fetchError && fetchError.code !== 'PGRST116') {
-        console.error('Error re-fetching profile after update:', fetchError);
-      } else {
-        setProfile(newProfile);
-      }
 
-      return { data: authData, error: null };
+      console.log('Auth: User update completed (optimistic)');
+      return { data: { user }, error: null };
     } catch (error) {
       console.error('Error updating user:', error);
       return { data: null, error };

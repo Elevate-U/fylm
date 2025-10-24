@@ -134,9 +134,8 @@
   }
   
   .home-section:hover {
-      box-shadow: var(--glass-shadow-hover);
-      transform: translateY(-2px);
-      border-color: var(--glass-border-hover);
+    transform: translateY(-2px);
+      /* Removed hover effects */
   }
   
   /* Dark mode hover tinting - reduced to prevent white overlay */
@@ -144,7 +143,7 @@
       background: color-mix(in srgb, rgba(0, 0, 0, 0.35) 80%, var(--glass-bg-hover));
   }
   
-  /* Light mode hover tinting */
+  /* Light mode hover tinting - removed */
   :root[data-theme='light'] .home-section:hover {
       background: color-mix(in srgb, rgba(255, 255, 255, 0.5) 70%, var(--glass-bg-hover));
   }

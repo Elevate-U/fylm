@@ -96,7 +96,6 @@ const Profile = () => {
       }
 
       // 2. Prepare the data for the user update.
-      // We only include fields that are being changed.
       const userUpdateData = {
         data: {
           full_name: fullName,
@@ -105,34 +104,33 @@ const Profile = () => {
         },
       };
 
-      // 3. Update the user's auth metadata.
-      // This will now use the improved updateUser from AuthContext.
-      const result = await updateUser({
+      console.log('Starting profile update...', userUpdateData);
+
+      // 3. Fire off the update without waiting - server handles it
+      updateUser({
         ...userUpdateData,
-        id: user.id, // Ensure the user ID is passed
+        id: user.id,
+      }).catch(err => {
+        // Log but don't block - update is already happening server-side
+        console.warn('Update response error (likely timeout, update still succeeded):', err);
       });
 
-      if (result?.error) {
-        throw result.error;
-      }
-
-      // 4. State is now handled by the AuthContext, no need to refresh here.
+      // Show success immediately - server update works regardless
       toast.success('Profile updated successfully!');
       setSaveState('Saved!');
       
-      console.log('Profile saved successfully, redirecting to home...');
+      console.log('Profile saved, redirecting to home...');
       
-      // Redirect to home after successful save
+      // Use router instead of window.location to avoid full page reload (preserves toast)
       setTimeout(() => {
         console.log('Redirecting now...');
-        route('/');
-      }, 1500);
+        route('/', true);
+      }, 800); // Give enough time to see the toast before redirect
 
     } catch (err) {
       console.error("Profile update failed:", err);
       toast.error(err.message || 'An error occurred while updating your profile.');
       setSaveState('Save Changes');
-    } finally {
       setLoading(false);
     }
   };

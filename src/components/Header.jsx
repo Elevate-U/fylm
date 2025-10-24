@@ -342,22 +342,23 @@ const Header = () => {
                     </button>
                     
                     <div class="header-actions">
-                        {/* Profile button - always visible */}
+                        {/* Profile button with name/picture - always visible */}
                         {user && (
                             <button 
                                 ref={profileButtonRef}
                                 onClick={toggleProfileDropdown}
-                                class="profile-button"
+                                class="profile-button-expanded"
                                 aria-label="Profile menu"
                                 aria-expanded={isProfileDropdownOpen}
                             >
                                 <img
                                     src={profile?.avatar_url ? getProxiedImageUrl(profile.avatar_url) : (user.user_metadata?.avatar_url ? getProxiedImageUrl(user.user_metadata.avatar_url) : defaultAvatar)}
                                     alt="Profile"
-                                    class="profile-avatar"
-                                    />
-                                </button>
-                            )}
+                                    class="profile-avatar-expanded"
+                                />
+                                <span class="profile-name-expanded">{profile?.full_name || user.user_metadata?.full_name || 'User'}</span>
+                            </button>
+                        )}
                         
                         {/* Auth links - hidden at 768px */}
                         <div class="auth-links">
@@ -396,19 +397,25 @@ const Header = () => {
                         position: 'fixed',
                         top: '60px',
                         right: '20px',
-                        zIndex: 9999
+                        zIndex: 9999,
+                        backdropFilter: 'blur(24px) saturate(180%)',
+                        WebkitBackdropFilter: 'blur(24px) saturate(180%)'
                     }}
                 >
+                    <Link href="/profile" onClick={closeMenu} class="dropdown-profile-header-link">
+                        <div class="dropdown-profile-header">
+                            <img
+                                src={profile?.avatar_url ? getProxiedImageUrl(profile.avatar_url) : (user.user_metadata?.avatar_url ? getProxiedImageUrl(user.user_metadata.avatar_url) : defaultAvatar)}
+                                alt="Profile"
+                                class="dropdown-profile-avatar"
+                            />
+                            <div class="dropdown-profile-info">
+                                <div class="dropdown-profile-name">{profile?.full_name || user.user_metadata?.full_name || 'User'}</div>
+                                <div class="dropdown-profile-email">{user.email}</div>
+                            </div>
+                        </div>
+                    </Link>
                     <ul class="dropdown-menu">
-                        <li>
-                            <Link href="/profile" onClick={closeMenu} class="dropdown-item">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                                    <circle cx="12" cy="7" r="4"></circle>
-                                </svg>
-                                Profile
-                            </Link>
-                        </li>
                         <li>
                             <Link href="/favorites" onClick={closeMenu} class="dropdown-item">
                                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
