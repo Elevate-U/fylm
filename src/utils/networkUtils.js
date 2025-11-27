@@ -4,6 +4,13 @@
  */
 
 /**
+ * Helper to get the connection object across different browsers
+ */
+const getConnection = () => {
+    return navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+};
+
+/**
  * Check if the browser is online
  */
 export const isOnline = () => {
@@ -14,9 +21,7 @@ export const isOnline = () => {
  * Detect if user is on a slow connection (2G, slow-2g)
  */
 export const isSlowConnection = () => {
-    if (!navigator.connection) return false;
-    
-    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    const connection = getConnection();
     if (!connection) return false;
     
     const slowTypes = ['slow-2g', '2g'];
@@ -27,7 +32,8 @@ export const isSlowConnection = () => {
  * Get connection information
  */
 export const getConnectionInfo = () => {
-    if (!navigator.connection) {
+    const connection = getConnection();
+    if (!connection) {
         return {
             type: 'unknown',
             effectiveType: 'unknown',
@@ -35,8 +41,6 @@ export const getConnectionInfo = () => {
             rtt: 'unknown'
         };
     }
-    
-    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
     
     return {
         type: connection.type || 'unknown',
@@ -121,8 +125,8 @@ export const setupNetworkListeners = (onOnline, onOffline) => {
     
     // Setup connection change listener if available
     let connectionChangeHandler = null;
-    if (navigator.connection) {
-        const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    const connection = getConnection();
+    if (connection) {
         connectionChangeHandler = () => {
             const info = getConnectionInfo();
             console.log('📶 Connection changed:', info.effectiveType);
@@ -138,8 +142,7 @@ export const setupNetworkListeners = (onOnline, onOffline) => {
     return () => {
         window.removeEventListener('online', handleOnline);
         window.removeEventListener('offline', handleOffline);
-        if (connectionChangeHandler && navigator.connection) {
-            const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+        if (connectionChangeHandler && connection) {
             connection.removeEventListener('change', connectionChangeHandler);
         }
     };

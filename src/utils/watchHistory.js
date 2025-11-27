@@ -1,6 +1,158 @@
 import { supabase } from '../supabase';
 import { API_BASE_URL } from '../config';
 
+// ============================================================================
+// SHARED BULK FETCH UTILITIES
+// ============================================================================
+
+/**
+ * Bulk fetch TMDB details for multiple media items
+ * @param {Array} historyData - Array of history items with media_id and media_type
+ * @returns {Object} Map of media details keyed by 'type-id'
+ */
+const bulkFetchTMDBDetails = async (historyData) => {
+    if (!historyData || historyData.length === 0) {
+        return {};
+    }
+
+    const requests = historyData.map(item => ({
+        type: item.media_type,
+        id: item.media_id
+    }));
+    
+    console.log(`📡 [Bulk] Making bulk request for ${requests.length} TMDB details...`);
+    
+    try {
+    const response = await fetch(`${API_BASE_URL}/tmdb/bulk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requests })
+    });
+
+    if (!response.ok) {
+            console.error(`❌ [Bulk] TMDB request failed: ${response.statusText}`);
+            return {};
+    }
+
+    const bulkDetails = await response.json();
+    const detailsMap = bulkDetails.reduce((acc, detail) => {
+        if (detail.success) {
+            acc[`${detail.type}-${detail.id}`] = detail.data;
+        }
+        return acc;
+    }, {});
+
+        console.log(`🗺️ [Bulk] Successfully fetched and mapped ${Object.keys(detailsMap).length} TMDB details.`);
+    return detailsMap;
+    } catch (error) {
+        console.error('❌ [Bulk] Error fetching TMDB details:', error);
+        return {};
+    }
+};
+
+/**
+ * Bulk fetch episode details for TV shows
+ * @param {Array} historyData - Array of items with season_number and episode_number
+ * @returns {Object} Map of episode details keyed by 'id-season-episode'
+ */
+const bulkFetchEpisodeDetails = async (historyData) => {
+    const episodeRequests = historyData
+        .filter(item => item.media_type === 'tv' && item.season_number && item.episode_number)
+        .map(item => ({
+            id: item.media_id,
+            season: item.season_number,
+            episode: item.episode_number
+        }));
+
+    if (episodeRequests.length === 0) {
+        return {};
+    }
+
+    console.log(`📡 [Bulk] Making bulk request for ${episodeRequests.length} episode details...`);
+    
+    try {
+    const episodeResponse = await fetch(`${API_BASE_URL}/tmdb/bulk-episodes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requests: episodeRequests })
+    });
+
+    if (!episodeResponse.ok) {
+            console.error(`❌ [Bulk] Episode fetch failed: ${episodeResponse.statusText}`);
+            return {};
+    }
+
+    const bulkEpisodes = await episodeResponse.json();
+    const episodeMap = bulkEpisodes.reduce((acc, ep) => {
+        if (ep.success) {
+            acc[`${ep.id}-${ep.season}-${ep.episode}`] = ep.data;
+        }
+        return acc;
+    }, {});
+
+        console.log(`📺 [Bulk] Successfully merged ${Object.keys(episodeMap).length} episode details.`);
+        return episodeMap;
+    } catch (error) {
+        console.error('❌ [Bulk] Error fetching episode details:', error);
+        return {};
+    }
+};
+
+/**
+ * Combine history data with TMDB and episode details
+ * @param {Array} historyData - Raw history data from database
+ * @param {Object} detailsMap - TMDB details map
+ * @param {Object} episodeMap - Episode details map
+ * @returns {Array} Enhanced history data with full details
+ */
+const combineHistoryWithDetails = (historyData, detailsMap, episodeMap = {}) => {
+    return historyData.map(item => {
+        const details = detailsMap[`${item.media_type}-${item.media_id}`];
+        
+        let combined = {
+            id: item.media_id,
+            watch_id: `${item.user_id}-${item.media_id}-${item.media_type}-${item.season_number || 0}-${item.episode_number || 0}`,
+            type: item.media_type,
+            media_type: item.media_type,
+            media_id: item.media_id,
+            season_number: item.season_number,
+            episode_number: item.episode_number,
+            watched_at: item.watched_at,
+            progress_seconds: item.progress_seconds,
+            duration_seconds: item.duration_seconds
+        };
+
+        if (details) {
+            combined = { ...details, ...combined, id: details.id };
+        } else {
+            // Fallback if TMDB details are missing
+            combined = {
+                ...combined,
+                title: 'Unknown Title',
+                poster_path: null,
+                overview: 'Details not available.',
+                _failed_to_load: true
+            };
+        }
+
+        // Add episode-specific details if available
+        if (item.media_type === 'tv' && item.season_number && item.episode_number) {
+            const episodeDetails = episodeMap[`${item.media_id}-${item.season_number}-${item.episode_number}`];
+            if (episodeDetails) {
+                combined.episode_name = episodeDetails.name;
+                combined.still_path = episodeDetails.still_path;
+                combined.episode_overview = episodeDetails.overview;
+            }
+        }
+
+        return combined;
+    });
+};
+
+// ============================================================================
+// CIRCUIT BREAKER AND AUTH RECOVERY
+// ============================================================================
+
 // Circuit breaker for GoTrueClient issues
 let authFailureCount = 0;
 let lastAuthFailure = 0;
@@ -117,117 +269,15 @@ export const getBatchedWatchHistory = async (userId, offset = 0, limit = 10) => 
 
         console.log(`✅ [History] Processing ${paginatedData.length} items in this batch.`);
 
-        // Bulk fetch TMDB details for this batch
-        const requests = paginatedData.map(item => ({
-            type: item.media_type,
-            id: item.media_id
-        }));
-        
-        console.log(`📡 [History] Making bulk request for ${requests.length} TMDB details...`);
-        const response = await fetch(`${API_BASE_URL}/tmdb/bulk`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ requests })
-        });
-
-        if (!response.ok) {
-            console.error(`❌ [History] Bulk TMDB request failed: ${response.statusText}`);
-            // Return raw data so the UI can still display something
+        // Use shared bulk fetch utilities
+        const detailsMap = await bulkFetchTMDBDetails(paginatedData);
+        if (Object.keys(detailsMap).length === 0) {
+            // Return raw data if bulk fetch failed
             return paginatedData;
         }
 
-        const bulkDetails = await response.json();
-        const detailsMap = bulkDetails.reduce((acc, detail) => {
-            if (detail.success) {
-                acc[`${detail.type}-${detail.id}`] = detail.data;
-            }
-            return acc;
-        }, {});
-
-        console.log(`🗺️ [History] Successfully fetched and mapped ${Object.keys(detailsMap).length} TMDB details.`);
-
-        // Combine history data with TMDB details
-        const detailedHistory = paginatedData.map(item => {
-            const details = detailsMap[`${item.media_type}-${item.media_id}`];
-            if (details) {
-                return {
-                    ...details, // Spread the TMDB details (title, poster_path, etc.)
-                    id: details.id,
-                    watch_id: `${item.user_id}-${item.media_id}-${item.media_type}-${item.season_number || 0}-${item.episode_number || 0}`,
-                    type: item.media_type,
-                    media_type: item.media_type,
-                    media_id: item.media_id,
-                    season_number: item.season_number,
-                    episode_number: item.episode_number,
-                    watched_at: item.watched_at,
-                    progress_seconds: item.progress_seconds,
-                    duration_seconds: item.duration_seconds
-                };
-            }
-            // Return a fallback object if TMDB details are missing
-            return {
-                id: item.media_id,
-                watch_id: `${item.user_id}-${item.media_id}-${item.media_type}-${item.season_number || 0}-${item.episode_number || 0}`,
-                type: item.media_type,
-                media_type: item.media_type,
-                media_id: item.media_id,
-                season_number: item.season_number,
-                episode_number: item.episode_number,
-                watched_at: item.watched_at,
-                title: 'Unknown Title',
-                poster_path: null,
-                overview: 'Details not available.',
-                _failed_to_load: true,
-                progress_seconds: item.progress_seconds,
-                duration_seconds: item.duration_seconds
-            };
-        });
-
-        // Fetch episode-specific details for TV shows in this batch
-        const episodeRequests = detailedHistory
-            .filter(item => item.media_type === 'tv' && item.season_number && item.episode_number)
-            .map(item => ({
-                id: item.media_id,
-                season: item.season_number,
-                episode: item.episode_number
-            }));
-
-        if (episodeRequests.length > 0) {
-            console.log(`📡 [History] Making bulk request for ${episodeRequests.length} episode details...`);
-            const episodeResponse = await fetch(`${API_BASE_URL}/tmdb/bulk-episodes`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ requests: episodeRequests })
-            });
-
-            if (episodeResponse.ok) {
-                const bulkEpisodes = await episodeResponse.json();
-                const episodeMap = bulkEpisodes.reduce((acc, ep) => {
-                    if (ep.success) {
-                        acc[`${ep.id}-${ep.season}-${ep.episode}`] = ep.data;
-                    }
-                    return acc;
-                }, {});
-
-                // Add episode details to the main history object
-                detailedHistory.forEach((item, index) => {
-                    if (item.media_type === 'tv' && item.season_number && item.episode_number) {
-                        const episodeDetails = episodeMap[`${item.media_id}-${item.season_number}-${item.episode_number}`];
-                        if (episodeDetails) {
-                            detailedHistory[index] = {
-                                ...item,
-                                episode_name: episodeDetails.name,
-                                still_path: episodeDetails.still_path,
-                                episode_overview: episodeDetails.overview
-                            };
-                        }
-                    }
-                });
-                console.log(`📺 [History] Successfully merged ${Object.keys(episodeMap).length} episode details.`);
-            } else {
-                console.error(`❌ [History] Bulk episode fetch failed: ${episodeResponse.statusText}`);
-            }
-        }
+        const episodeMap = await bulkFetchEpisodeDetails(paginatedData);
+        const detailedHistory = combineHistoryWithDetails(paginatedData, detailsMap, episodeMap);
 
         console.log(`🏁 [History] Finished processing batch. Returning ${detailedHistory.length} detailed history items.`);
         return detailedHistory;
@@ -262,117 +312,15 @@ export const getFullWatchHistory = async (userId) => {
 
         console.log(`✅ [History] Successfully fetched ${historyData.length} raw history items.`);
 
-        // Bulk fetch TMDB details
-        const requests = historyData.map(item => ({
-            type: item.media_type,
-            id: item.media_id
-        }));
-        
-        console.log(`📡 [History] Making bulk request for ${requests.length} TMDB details...`);
-        const response = await fetch(`${API_BASE_URL}/tmdb/bulk`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ requests })
-        });
-
-        if (!response.ok) {
-            console.error(`❌ [History] Bulk TMDB request failed: ${response.statusText}`);
-            // Return raw data so the UI can still display something
+        // Use shared bulk fetch utilities
+        const detailsMap = await bulkFetchTMDBDetails(historyData);
+        if (Object.keys(detailsMap).length === 0) {
+            // Return raw data if bulk fetch failed
             return historyData;
         }
 
-        const bulkDetails = await response.json();
-        const detailsMap = bulkDetails.reduce((acc, detail) => {
-            if (detail.success) {
-                acc[`${detail.type}-${detail.id}`] = detail.data;
-            }
-            return acc;
-        }, {});
-
-        console.log(`🗺️ [History] Successfully fetched and mapped ${Object.keys(detailsMap).length} TMDB details.`);
-
-        // Combine history data with TMDB details
-        const detailedHistory = historyData.map(item => {
-            const details = detailsMap[`${item.media_type}-${item.media_id}`];
-            if (details) {
-                return {
-                    ...details, // Spread the TMDB details (title, poster_path, etc.)
-                    id: details.id,
-                    watch_id: `${item.user_id}-${item.media_id}-${item.media_type}-${item.season_number || 0}-${item.episode_number || 0}`,
-                    type: item.media_type,
-                    media_type: item.media_type,
-                    media_id: item.media_id,
-                    season_number: item.season_number,
-                    episode_number: item.episode_number,
-                    watched_at: item.watched_at,
-                    progress_seconds: item.progress_seconds,
-                    duration_seconds: item.duration_seconds
-                };
-            }
-            // Return a fallback object if TMDB details are missing
-            return {
-                id: item.media_id,
-                watch_id: `${item.user_id}-${item.media_id}-${item.media_type}-${item.season_number || 0}-${item.episode_number || 0}`,
-                type: item.media_type,
-                media_type: item.media_type,
-                media_id: item.media_id,
-                season_number: item.season_number,
-                episode_number: item.episode_number,
-                watched_at: item.watched_at,
-                title: 'Unknown Title',
-                poster_path: null,
-                overview: 'Details not available.',
-                _failed_to_load: true,
-                progress_seconds: item.progress_seconds,
-                duration_seconds: item.duration_seconds
-            };
-        });
-
-        // Fetch episode-specific details for TV shows in a second bulk request
-        const episodeRequests = detailedHistory
-            .filter(item => item.media_type === 'tv' && item.season_number && item.episode_number)
-            .map(item => ({
-                id: item.media_id,
-                season: item.season_number,
-                episode: item.episode_number
-            }));
-
-        if (episodeRequests.length > 0) {
-            console.log(`📡 [History] Making bulk request for ${episodeRequests.length} episode details...`);
-            const episodeResponse = await fetch(`${API_BASE_URL}/tmdb/bulk-episodes`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ requests: episodeRequests })
-            });
-
-            if (episodeResponse.ok) {
-                const bulkEpisodes = await episodeResponse.json();
-                const episodeMap = bulkEpisodes.reduce((acc, ep) => {
-                    if (ep.success) {
-                        acc[`${ep.id}-${ep.season}-${ep.episode}`] = ep.data;
-                    }
-                    return acc;
-                }, {});
-
-                // Add episode details to the main history object
-                detailedHistory.forEach((item, index) => {
-                    if (item.media_type === 'tv' && item.season_number && item.episode_number) {
-                        const episodeDetails = episodeMap[`${item.media_id}-${item.season_number}-${item.episode_number}`];
-                        if (episodeDetails) {
-                            detailedHistory[index] = {
-                                ...item,
-                                episode_name: episodeDetails.name,
-                                still_path: episodeDetails.still_path,
-                                episode_overview: episodeDetails.overview
-                            };
-                        }
-                    }
-                });
-                console.log(`📺 [History] Successfully merged ${Object.keys(episodeMap).length} episode details.`);
-            } else {
-                console.error(`❌ [History] Bulk episode fetch failed: ${episodeResponse.statusText}`);
-            }
-        }
+        const episodeMap = await bulkFetchEpisodeDetails(historyData);
+        const detailedHistory = combineHistoryWithDetails(historyData, detailsMap, episodeMap);
 
         console.log(`🏁 [History] Finished processing. Returning ${detailedHistory.length} detailed history items.`);
         return detailedHistory;
@@ -502,23 +450,23 @@ export const getContinueWatching = async (userId) => {
                     const completion = progress_seconds / duration_seconds;
                     if (completion >= 0.98) {
                         // Episode is completed, try to find the next episode
-                        console.log(`🎯 Episode S${season_number}E${episode_number} is completed (${(completion * 100).toFixed(1)}%), finding next episode...`);
-                        const nextEpisode = await getNextEpisode(entry.media_id, season_number, episode_number, media_type);
-                        
-                        if (nextEpisode) {
-                            // Return entry with next episode info
-                            console.log(`➡️ Advancing to next episode: S${nextEpisode.season}E${nextEpisode.episode}`);
-                            return {
-                                ...entry,
-                                season_number: nextEpisode.season,
-                                episode_number: nextEpisode.episode,
-                                progress_seconds: 0, // Reset progress for new episode
-                                duration_seconds: null // Will be set when episode is played
-                            };
-                        } else {
-                            // No next episode available, series is finished
-                            console.log(`🏁 Series completed, removing from continue watching`);
-                            return null;
+                    console.log(`🎯 Episode S${season_number}E${episode_number} is completed (${(completion * 100).toFixed(1)}%), finding next episode...`);
+                    const nextEpisode = await getNextEpisode(entry.media_id, season_number, episode_number, media_type);
+                    
+                    if (nextEpisode) {
+                        // Return entry with next episode info
+                        console.log(`➡️ Advancing to next episode: S${nextEpisode.season}E${nextEpisode.episode}`);
+                        return {
+                            ...entry,
+                            season_number: nextEpisode.season,
+                            episode_number: nextEpisode.episode,
+                            progress_seconds: 0, // Reset progress for new episode
+                            duration_seconds: null // Will be set when episode is played
+                        };
+                    } else {
+                        // No next episode available, series is finished
+                        console.log(`🏁 Series completed, removing from continue watching`);
+                        return null;
                         }
                     }
                 }
@@ -528,8 +476,8 @@ export const getContinueWatching = async (userId) => {
                 if (progress_seconds && duration_seconds > 0) {
                     const completion = progress_seconds / duration_seconds;
                     if (completion >= 0.95) {
-                        // Movie is likely finished, exclude it from "Continue Watching"
-                        return null;
+                    // Movie is likely finished, exclude it from "Continue Watching"
+                    return null;
                     }
                 }
                 return entry;
@@ -544,54 +492,28 @@ export const getContinueWatching = async (userId) => {
         
         console.log(`📺 Found ${validItems.length} valid continue watching entries`);
 
-        // 7. NEW: Bulk fetch TMDB details for the final list to fix N+1 problem.
-        const requests = validItems.map(entry => ({
-            type: entry.media_type,
-            id: entry.media_id
-        }));
-
+        // 7. Bulk fetch TMDB details for the final list using shared utilities
+        const detailsMap = await bulkFetchTMDBDetails(validItems);
+        
         let detailedItems = [];
-        if (requests.length > 0) {
-            try {
-                const response = await fetch(`${API_BASE_URL}/tmdb/bulk`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ requests })
-                });
-
-                if (response.ok) {
-                    const bulkDetails = await response.json();
-                    // Create a map for quick lookup
-                    const detailsMap = bulkDetails.reduce((acc, detail) => {
-                        if (detail.success) {
-                            acc[`${detail.type}-${detail.id}`] = detail.data;
-                        }
-                        return acc;
-                    }, {});
-
-                    // Re-associate bulk details with original watch history items
-                    detailedItems = validItems.map(entry => {
-                        const details = detailsMap[`${entry.media_type}-${entry.media_id}`];
-                        if (details) {
-                            return {
-                                ...details,
-                                type: entry.media_type,
-                                progress_seconds: entry.progress_seconds,
-                                duration_seconds: entry.duration_seconds,
-                                season_number: entry.season_number,
-                                episode_number: entry.episode_number,
-                                updated_at: entry.watched_at,
-                                media_id: entry.media_id
-                            };
-                        }
-                        return null; // In case a single item failed
-                    }).filter(Boolean);
-                } else {
-                     console.error('Error fetching bulk TMDB details:', response.statusText);
+        if (Object.keys(detailsMap).length > 0) {
+            // Re-associate bulk details with original watch history items
+            detailedItems = validItems.map(entry => {
+                const details = detailsMap[`${entry.media_type}-${entry.media_id}`];
+                if (details) {
+                    return {
+                        ...details,
+                        type: entry.media_type,
+                        progress_seconds: entry.progress_seconds,
+                        duration_seconds: entry.duration_seconds,
+                        season_number: entry.season_number,
+                        episode_number: entry.episode_number,
+                        updated_at: entry.watched_at,
+                        media_id: entry.media_id
+                    };
                 }
-            } catch (e) {
-                console.error('Error in bulk fetching TMDB details:', e);
-            }
+                return null; // In case a single item failed
+            }).filter(Boolean);
         }
         
         console.log(`🎬 Returning ${detailedItems.length} continue watching items`);

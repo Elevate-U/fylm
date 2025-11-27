@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+@import './styles/miniPlayer.css';
 
 /* ===== LIQUID GLASSMORPHIC DESIGN SYSTEM 2025 ===== */
 /* Inspired by Apple's Liquid Glass Technology */
@@ -298,18 +299,18 @@ body {
 main {
   flex: 1;
   width: 100%;
-  padding-top: 50px; /* Account for fixed header height */
+  padding-top: calc(50px + env(safe-area-inset-top, 0px)); /* Account for fixed header height */
 }
 
 @media (max-width: 1000px) {
   main {
-    padding-top: 65px; /* Reduced padding for mobile header */
+    padding-top: calc(65px + env(safe-area-inset-top, 0px)); /* Reduced padding for mobile header */
   }
 }
 
 @media (max-width: 480px) {
   main {
-    padding-top: 65px; /* Further reduced for very small screens */
+    padding-top: calc(65px + env(safe-area-inset-top, 0px)); /* Further reduced for very small screens */
   }
 }
 

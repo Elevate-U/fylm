@@ -6,6 +6,7 @@ import { useStore } from '../store';
 import MovieCard from '../components/MovieCard';
 import { getWatchProgressForMedia, saveWatchProgress, getSeriesHistory, getLastWatchedEpisode, getLastWatchedEpisodeWithProgress, syncOfflineProgress } from '../utils/watchHistory';
 import { useAuth } from '../context/Auth';
+import { useMiniPlayer } from '../context/MiniPlayer';
 import { addFavoriteShow, removeFavoriteShow } from '../utils/favorites';
 import './Watch.css';
 import { API_BASE_URL, IMAGE_BASE_URL, getProxiedImageUrl } from '../config';
@@ -65,11 +66,13 @@ const Watch = (props) => {
     const lastHistoryUpdateRef = useRef({});
     const lastProgressSaveTime = useRef(0); // For throttling
     const pendingSaveTimeout = useRef(null); // For debouncing
+    const currentProgressRef = useRef({ progress: 0, duration: 0 }); // Track current progress for MiniPlayer
 
     const { user, session } = useAuth(); // Get authentication state
     const userId = user?.id;
     const tmdbType = 'tv'; // Always use 'tv' for TMDB anime lookups
-    
+    const { openMiniPlayer, closeMiniPlayer, isActive: isMiniPlayerActive, isSupported: isMiniPlayerSupported } = useMiniPlayer();
+
     // Debug authentication status on component load
     useEffect(() => {
         const checkAuthStatus = async () => {
@@ -124,14 +127,14 @@ const Watch = (props) => {
     // Calculate and set initial episode page based on current episode
     const calculateInitialEpisodePage = useCallback((targetEpisode, totalEpisodes) => {
         if (!targetEpisode || !totalEpisodes) return 1;
-        
+
         const page = Math.ceil(targetEpisode / episodesPerPage);
         return Math.max(1, Math.min(page, Math.ceil(totalEpisodes / episodesPerPage)));
     }, [episodesPerPage]);
 
     // Create stable user ID reference to prevent unnecessary re-renders
     const userIdRef = useRef(userId);
-    
+
     // Update ref when userId changes but don't trigger re-renders
     useEffect(() => {
         userIdRef.current = userId;
@@ -169,10 +172,10 @@ const Watch = (props) => {
     // Handle fullscreen events to refresh auth when entering/exiting fullscreen
     useEffect(() => {
         const handleFullscreenChange = async () => {
-            const isFullscreen = document.fullscreenElement || 
-                               document.webkitFullscreenElement || 
-                               document.mozFullScreenElement;
-            
+            const isFullscreen = document.fullscreenElement ||
+                document.webkitFullscreenElement ||
+                document.mozFullScreenElement;
+
             if (isFullscreen) {
                 console.log('📱 Entered fullscreen mode');
                 // Note: Session management is handled by Auth context
@@ -200,11 +203,11 @@ const Watch = (props) => {
                 });
             }
         };
-        
+
         document.addEventListener('fullscreenchange', handleFullscreenChange);
         document.addEventListener('webkitfullscreenchange', handleFullscreenChange);
         document.addEventListener('mozfullscreenchange', handleFullscreenChange);
-        
+
         return () => {
             document.removeEventListener('fullscreenchange', handleFullscreenChange);
             document.removeEventListener('webkitfullscreenchange', handleFullscreenChange);
@@ -217,19 +220,100 @@ const Watch = (props) => {
         if (mediaDetails) {
             setCurrentMediaItem({ ...mediaDetails, type });
         }
-        
+
         // When the component unmounts, clear the global state
         return () => {
             setCurrentMediaItem(null);
         };
     }, [mediaDetails, type, setCurrentMediaItem]);
 
+    // Handle mini-player activation on navigation away
+    useEffect(() => {
+        // Close mini-player when returning to the Watch page
+        if (isMiniPlayerActive) {
+            console.log('👁️ Watch page mounted, closing mini-player');
+            closeMiniPlayer();
+        }
+
+        // Capture refs early so they're available during cleanup
+        // This is crucial because refs get cleared during unmount
+        const captureRefs = () => {
+            return {
+                iframe: document.querySelector('iframe[title="Video Player"]'),
+                container: playerContainerRef.current
+            };
+        };
+
+        // Also handle component unmount for SPA navigation
+        return () => {
+            console.log('🚪 Watch component unmounting - checking mini-player conditions');
+
+            // Capture element references at cleanup time
+            const { iframe, container } = captureRefs();
+            const hasVideo = iframe && streamUrl && playerReady;
+
+            console.log('🔍 Mini-player pre-flight check:', {
+                hasIframe: !!iframe,
+                hasStreamUrl: !!streamUrl,
+                playerReady,
+                hasVideo,
+                isMiniPlayerSupported,
+                isMiniPlayerActive,
+                hasMediaDetails: !!mediaDetails,
+                hasContainer: !!container
+            });
+
+            if (hasVideo && isMiniPlayerSupported && !isMiniPlayerActive && mediaDetails && container) {
+                console.log('✅ All conditions met, activating mini-player');
+
+                // Prepare video information for mini-player
+                const videoInfo = {
+                    title: mediaDetails.title || mediaDetails.name || 'Video',
+                    url: window.location.href,
+                    type: type,
+                    id: id,
+                    season: currentSeason,
+                    id: id,
+                    season: currentSeason,
+                    episode: currentEpisode,
+                    progress: currentProgressRef.current?.progress || 0,
+                    duration: currentProgressRef.current?.duration || 0
+                };
+
+                console.log('📞 Calling openMiniPlayer with:', { videoInfo });
+                // Call synchronously during unmount
+                try {
+                    openMiniPlayer(iframe, container, videoInfo);
+                } catch (err) {
+                    console.error('❌ Failed to open mini-player:', err);
+                }
+            } else {
+                console.log('❌ Conditions NOT met for mini-player');
+                if (!container) {
+                    console.error('❌ Container not found - ref not attached to DOM element');
+                }
+            }
+        };
+    }, [
+        streamUrl,
+        playerReady,
+        isMiniPlayerSupported,
+        isMiniPlayerActive,
+        mediaDetails,
+        type,
+        id,
+        currentSeason,
+        currentEpisode,
+        openMiniPlayer,
+        closeMiniPlayer
+    ]);
+
     useEffect(() => {
         if (!id || !type) {
             route('/');
             return;
         }
-        
+
         // Determine the correct handling based on the type parameter
         if (type === 'anime') {
             // For anime route, we use the anilist ID directly, so tmdbId can be null initially.
@@ -284,27 +368,27 @@ const Watch = (props) => {
                 // Create abort controller for timeout handling
                 const controller = new AbortController();
                 const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
-                
+
                 // Fetch data with better error handling
                 const anilistId = id; // Use the raw ID from props for anime
-                
+
                 // Use enhanced endpoint for anime content
-                const detailsUrl = type === 'anime' 
-                    ? `${API_BASE_URL}/tmdb/anime/${anilistId}/enhanced` 
+                const detailsUrl = type === 'anime'
+                    ? `${API_BASE_URL}/tmdb/anime/${anilistId}/enhanced`
                     : `${API_BASE_URL}/tmdb/${mediaType}/${tmdbId}`;
-                
+
                 // Videos are now included in enhanced endpoint for anime
-                const videosUrl = type === 'anime' 
+                const videosUrl = type === 'anime'
                     ? null // Will get videos from enhanced endpoint
                     : `${API_BASE_URL}/tmdb/${mediaType}/${tmdbId}/videos`;
-                
-                const recommendationsUrl = type === 'anime' 
-                    ? `${API_BASE_URL}/tmdb/anime/${anilistId}/recommendations` 
+
+                const recommendationsUrl = type === 'anime'
+                    ? `${API_BASE_URL}/tmdb/anime/${anilistId}/recommendations`
                     : `${API_BASE_URL}/tmdb/${mediaType}/${tmdbId}/recommendations`;
 
                 const fetchData = async (url, errorMessage) => {
                     if (!url) return null; // Skip null URLs
-                    
+
                     try {
                         const res = await fetch(url, { signal: controller.signal });
                         if (!res.ok) throw new Error(`HTTP ${res.status}: ${res.statusText}`);
@@ -332,7 +416,7 @@ const Watch = (props) => {
                 // For anime, fetch enhanced data only
                 // For non-anime, fetch details and videos separately
                 let detailsData, videosData, recommendationsData;
-                
+
                 if (type === 'anime') {
                     detailsData = await fetchData(detailsUrl, 'Error fetching anime details');
                     videosData = { results: detailsData?.videos?.results || [] };
@@ -344,12 +428,12 @@ const Watch = (props) => {
                         fetchData(recommendationsUrl, 'Error fetching recommendations')
                     ]);
                 }
-                
+
                 clearTimeout(timeoutId);
                 setMediaDetails(detailsData);
                 setVideos(videosData.results || []);
                 setRecommendations(recommendationsData.results || []);
-                
+
                 // Season and episode initialization is now handled in a separate effect
             } catch (error) {
                 setMediaDetails(null);
@@ -374,12 +458,12 @@ const Watch = (props) => {
                 }
                 return;
             }
-            
+
             try {
                 // Only fetch user-specific data when user is authenticated
                 if ((type === 'tv' || type === 'anime') && mediaDetails.seasons && mediaDetails.seasons.length > 0) {
                     const hasExplicitEpisode = season && episode && !isNaN(parseInt(season)) && !isNaN(parseInt(episode));
-                    
+
                     // Modified logic: Always try to get continue watching when no explicit episode in URL
                     if (!hasExplicitEpisode && !hasLoadedResumeData.current && currentSeason !== null && currentEpisode !== null) {
                         console.log('🎬 Checking for continue watching episode...');
@@ -400,13 +484,13 @@ const Watch = (props) => {
                         hasLoadedResumeData.current = true;
                     }
                 }
-                
+
                 if (type === 'tv' || type === 'anime') {
                     const history = await getSeriesHistory(userId, id, tmdbType);
                     console.log(`📺 [Watch] Series history loaded for ${type} ${id}:`, history);
                     setSeriesWatchHistory(history);
                 }
-                
+
                 // Load progress data for all media types
                 const progressData = await getWatchProgressForMedia(userId, id, type);
                 console.log('Progress data loaded:', progressData);
@@ -415,7 +499,7 @@ const Watch = (props) => {
                 console.error('Error loading user-specific data:', error);
             }
         };
-        
+
         loadUserSpecificData();
     }, [userId, mediaDetails, id, type, season, episode, tmdbType]); // Remove season and episode from dependencies to prevent re-running when user changes selection
 
@@ -442,21 +526,21 @@ const Watch = (props) => {
                 const url = type === 'anime' ?
                     `${API_BASE_URL}/tmdb/anime/${mediaIdForRequest}/season/${currentSeason}` :
                     `${API_BASE_URL}/tmdb/${mediaType}/${mediaIdForRequest}/season/${currentSeason}`;
-                
+
                 const response = await fetch(url);
                 if (!response.ok) {
                     throw new Error(`Failed to fetch season details: ${response.statusText}`);
                 }
                 const data = await response.json();
-                    setSeasonDetails(data);
-                    
+                setSeasonDetails(data);
+
                 // If this is the initial load, set the episode page based on the current episode
                 if (!initialPageSet) {
                     const totalEpisodes = data.episodes.length;
                     const page = calculateInitialEpisodePage(currentEpisode, totalEpisodes);
                     setCurrentEpisodePage(page);
-                        setInitialPageSet(true);
-                    }
+                    setInitialPageSet(true);
+                }
 
             } catch (error) {
                 console.error("Error fetching season details:", error);
@@ -497,7 +581,7 @@ const Watch = (props) => {
             streamTimeoutRef.current = setTimeout(() => setStreamTimeoutError(true), 10000);
 
             const isAnimeMovie = type === 'anime' && mediaDetails && (!mediaDetails.seasons || mediaDetails.seasons.length === 0);
-            
+
             if ((type === 'tv' || type === 'anime') && !isAnimeMovie && (currentSeason === null || currentEpisode === null)) {
                 console.log("Season/episode not set, aborting stream URL fetch.");
                 clearTimeout(streamTimeoutRef.current);
@@ -507,21 +591,21 @@ const Watch = (props) => {
             try {
                 // Use `type` from props for the stream-url endpoint, `streamId` for the ID
                 let url = `${API_BASE_URL}/stream-url?type=${type}&id=${streamId}&source=${currentSource}`;
-            
-            if (type === 'tv' || (type === 'anime' && !isAnimeMovie)) {
-                url += `&season=${currentSeason}&episode=${currentEpisode}`;
-            }
-            
-            if (type === 'anime' && isDubbed) {
-                url += `&dub=true`;
-            }
-            
-            if (currentSource === 'videasy') {
-                if (progressToResume > 0) url += `&progress=${Math.round(progressToResume)}`;
-                if (type === 'tv' || type === 'anime') {
-                    url += `&nextEpisode=true&episodeSelector=true&autoplayNextEpisode=true`;
+
+                if (type === 'tv' || (type === 'anime' && !isAnimeMovie)) {
+                    url += `&season=${currentSeason}&episode=${currentEpisode}`;
                 }
-            }
+
+                if (type === 'anime' && isDubbed) {
+                    url += `&dub=true`;
+                }
+
+                if (currentSource === 'videasy') {
+                    if (progressToResume > 0) url += `&progress=${Math.round(progressToResume)}`;
+                    if (type === 'tv' || type === 'anime') {
+                        url += `&nextEpisode=true&episodeSelector=true&autoplayNextEpisode=true`;
+                    }
+                }
 
                 console.log(`Fetching stream URL: ${url}`);
                 const response = await fetch(url);
@@ -529,7 +613,7 @@ const Watch = (props) => {
                 const data = await response.json();
 
                 clearTimeout(streamTimeoutRef.current);
-                
+
                 if (data.url) {
                     console.log(`Stream URL generated: ${data.url}`);
                     setStreamUrl(data.url);
@@ -539,10 +623,10 @@ const Watch = (props) => {
                         setAvailableSources(data.availableSources);
                     }
                     if (data.currentSource) {
-                    sourceUpdatedFromBackend.current = true;
+                        sourceUpdatedFromBackend.current = true;
                         setCurrentSource(data.currentSource);
-                }
-                setStreamError(null);
+                    }
+                    setStreamError(null);
                     setPlayerReady(true);
                 } else {
                     throw new Error(data.message || 'No stream URL returned from API');
@@ -597,13 +681,13 @@ const Watch = (props) => {
     useEffect(() => {
         const currentUserId = userIdRef.current;
         if (currentUserId) {
-            console.log('🔐 Progress tracking setup:', { 
-                hasUser: true, 
-                userId: currentUserId, 
-                hasMediaDetails: !!mediaDetails 
+            console.log('🔐 Progress tracking setup:', {
+                hasUser: true,
+                userId: currentUserId,
+                hasMediaDetails: !!mediaDetails
             });
         }
-        
+
         if (!currentUserId || !mediaDetails) {
             if (currentUserId && !mediaDetails) {
                 console.log('⚠️ Progress tracking disabled - media details not yet available');
@@ -614,25 +698,33 @@ const Watch = (props) => {
         // This function will be called by the message event listener
         const handleProgressUpdate = async (progressData, messageType) => {
             console.log(`📊 Progress update received via ${messageType}: `, progressData);
-            
+
             // Determine the season and episode to save progress for.
             // Prioritize data from the event, then fall back to component state.
             const seasonToSave = progressData.season || currentSeason;
             const episodeToSave = progressData.episode || currentEpisode;
+
+            // Update ref for MiniPlayer
+            if (progressData && progressData.progress >= 0) {
+                currentProgressRef.current = {
+                    progress: progressData.progress,
+                    duration: progressData.duration
+                };
+            }
 
             if (progressData && progressData.progress >= 0 && progressData.duration > 0) {
                 const now = Date.now();
                 if (now - lastProgressSaveTime.current < 2000) { // Increased to 2-second throttle
                     return;
                 }
-                
+
                 // Clear any pending save to prevent duplicate calls
                 if (pendingSaveTimeout.current) {
                     clearTimeout(pendingSaveTimeout.current);
                 }
-                
+
                 lastProgressSaveTime.current = now;
-                
+
                 try {
                     console.log(`🎬 Attempting to save progress for ${type} ${id}:`, {
                         progress: progressData.progress,
@@ -640,7 +732,7 @@ const Watch = (props) => {
                         season: seasonToSave,
                         episode: episodeToSave
                     });
-                    
+
                     const saveResult = await saveWatchProgress(
                         currentUserId,
                         { ...mediaDetails, id: mediaDetails.id, type, season: seasonToSave, episode: episodeToSave },
@@ -668,7 +760,7 @@ const Watch = (props) => {
                         }
                         return false;
                     });
-                    
+
                     if (saveResult) {
                         console.log('✅ Progress saved successfully');
                         fetchContinueWatching(); // Refresh continue watching list
@@ -676,15 +768,15 @@ const Watch = (props) => {
                         // Update state in real-time only if the progress applies to the currently viewed item
                         if (seasonToSave === currentSeason && episodeToSave === currentEpisode) {
                             // Use the actual saved progress data if available, otherwise fall back to local data
-                            const progressToUse = (typeof saveResult === 'object' && saveResult.progress_seconds !== undefined) 
-                                ? saveResult 
+                            const progressToUse = (typeof saveResult === 'object' && saveResult.progress_seconds !== undefined)
+                                ? saveResult
                                 : {
                                     progress_seconds: progressData.progress,
                                     duration_seconds: progressData.duration
                                 };
-                            
+
                             console.log('📊 Using progress data for state update:', progressToUse);
-                            
+
                             if (type === 'movie') {
                                 setMovieProgress(progressToUse);
                             } else if (type === 'tv' || type === 'anime') {
@@ -693,7 +785,7 @@ const Watch = (props) => {
                                     const index = historyCopy.findIndex(
                                         h => h.season_number === seasonToSave && h.episode_number === episodeToSave
                                     );
-                                
+
                                     const newProgressData = {
                                         media_id: parseInt(id, 10),
                                         media_type: type,
@@ -702,13 +794,13 @@ const Watch = (props) => {
                                         progress_seconds: progressToUse.progress_seconds,
                                         duration_seconds: progressToUse.duration_seconds,
                                     };
-                                
+
                                     if (index > -1) {
                                         historyCopy[index] = { ...historyCopy[index], ...newProgressData };
                                     } else {
                                         historyCopy.push(newProgressData);
                                     }
-                                
+
                                     return historyCopy;
                                 });
                             }
@@ -759,7 +851,7 @@ const Watch = (props) => {
                 if (isIOS()) {
                     optimizeVideoForIOS(videoElement);
                 }
-                
+
                 const history = await getWatchProgressForMedia(userId, id, type, currentSeason, currentEpisode);
                 if (history && history.progress_seconds) {
                     videoElement.currentTime = history.progress_seconds;
@@ -772,12 +864,12 @@ const Watch = (props) => {
                     if (now - lastProgressSaveTime.current < 2000) { // Increased to 2-second throttle
                         return;
                     }
-                    
+
                     // Clear any pending save to prevent duplicate calls
                     if (pendingSaveTimeout.current) {
                         clearTimeout(pendingSaveTimeout.current);
                     }
-                    
+
                     lastProgressSaveTime.current = now;
 
                     const progressData = {
@@ -785,9 +877,9 @@ const Watch = (props) => {
                         duration: Math.round(videoElement.duration),
                         percentage: videoElement.duration > 0 ? (videoElement.currentTime / videoElement.duration) * 100 : 0
                     };
-                    
+
                     console.log(`🎬 Direct video - saving progress:`, progressData);
-                    
+
                     const saveResult = await saveWatchProgress(
                         userId,
                         { ...mediaDetails, id: mediaDetails.id, type, season: currentSeason, episode: currentEpisode },
@@ -796,18 +888,18 @@ const Watch = (props) => {
                         false, // forceHistoryEntry
                         session // Pass session from Auth context
                     );
-                    
+
                     if (saveResult) {
                         console.log('✅ Direct video progress saved successfully');
 
                         // Use the actual saved progress data if available, otherwise fall back to local data
-                        const progressToUse = (typeof saveResult === 'object' && saveResult.progress_seconds !== undefined) 
-                            ? saveResult 
+                        const progressToUse = (typeof saveResult === 'object' && saveResult.progress_seconds !== undefined)
+                            ? saveResult
                             : {
                                 progress_seconds: progressData.progress,
                                 duration_seconds: progressData.duration
                             };
-                        
+
                         console.log('📊 Using direct video progress data for state update:', progressToUse);
 
                         // Update state in real-time
@@ -819,7 +911,7 @@ const Watch = (props) => {
                                 const index = historyCopy.findIndex(
                                     h => h.season_number === currentSeason && h.episode_number === currentEpisode
                                 );
-                            
+
                                 const newProgressData = {
                                     media_id: parseInt(id, 10),
                                     media_type: type,
@@ -828,13 +920,13 @@ const Watch = (props) => {
                                     progress_seconds: progressToUse.progress_seconds,
                                     duration_seconds: progressToUse.duration_seconds,
                                 };
-                            
+
                                 if (index > -1) {
                                     historyCopy[index] = { ...historyCopy[index], ...newProgressData };
                                 } else {
                                     historyCopy.push(newProgressData);
                                 }
-                            
+
                                 return historyCopy;
                             });
                         }
@@ -859,7 +951,7 @@ const Watch = (props) => {
             messageListener = (event) => {
                 const trustedDomains = ['player.videasy.net', 'vidsrc.to', 'embed.su', 'vidsrc.xyz', 'vidsrc.in', 'vidsrc.pm'];
                 const origin = new URL(event.origin);
-                
+
                 if (!trustedDomains.includes(origin.hostname)) {
                     return;
                 }
@@ -883,7 +975,7 @@ const Watch = (props) => {
 
                     // Deprecated: Legacy `MEDIA_DATA` format for backward compatibility
                     if (data.type === 'MEDIA_DATA' && data.data) {
-                    
+
                         let mediaData = data.data;
                         if (typeof mediaData === 'string') {
                             try {
@@ -897,7 +989,7 @@ const Watch = (props) => {
                         // The data can be an object keyed by `tv-id`.
                         const mediaKey = `${type}-${id}`;
                         const media = mediaData[mediaKey];
-                        
+
                         if (media && media.progress) {
                             const normalizedProgress = {
                                 progress: media.progress.watched,
@@ -938,9 +1030,9 @@ const Watch = (props) => {
                     });
                 }
             };
-            
+
             window.addEventListener('message', messageListener);
-            
+
             // Fallback for players that don't send `player_ready` has been moved
             // to a dedicated useEffect hook that depends on streamUrl.
 
@@ -1015,7 +1107,7 @@ const Watch = (props) => {
                 <div class="loading-spinner"></div>
                 <p>Loading media details...</p>
                 <p>If your video doesnt load refresh the page or pick a new server.</p>
-                
+
             </div>
         );
     }
@@ -1031,8 +1123,8 @@ const Watch = (props) => {
                         <li>The content may no longer be available</li>
                         <li>Server maintenance</li>
                     </ul>
-                    <button 
-                        onClick={() => window.location.reload()} 
+                    <button
+                        onClick={() => window.location.reload()}
                         class="btn btn-primary"
                         style={{ marginTop: '20px' }}
                     >
@@ -1042,13 +1134,13 @@ const Watch = (props) => {
             </div>
         );
     }
-    
+
     const { title, name, overview, vote_average, release_date, first_air_date, last_air_date, runtime, number_of_seasons, genres, poster_path, status } = mediaDetails;
-    
+
     // Use AniList ID for anime, TMDB ID for others, and the correct type from props
     const favoritedId = type === 'anime' ? id : mediaDetails.id;
     const favorited = isShowFavorited(favoritedId, type);
-    
+
     const year = release_date || first_air_date ? new Date(release_date || first_air_date).getFullYear() : '';
 
     const handleFavoriteClick = () => {
@@ -1058,6 +1150,30 @@ const Watch = (props) => {
             removeFavoriteShow(itemToFavorite);
         } else {
             addFavoriteShow(itemToFavorite);
+        }
+    };
+
+    // Manual PiP Trigger
+    const handlePiPClick = async () => {
+        const iframe = document.querySelector('iframe[title="Video Player"]');
+        const video = document.querySelector('video');
+        const element = isDirectSource ? video : iframe;
+
+        if (element && playerContainerRef.current && mediaDetails) {
+            const videoInfo = {
+                title: mediaDetails.title || mediaDetails.name || 'Video',
+                url: window.location.href,
+                type: type,
+                id: id,
+                season: currentSeason,
+                episode: currentEpisode
+            };
+
+            if (isMiniPlayerActive) {
+                closeMiniPlayer();
+            } else {
+                await openMiniPlayer(element, playerContainerRef.current, videoInfo);
+            }
         }
     };
 
@@ -1082,24 +1198,24 @@ const Watch = (props) => {
                 </div>
             )}
 
-            <div class="player-container">
+            <div class="player-container" ref={playerContainerRef}>
                 {!streamUrl && streamError && (
                     <div class="stream-error-message">
                         <p>{streamError.message}</p>
                         {streamError.canRetry && (
                             <div class="error-actions">
-                                <button 
+                                <button
                                     onClick={async () => {
                                         setIsRetrying(true);
                                         // Wait a bit then retry
                                         setTimeout(() => {
                                             const fetchStreamUrl = async () => {
                                                 const url = `${API_BASE_URL}/stream-url?type=${type}&id=${id}&source=${currentSource}${(type === 'tv' || type === 'anime') ? `&season=${currentSeason}&episode=${currentEpisode}` : ''}${type === 'anime' ? `&dub=${isDubbed}` : ''}`;
-                                                
+
                                                 try {
                                                     const response = await fetch(url);
                                                     const streamUrlData = await response.json();
-                                                    
+
                                                     if (response.ok) {
                                                         setStreamUrl(streamUrlData.url);
                                                         setIsDirectSource(streamUrlData.isDirectSource);
@@ -1110,9 +1226,9 @@ const Watch = (props) => {
                                                     }
                                                 } catch (error) {
                                                     console.error('Retry failed:', error);
-                                                    setStreamError({ 
-                                                        message: "Retry failed. Please try selecting a different source.", 
-                                                        canRetry: true 
+                                                    setStreamError({
+                                                        message: "Retry failed. Please try selecting a different source.",
+                                                        canRetry: true
                                                     });
                                                 }
                                                 setIsRetrying(false);
@@ -1141,8 +1257,8 @@ const Watch = (props) => {
                     <div class="stream-error-message">
                         <p>Sorry, this episode failed to load. Please refresh the page.</p>
                         <div class="error-actions">
-                            <button 
-                                onClick={() => window.location.reload()} 
+                            <button
+                                onClick={() => window.location.reload()}
                                 class="btn retry-btn"
                             >
                                 Refresh
@@ -1152,12 +1268,12 @@ const Watch = (props) => {
                     </div>
                 )}
                 {isDirectSource ? (
-                    <video 
-                        ref={videoRef} 
-                        src={streamUrl} 
-                        controls 
-                        autoPlay 
-                        playsInline 
+                    <video
+                        ref={videoRef}
+                        src={streamUrl}
+                        controls
+                        autoPlay
+                        playsInline
                         preload="metadata"
                         width="100%"
                         style={{ maxWidth: '100%', height: 'auto' }}
@@ -1166,7 +1282,7 @@ const Watch = (props) => {
                     ></video>
                 ) : (
                     streamUrl && (
-                        <iframe 
+                        <iframe
                             src={streamUrl}
                             width="100%"
                             height="100%"
@@ -1181,7 +1297,7 @@ const Watch = (props) => {
                             onLoad={() => {
                                 console.log('🎬 Player iframe loaded');
                                 setPlayerReady(true);
-                                
+
                                 // Handle progress restoration via postMessage (only for non-Videasy sources)
                                 // Videasy handles progress natively via URL parameters for faster loading
                                 if (currentSource !== 'videasy' && progressToResume > 30) {
@@ -1217,13 +1333,13 @@ const Watch = (props) => {
                         {movieProgressPercent > 0 && (
                             <div class="movie-progress-container">
                                 <div class="movie-progress-bar">
-                                    <div 
-                                        class="movie-progress" 
+                                    <div
+                                        class="movie-progress"
                                         style={{ width: `${Math.max(2, movieProgressPercent)}%` }}
                                     ></div>
                                 </div>
                                 <div class="movie-progress-text">
-                                    {movieProgress.duration_seconds > 0 
+                                    {movieProgress.duration_seconds > 0
                                         ? `${Math.floor(movieProgress.progress_seconds / 60)}m / ${Math.floor(movieProgress.duration_seconds / 60)}m watched`
                                         : `${Math.floor(movieProgress.progress_seconds / 60)}m watched`
                                     }
@@ -1231,7 +1347,7 @@ const Watch = (props) => {
                             </div>
                         )}
                     </div>
-                                            <div class="details">
+                    <div class="details">
                         <div class="title-container">
                             <h1>{title || name}</h1>
                             <button
@@ -1247,6 +1363,15 @@ const Watch = (props) => {
                             >
                                 <i class="fas fa-film"></i> Trailer
                             </button>
+                            {isMiniPlayerSupported && (
+                                <button
+                                    onClick={handlePiPClick}
+                                    class={`favorite-btn pip-btn ${isMiniPlayerActive ? 'active' : ''}`}
+                                    title={isMiniPlayerActive ? "Close Mini Player" : "Open Mini Player"}
+                                >
+                                    <i class="fas fa-compress-alt"></i> {isMiniPlayerActive ? 'Close PiP' : 'Mini Player'}
+                                </button>
+                            )}
                             {!user && (
                                 <span class="login-hint">
                                     <small>
@@ -1280,7 +1405,7 @@ const Watch = (props) => {
                                     })()}
                                 </span>
                             )}
-                            
+
                             {runtime && <span>{runtime} min</span>}
                             {number_of_seasons && <span>{number_of_seasons} Seasons</span>}
                         </div>
@@ -1292,7 +1417,7 @@ const Watch = (props) => {
                             <div class="quality-selector">
                                 <label>Quality:</label>
                                 {qualities.map(q => (
-                                    <button 
+                                    <button
                                         class={`quality-btn ${streamUrl === q.url ? 'active' : ''}`}
                                         onClick={() => setStreamUrl(q.url)}
                                     >
@@ -1303,7 +1428,7 @@ const Watch = (props) => {
                         )}
                     </div>
                 </div>
-                
+
                 {type === 'anime' && (
                     <div class="select-container">
                         <label for="dub-select">Audio:</label>
@@ -1344,7 +1469,7 @@ const Watch = (props) => {
                         </div>
                     )}
                     {availableSources.length > 1 && (
-                         <div class="select-container">
+                        <div class="select-container">
                             <label>Source:</label>
                             <div class="selector-buttons">
                                 {availableSources.map(source => (
@@ -1376,7 +1501,7 @@ const Watch = (props) => {
                                             const episodeHistory = seriesWatchHistory.find(
                                                 h => h.season_number === currentSeason && h.episode_number === episode.episode_number
                                             );
-                                            
+
                                             // Calculate progress percentage with better error handling and fallback
                                             const progressPercent = (() => {
                                                 if (episodeHistory && episodeHistory.progress_seconds > 0) {
@@ -1400,7 +1525,7 @@ const Watch = (props) => {
                                             }
 
                                             return (
-                                                <div 
+                                                <div
                                                     key={episode.id}
                                                     class={`episode-card ${episode.episode_number === currentEpisode ? 'active' : ''}`}
                                                     onClick={() => {
@@ -1417,10 +1542,10 @@ const Watch = (props) => {
                                                         {progressPercent > 0 && (
                                                             <div class="episode-progress-container">
                                                                 <div class="episode-progress-bar">
-                                                                    <div class="episode-progress" style={{width: `${Math.max(2, progressPercent)}%`}}></div>
+                                                                    <div class="episode-progress" style={{ width: `${Math.max(2, progressPercent)}%` }}></div>
                                                                 </div>
                                                                 <div class="episode-progress-text">
-                                                                    {episodeHistory && episodeHistory.duration_seconds > 0 
+                                                                    {episodeHistory && episodeHistory.duration_seconds > 0
                                                                         ? `${Math.floor(episodeHistory.progress_seconds / 60)}m / ${Math.floor(episodeHistory.duration_seconds / 60)}m`
                                                                         : `${Math.floor(episodeHistory.progress_seconds / 60)}m watched`
                                                                     }
@@ -1453,30 +1578,30 @@ const Watch = (props) => {
 
                                 {/* Pagination Controls */}
                                 {seasonDetails?.episodes && seasonDetails.episodes.length > episodesPerPage && (() => {
-                        const totalPages = Math.ceil(seasonDetails.episodes.length / episodesPerPage);
-                        const pagesPerPagination = 10;
-                        const totalPaginationPages = Math.ceil(totalPages / pagesPerPagination);
-                        const startPage = (paginationPage - 1) * pagesPerPagination + 1;
-                        const endPage = Math.min(startPage + pagesPerPagination - 1, totalPages);
-                        
-                        const pageNumbers = Array.from({ length: (endPage - startPage + 1) }, (_, i) => startPage + i);
+                                    const totalPages = Math.ceil(seasonDetails.episodes.length / episodesPerPage);
+                                    const pagesPerPagination = 10;
+                                    const totalPaginationPages = Math.ceil(totalPages / pagesPerPagination);
+                                    const startPage = (paginationPage - 1) * pagesPerPagination + 1;
+                                    const endPage = Math.min(startPage + pagesPerPagination - 1, totalPages);
 
-                        return (
-                                    <div class="pagination-controls">
-                                        {paginationPage > 1 && <button onClick={() => setPaginationPage(p => p - 1)}><i class="fas fa-angle-double-left"></i></button>}
-                                        {pageNumbers.map(number => (
-                                            <button
-                                                key={number}
-                                                class={currentEpisodePage === number ? 'active' : ''}
-                                                onClick={() => setCurrentEpisodePage(number)}
-                                            >
-                                                {number}
-                                            </button>
-                                        ))}
-                                        {paginationPage < totalPaginationPages && <button onClick={() => setPaginationPage(p => p + 1)}><i class="fas fa-angle-double-right"></i></button>}
-                                    </div>
-                        );
-                    })()}
+                                    const pageNumbers = Array.from({ length: (endPage - startPage + 1) }, (_, i) => startPage + i);
+
+                                    return (
+                                        <div class="pagination-controls">
+                                            {paginationPage > 1 && <button onClick={() => setPaginationPage(p => p - 1)}><i class="fas fa-angle-double-left"></i></button>}
+                                            {pageNumbers.map(number => (
+                                                <button
+                                                    key={number}
+                                                    class={currentEpisodePage === number ? 'active' : ''}
+                                                    onClick={() => setCurrentEpisodePage(number)}
+                                                >
+                                                    {number}
+                                                </button>
+                                            ))}
+                                            {paginationPage < totalPaginationPages && <button onClick={() => setPaginationPage(p => p + 1)}><i class="fas fa-angle-double-right"></i></button>}
+                                        </div>
+                                    );
+                                })()}
                             </>
                         )}
                     </div>
@@ -1487,10 +1612,10 @@ const Watch = (props) => {
                         <h2>More Like This</h2>
                         <div class="movie-grid">
                             {recommendations.map(item => (
-                                <MovieCard 
+                                <MovieCard
                                     key={`${item.media_type || type}-${item.id}`}
-                                    item={item} 
-                                    type={type} 
+                                    item={item}
+                                    type={type}
                                     progress={null}
                                     duration={null}
                                 />

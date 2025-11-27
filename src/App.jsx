@@ -3,6 +3,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { Router } from 'preact-router';
 import { createHashHistory } from 'history';
 import { AuthProvider, useAuth } from './context/Auth';
+import { MiniPlayerProvider } from './context/MiniPlayer';
 import { Toaster } from './components/Toast';
 import { initializeTheme } from './utils/themeUtils';
 import { useStore } from './store';
@@ -178,7 +179,9 @@ const App = () => {
 
     return (
         <AuthProvider>
-            <MainApp />
+            <MiniPlayerProvider>
+                <MainApp />
+            </MiniPlayerProvider>
         </AuthProvider>
     );
 };

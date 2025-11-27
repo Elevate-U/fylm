@@ -393,14 +393,6 @@ const Header = () => {
                 <div 
                     ref={profileDropdownRef}
                     class="profile-dropdown"
-                    style={{
-                        position: 'fixed',
-                        top: '60px',
-                        right: '20px',
-                        zIndex: 9999,
-                        backdropFilter: 'blur(24px) saturate(180%)',
-                        WebkitBackdropFilter: 'blur(24px) saturate(180%)'
-                    }}
                 >
                     <Link href="/profile" onClick={closeMenu} class="dropdown-profile-header-link">
                         <div class="dropdown-profile-header">

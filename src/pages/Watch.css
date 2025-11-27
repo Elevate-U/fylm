@@ -1127,6 +1127,19 @@
     border-radius: 12px; /* Add this line */
 }
 
+.pip-btn {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.pip-btn.active {
+    background: linear-gradient(135deg, 
+        rgba(var(--primary-rgb), 0.4) 0%, 
+        rgba(var(--primary-rgb), 0.2) 100%);
+    border-color: var(--primary);
+    color: var(--primary);
+}
 
 
 .trailer-modal {
