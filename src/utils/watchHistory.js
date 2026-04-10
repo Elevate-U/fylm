@@ -19,31 +19,31 @@ const bulkFetchTMDBDetails = async (historyData) => {
         type: item.media_type,
         id: item.media_id
     }));
-    
-    console.log(`📡 [Bulk] Making bulk request for ${requests.length} TMDB details...`);
-    
-    try {
-    const response = await fetch(`${API_BASE_URL}/tmdb/bulk`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requests })
-    });
 
-    if (!response.ok) {
+    console.log(`📡 [Bulk] Making bulk request for ${requests.length} TMDB details...`);
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/tmdb/bulk`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requests })
+        });
+
+        if (!response.ok) {
             console.error(`❌ [Bulk] TMDB request failed: ${response.statusText}`);
             return {};
-    }
-
-    const bulkDetails = await response.json();
-    const detailsMap = bulkDetails.reduce((acc, detail) => {
-        if (detail.success) {
-            acc[`${detail.type}-${detail.id}`] = detail.data;
         }
-        return acc;
-    }, {});
+
+        const bulkDetails = await response.json();
+        const detailsMap = bulkDetails.reduce((acc, detail) => {
+            if (detail.success) {
+                acc[`${detail.type}-${detail.id}`] = detail.data;
+            }
+            return acc;
+        }, {});
 
         console.log(`🗺️ [Bulk] Successfully fetched and mapped ${Object.keys(detailsMap).length} TMDB details.`);
-    return detailsMap;
+        return detailsMap;
     } catch (error) {
         console.error('❌ [Bulk] Error fetching TMDB details:', error);
         return {};
@@ -69,26 +69,26 @@ const bulkFetchEpisodeDetails = async (historyData) => {
     }
 
     console.log(`📡 [Bulk] Making bulk request for ${episodeRequests.length} episode details...`);
-    
-    try {
-    const episodeResponse = await fetch(`${API_BASE_URL}/tmdb/bulk-episodes`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ requests: episodeRequests })
-    });
 
-    if (!episodeResponse.ok) {
+    try {
+        const episodeResponse = await fetch(`${API_BASE_URL}/tmdb/bulk-episodes`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ requests: episodeRequests })
+        });
+
+        if (!episodeResponse.ok) {
             console.error(`❌ [Bulk] Episode fetch failed: ${episodeResponse.statusText}`);
             return {};
-    }
-
-    const bulkEpisodes = await episodeResponse.json();
-    const episodeMap = bulkEpisodes.reduce((acc, ep) => {
-        if (ep.success) {
-            acc[`${ep.id}-${ep.season}-${ep.episode}`] = ep.data;
         }
-        return acc;
-    }, {});
+
+        const bulkEpisodes = await episodeResponse.json();
+        const episodeMap = bulkEpisodes.reduce((acc, ep) => {
+            if (ep.success) {
+                acc[`${ep.id}-${ep.season}-${ep.episode}`] = ep.data;
+            }
+            return acc;
+        }, {});
 
         console.log(`📺 [Bulk] Successfully merged ${Object.keys(episodeMap).length} episode details.`);
         return episodeMap;
@@ -108,7 +108,7 @@ const bulkFetchEpisodeDetails = async (historyData) => {
 const combineHistoryWithDetails = (historyData, detailsMap, episodeMap = {}) => {
     return historyData.map(item => {
         const details = detailsMap[`${item.media_type}-${item.media_id}`];
-        
+
         let combined = {
             id: item.media_id,
             watch_id: `${item.user_id}-${item.media_id}-${item.media_type}-${item.season_number || 0}-${item.episode_number || 0}`,
@@ -188,7 +188,7 @@ const callSaveProgressDirect = async (progressData, session) => {
             throw new Error(`Direct RPC failed: HTTP ${res.status} ${text}`);
         }
         let data = null;
-        try { data = await res.json(); } catch (_) {}
+        try { data = await res.json(); } catch (_) { }
         console.log('🧪 Direct RPC (fetch) succeeded');
         return { data, error: null };
     } catch (e) {
@@ -200,26 +200,26 @@ const callSaveProgressDirect = async (progressData, session) => {
 // Helper function to recover from GoTrueClient lock issues
 const recoverFromAuthLock = async () => {
     const now = Date.now();
-    
+
     // Reset failure count if enough time has passed
     if (now - lastAuthFailure > AUTH_FAILURE_RESET_TIME) {
         authFailureCount = 0;
     }
-    
+
     // Skip recovery if we've failed too many times recently
     if (authFailureCount >= AUTH_FAILURE_THRESHOLD) {
         console.warn('🚫 Skipping auth recovery due to circuit breaker (too many recent failures)');
         return false;
     }
-    
+
     try {
         console.log('🔄 Attempting to recover from GoTrueClient lock...');
         // Force a new session check with a very short timeout
         const quickSessionPromise = supabase.auth.getSession();
-        const quickTimeoutPromise = new Promise((_, reject) => 
+        const quickTimeoutPromise = new Promise((_, reject) =>
             setTimeout(() => reject(new Error('Quick session check timeout')), 1000)
         );
-        
+
         await Promise.race([quickSessionPromise, quickTimeoutPromise]);
         console.log('✅ GoTrueClient lock recovery successful');
         authFailureCount = 0; // Reset on success
@@ -245,7 +245,7 @@ export const getBatchedWatchHistory = async (userId, offset = 0, limit = 10) => 
         }
 
         console.log(`🔄 [History] Fetching batched watch history (offset: ${offset}, limit: ${limit})...`);
-        
+
         // Get raw history data with pagination
         const { data: historyData, error: rpcError } = await supabase.rpc('get_watch_history_with_progress');
 
@@ -261,7 +261,7 @@ export const getBatchedWatchHistory = async (userId, offset = 0, limit = 10) => 
 
         // Apply pagination to the results
         const paginatedData = historyData.slice(offset, offset + limit);
-        
+
         if (paginatedData.length === 0) {
             console.log('📭 [History] No more items in this batch.');
             return [];
@@ -362,7 +362,18 @@ export const getWatchHistory = async (userId) => {
 export const getWatchProgressForMedia = async (userId, mediaId, mediaType, season, episode) => {
     try {
         if (!userId) {
-            console.log('No authenticated user, returning null progress');
+            console.log('No authenticated user, checking localStorage for progress');
+            try {
+                const key = `offline_progress_${mediaType}_${mediaId}_${season || 0}_${episode || 0}`;
+                const stored = localStorage.getItem(key);
+                if (stored) {
+                    const data = JSON.parse(stored);
+                    console.log('📱 Found offline progress in localStorage:', data);
+                    return data;
+                }
+            } catch (e) {
+                console.error('Error reading offline progress:', e);
+            }
             return null;
         }
 
@@ -372,7 +383,7 @@ export const getWatchProgressForMedia = async (userId, mediaId, mediaType, seaso
             .eq('user_id', userId)
             .eq('media_id', mediaId)
             .eq('media_type', mediaType);
-        
+
         if (mediaType !== 'movie') {
             query = query[
                 season == null ? 'is' : 'eq'
@@ -387,7 +398,7 @@ export const getWatchProgressForMedia = async (userId, mediaId, mediaType, seaso
             console.error('Error fetching watch progress:', error);
             return null;
         }
-        
+
         // Return the first result if it exists, otherwise null
         return data && data.length > 0 ? data[0] : null;
     } catch (error) {
@@ -443,30 +454,30 @@ export const getContinueWatching = async (userId) => {
         // 4. Process these latest entries to determine if they are "continuable".
         const continueWatchingItems = await Promise.all(latestEntries.map(async (entry) => {
             const { progress_seconds, duration_seconds, media_type, season_number, episode_number } = entry;
-            
+
             // For TV shows and anime, check if episode is completed and find next episode
             if ((media_type === 'tv' || media_type === 'anime') && season_number && episode_number) {
                 if (progress_seconds && duration_seconds > 0) {
                     const completion = progress_seconds / duration_seconds;
                     if (completion >= 0.98) {
                         // Episode is completed, try to find the next episode
-                    console.log(`🎯 Episode S${season_number}E${episode_number} is completed (${(completion * 100).toFixed(1)}%), finding next episode...`);
-                    const nextEpisode = await getNextEpisode(entry.media_id, season_number, episode_number, media_type);
-                    
-                    if (nextEpisode) {
-                        // Return entry with next episode info
-                        console.log(`➡️ Advancing to next episode: S${nextEpisode.season}E${nextEpisode.episode}`);
-                        return {
-                            ...entry,
-                            season_number: nextEpisode.season,
-                            episode_number: nextEpisode.episode,
-                            progress_seconds: 0, // Reset progress for new episode
-                            duration_seconds: null // Will be set when episode is played
-                        };
-                    } else {
-                        // No next episode available, series is finished
-                        console.log(`🏁 Series completed, removing from continue watching`);
-                        return null;
+                        console.log(`🎯 Episode S${season_number}E${episode_number} is completed (${(completion * 100).toFixed(1)}%), finding next episode...`);
+                        const nextEpisode = await getNextEpisode(entry.media_id, season_number, episode_number, media_type);
+
+                        if (nextEpisode) {
+                            // Return entry with next episode info
+                            console.log(`➡️ Advancing to next episode: S${nextEpisode.season}E${nextEpisode.episode}`);
+                            return {
+                                ...entry,
+                                season_number: nextEpisode.season,
+                                episode_number: nextEpisode.episode,
+                                progress_seconds: 0, // Reset progress for new episode
+                                duration_seconds: null // Will be set when episode is played
+                            };
+                        } else {
+                            // No next episode available, series is finished
+                            console.log(`🏁 Series completed, removing from continue watching`);
+                            return null;
                         }
                     }
                 }
@@ -476,25 +487,25 @@ export const getContinueWatching = async (userId) => {
                 if (progress_seconds && duration_seconds > 0) {
                     const completion = progress_seconds / duration_seconds;
                     if (completion >= 0.95) {
-                    // Movie is likely finished, exclude it from "Continue Watching"
-                    return null;
+                        // Movie is likely finished, exclude it from "Continue Watching"
+                        return null;
                     }
                 }
                 return entry;
             }
         }));
-        
+
         // Filter out null entries (completed series with no next episode)
         const validItems = continueWatchingItems.filter(Boolean);
-        
+
         // 6. Sort by `watched_at` to show the most recently watched items first.
         validItems.sort((a, b) => new Date(b.watched_at) - new Date(a.watched_at));
-        
+
         console.log(`📺 Found ${validItems.length} valid continue watching entries`);
 
         // 7. Bulk fetch TMDB details for the final list using shared utilities
         const detailsMap = await bulkFetchTMDBDetails(validItems);
-        
+
         let detailedItems = [];
         if (Object.keys(detailsMap).length > 0) {
             // Re-associate bulk details with original watch history items
@@ -515,7 +526,7 @@ export const getContinueWatching = async (userId) => {
                 return null; // In case a single item failed
             }).filter(Boolean);
         }
-        
+
         console.log(`🎬 Returning ${detailedItems.length} continue watching items`);
         return detailedItems;
 
@@ -543,12 +554,12 @@ export const saveWatchProgress = async (userId, item, progress, durationInSecond
                 };
                 localStorage.setItem(key, JSON.stringify(progressData));
                 console.log('📱 Progress saved to localStorage as fallback');
-                
+
                 // Schedule a retry when auth is restored
                 setTimeout(() => {
                     syncOfflineProgress(userId);
                 }, 10000);
-                
+
                 return true; // Return success even though it's just local
             } catch (localError) {
                 console.error('❌ Failed to save to localStorage:', localError);
@@ -579,7 +590,7 @@ export const saveWatchProgress = async (userId, item, progress, durationInSecond
     // Previously: We skipped RPCs in fullscreen and only saved locally. This caused
     // progress to stop syncing in fullscreen. We now always attempt the RPC first.
     // If the RPC later fails due to auth/network, we fall back to localStorage below.
-    
+
     // Serialize per media key to avoid overlapping RPCs
     const mediaKey = `${progressData.p_media_type}-${progressData.p_media_id}-${progressData.p_season_number || 0}-${progressData.p_episode_number || 0}`;
     // If a save is in-flight, store/replace the queued payload and return quickly; the runner will pick latest
@@ -599,40 +610,40 @@ export const saveWatchProgress = async (userId, item, progress, durationInSecond
 
     // Use provided session or fall back to checking auth status
     let session = userSession;
-    
+
     if (!session) {
         console.log('🔍 No session provided, checking authentication status...');
         try {
             const sessionPromise = supabase.auth.getSession();
-            const timeoutPromise = new Promise((_, reject) => 
+            const timeoutPromise = new Promise((_, reject) =>
                 setTimeout(() => reject(new Error('Session check timeout after 10 seconds')), 10000)
             );
-            
+
             const { data: { session: sessionData } } = await Promise.race([sessionPromise, timeoutPromise]);
             session = sessionData;
         } catch (sessionError) {
             console.error('❌ Session check failed or timed out:', sessionError);
-            
+
             // Attempt to recover from GoTrueClient lock
             console.log('🔄 Attempting GoTrueClient lock recovery...');
             const recovered = await recoverFromAuthLock();
             if (!recovered) {
                 console.log('⚠️ Recovery failed, proceeding with fallback methods');
             }
-            
+
             session = null;
         }
     } else {
         console.log('✅ Using provided session from Auth context');
     }
-    
+
     if (!session || !session.user || !session.access_token) {
         console.error('❌ No valid session found, cannot save progress via RPC');
-        console.log('Session details:', { 
-            hasSession: !!session, 
-            hasUser: !!(session?.user), 
+        console.log('Session details:', {
+            hasSession: !!session,
+            hasUser: !!(session?.user),
             hasToken: !!(session?.access_token),
-            userId: session?.user?.id 
+            userId: session?.user?.id
         });
         // Skip RPC and go directly to fallback
         console.log('⚠️ No valid session, attempting direct DB write fallback...');
@@ -646,7 +657,7 @@ export const saveWatchProgress = async (userId, item, progress, durationInSecond
         } catch (fallbackError) {
             console.error('❌ Direct DB write fallback failed:', fallbackError);
         }
-        
+
         // Store in localStorage as last resort
         try {
             const key = `offline_progress_${item.type}_${item.id}_${item.season || 0}_${item.episode || 0}`;
@@ -667,9 +678,9 @@ export const saveWatchProgress = async (userId, item, progress, durationInSecond
             return false;
         }
     }
-    
+
     console.log('✅ Valid session found, proceeding with RPC call');
-    
+
     try {
         // Add network connectivity and debugging checks
         console.log('🔍 Pre-RPC debugging info:', {
@@ -679,7 +690,7 @@ export const saveWatchProgress = async (userId, item, progress, durationInSecond
             hasAuth: !!supabase.auth,
             sessionValid: !!session && !!session.access_token
         });
-        
+
         // Single, awaited RPC call without aggressive quick-timeout
         console.log('📡 Making RPC call with parameters:', progressData);
         const rpcPromise = supabase.rpc('save_watch_progress', progressData);
@@ -695,17 +706,17 @@ export const saveWatchProgress = async (userId, item, progress, durationInSecond
             console.warn('❌ RPC call timed out/failed, trying direct REST fallback:', timeoutError.message);
             rpcResult = await callSaveProgressDirect(progressData, session);
         }
-        
+
         const { data: rpcData, error: rpcError } = rpcResult;
-        
+
         if (rpcError) {
             console.error(`❌ RPC failed. Error: ${rpcError.message}. Details:`, rpcError);
-            
+
             // Log additional context for debugging
             if (rpcError.message && rpcError.message.includes('timeout')) {
                 console.log('🔍 RPC timeout detected - this usually indicates authentication or network issues');
             }
-            
+
             // Fallback to direct DB write if RPC fails
             console.log('⚠️ RPC method failed, attempting direct DB write fallback...');
             try {
@@ -745,7 +756,7 @@ export const saveWatchProgress = async (userId, item, progress, durationInSecond
 
         // RPC succeeded
         console.log('✅ Watch progress saved successfully via RPC.');
-        
+
         // Fetch and return the actual saved progress data from the database
         try {
             const savedProgress = await getWatchProgressForMedia(userId, item.id, item.type, item.season, item.episode);
@@ -784,7 +795,7 @@ export const saveWatchProgress = async (userId, item, progress, durationInSecond
             }
             // Resolve any waiters
             resolvers.forEach(r => {
-                try { r(true); } catch (_) {}
+                try { r(true); } catch (_) { }
             });
         } catch (_) {
             // swallow
@@ -841,7 +852,7 @@ const saveWatchProgressFallback = async (userId, item, progress, durationInSecon
 
         console.log('✅ Watch progress saved via direct database fallback');
         return true;
-        
+
     } catch (error) {
         console.error('❌ Direct database fallback failed:', error);
         return false;
@@ -896,9 +907,9 @@ export const deleteWatchItem = async (userId, item) => {
             console.log('Cannot delete watch item: No authenticated user');
             return;
         }
-        
+
         if (!item) return;
-        
+
         const { error } = await supabase.rpc('delete_watch_item', {
             p_media_id: item.media_id,
             p_media_type: item.media_type,
@@ -920,7 +931,7 @@ export const getSeriesHistory = async (userId, seriesId) => {
         if (!userId) {
             return [];
         }
-        
+
         // Use the main RPC function to get all data at once
         const { data, error } = await supabase.rpc('get_watch_history_with_progress');
 
@@ -928,7 +939,7 @@ export const getSeriesHistory = async (userId, seriesId) => {
             console.error('Error fetching series history via RPC:', error);
             return [];
         }
-        
+
         if (!data) {
             return [];
         }
@@ -957,12 +968,12 @@ export const getLastWatchedEpisode = async (userId, seriesId) => {
             .eq('media_id', seriesId)
             .order('watched_at', { ascending: false })
             .limit(1);
-        
+
         if (error) {
             console.error('Error fetching last watched episode:', error);
             return null;
         }
-        
+
         const episode = data && data.length > 0 ? data[0] : null;
         return episode ? { season: episode.season_number, episode: episode.episode_number } : null;
     } catch (error) {
@@ -986,11 +997,11 @@ const getNextEpisode = async (seriesId, currentSeason, currentEpisode, mediaType
                     }
                 }
             `;
-            
+
             const variables = {
                 id: parseInt(seriesId)
             };
-            
+
             const response = await fetch(`${API_BASE_URL}/anilist`, {
                 method: 'POST',
                 headers: {
@@ -1002,82 +1013,82 @@ const getNextEpisode = async (seriesId, currentSeason, currentEpisode, mediaType
                     variables
                 })
             });
-            
+
             if (!response.ok) {
                 console.error(`Failed to fetch anime details from AniList: ${response.status}`);
                 return null;
             }
-            
+
             const data = await response.json();
             if (!data?.data?.Media) {
                 console.error('No anime data found in AniList response');
                 return null;
             }
-            
+
             const anime = data.data.Media;
             const totalEpisodes = anime.episodes;
-            
+
             console.log(`Anime has ${totalEpisodes} episodes, current episode: ${currentEpisode}`);
-            
+
             // Most anime only have one season, so we just check if there's a next episode
             if (currentEpisode < totalEpisodes) {
                 console.log(`Next episode: E${currentEpisode + 1}`);
                 return { season: 1, episode: currentEpisode + 1 };
             }
-            
+
             console.log('No next episode available - anime may be completed');
             return null;
         } else {
-        // For TMDB API, both 'tv' and 'anime' use the 'tv' endpoint
+            // For TMDB API, both 'tv' and 'anime' use the 'tv' endpoint
             const tmdbType = 'tv';
-        
-        // Get series details from TMDB to check episode/season structure
-        const response = await fetch(`${API_BASE_URL}/tmdb/${tmdbType}/${seriesId}`);
-        if (!response.ok) {
-            console.error(`Failed to fetch series details: ${response.status}`);
+
+            // Get series details from TMDB to check episode/season structure
+            const response = await fetch(`${API_BASE_URL}/tmdb/${tmdbType}/${seriesId}`);
+            if (!response.ok) {
+                console.error(`Failed to fetch series details: ${response.status}`);
+                return null;
+            }
+
+            const seriesDetails = await response.json();
+            if (!seriesDetails.seasons || seriesDetails.seasons.length === 0) {
+                console.error('No seasons found in series details');
+                return null;
+            }
+
+            // Get current season details to find episode count
+            const seasonResponse = await fetch(`${API_BASE_URL}/tmdb/${tmdbType}/${seriesId}/season/${currentSeason}`);
+            if (!seasonResponse.ok) {
+                console.error(`Failed to fetch season ${currentSeason} details: ${seasonResponse.status}`);
+                return null;
+            }
+
+            const seasonDetails = await seasonResponse.json();
+            if (!seasonDetails.episodes || seasonDetails.episodes.length === 0) {
+                console.error(`No episodes found in season ${currentSeason}`);
+                return null;
+            }
+
+            const episodeCount = seasonDetails.episodes.length;
+            console.log(`Current season ${currentSeason} has ${episodeCount} episodes, current episode: ${currentEpisode}`);
+
+            // If there's a next episode in the same season, return it
+            if (currentEpisode < episodeCount) {
+                console.log(`Next episode: S${currentSeason}E${currentEpisode + 1}`);
+                return { season: currentSeason, episode: currentEpisode + 1 };
+            }
+
+            // If this was the last episode of the season, check for next season
+            // Filter out season 0 (specials) and find the next sequential season
+            const validSeasons = seriesDetails.seasons.filter(s => s.season_number > 0);
+            const nextSeason = validSeasons.find(s => s.season_number === currentSeason + 1);
+
+            if (nextSeason && nextSeason.episode_count > 0) {
+                console.log(`Next season found: S${nextSeason.season_number}E1`);
+                return { season: nextSeason.season_number, episode: 1 };
+            }
+
+            console.log('No next episode available - series may be completed');
             return null;
-        }
-        
-        const seriesDetails = await response.json();
-        if (!seriesDetails.seasons || seriesDetails.seasons.length === 0) {
-            console.error('No seasons found in series details');
-            return null;
-        }
-        
-        // Get current season details to find episode count
-        const seasonResponse = await fetch(`${API_BASE_URL}/tmdb/${tmdbType}/${seriesId}/season/${currentSeason}`);
-        if (!seasonResponse.ok) {
-            console.error(`Failed to fetch season ${currentSeason} details: ${seasonResponse.status}`);
-            return null;
-        }
-        
-        const seasonDetails = await seasonResponse.json();
-        if (!seasonDetails.episodes || seasonDetails.episodes.length === 0) {
-            console.error(`No episodes found in season ${currentSeason}`);
-            return null;
-        }
-        
-        const episodeCount = seasonDetails.episodes.length;
-        console.log(`Current season ${currentSeason} has ${episodeCount} episodes, current episode: ${currentEpisode}`);
-        
-        // If there's a next episode in the same season, return it
-        if (currentEpisode < episodeCount) {
-            console.log(`Next episode: S${currentSeason}E${currentEpisode + 1}`);
-            return { season: currentSeason, episode: currentEpisode + 1 };
-        }
-        
-        // If this was the last episode of the season, check for next season
-        // Filter out season 0 (specials) and find the next sequential season
-        const validSeasons = seriesDetails.seasons.filter(s => s.season_number > 0);
-        const nextSeason = validSeasons.find(s => s.season_number === currentSeason + 1);
-        
-        if (nextSeason && nextSeason.episode_count > 0) {
-            console.log(`Next season found: S${nextSeason.season_number}E1`);
-            return { season: nextSeason.season_number, episode: 1 };
-        }
-        
-        console.log('No next episode available - series may be completed');
-        return null;
         }
     } catch (error) {
         console.error('Error getting next episode:', error);
@@ -1097,7 +1108,7 @@ export const getLastWatchedEpisodeWithProgress = async (userId, seriesId) => {
 
         // 1. Get all history for this series using the refactored getSeriesHistory
         const seriesHistory = await getSeriesHistory(userId, seriesId);
-        
+
         if (!seriesHistory || seriesHistory.length === 0) {
             console.log('📭 [CW] No episodes found in watch history for this series.');
             return null;
@@ -1106,21 +1117,21 @@ export const getLastWatchedEpisodeWithProgress = async (userId, seriesId) => {
         // History is already sorted by watched_at DESC from the RPC call. The first item is the most recent.
         const lastWatched = seriesHistory[0];
         console.log(`📺 [CW] Most recent interaction: S${lastWatched.season_number}E${lastWatched.episode_number} (at ${lastWatched.watched_at})`);
-        
+
         // 2. Check if this episode is completed.
         const { progress_seconds, duration_seconds } = lastWatched;
-        
+
         if (progress_seconds && duration_seconds > 0) {
             const completionPercentage = progress_seconds / duration_seconds;
             const isCompleted = completionPercentage >= 0.9; // 90% considered complete
 
             console.log(`📊 [CW] Progress: ${(completionPercentage * 100).toFixed(1)}% - ${isCompleted ? 'COMPLETED' : 'INCOMPLETE'}`);
-            
+
             if (isCompleted) {
                 // Episode was completed, find the next one.
                 console.log(`✅ [CW] Episode S${lastWatched.season_number}E${lastWatched.episode_number} is completed. Finding next...`);
                 const nextEpisode = await getNextEpisode(seriesId, lastWatched.season_number, lastWatched.episode_number, lastWatched.media_type);
-                
+
                 if (nextEpisode) {
                     console.log(`🎯 [CW] Next episode is S${nextEpisode.season}E${nextEpisode.episode}.`);
                     return nextEpisode;
@@ -1131,18 +1142,18 @@ export const getLastWatchedEpisodeWithProgress = async (userId, seriesId) => {
             } else {
                 // Episode is not completed, resume from here.
                 console.log(`⏯️ [CW] Resuming incomplete episode S${lastWatched.season_number}E${lastWatched.episode_number}.`);
-                return { 
-                    season: lastWatched.season_number, 
-                    episode: lastWatched.episode_number 
+                return {
+                    season: lastWatched.season_number,
+                    episode: lastWatched.episode_number
                 };
             }
         } else {
             // No progress data, or no duration.
             // It's the last thing they interacted with, so suggest resuming it.
             console.log(`📝 [CW] No meaningful progress found. Suggesting last touched episode: S${lastWatched.season_number}E${lastWatched.episode_number}`);
-            return { 
-                season: lastWatched.season_number, 
-                episode: lastWatched.episode_number 
+            return {
+                season: lastWatched.season_number,
+                episode: lastWatched.episode_number
             };
         }
     } catch (error) {
@@ -1164,7 +1175,7 @@ export const getProgressForHistoryItems = async (userId, historyItems) => {
 
         // Create a query to get all progress data for the history items
         const progressMap = {};
-        
+
         await Promise.all(historyItems.map(async (item) => {
             try {
                 let query = supabase
@@ -1173,7 +1184,7 @@ export const getProgressForHistoryItems = async (userId, historyItems) => {
                     .eq('user_id', userId)
                     .eq('media_id', item.media_id)
                     .eq('media_type', item.media_type);
-                
+
                 // For TV shows, include season and episode - handle null values properly
                 if (item.media_type === 'tv') {
                     // Only add season/episode filters if they exist and are not null
@@ -1190,14 +1201,14 @@ export const getProgressForHistoryItems = async (userId, historyItems) => {
                 }
 
                 const { data, error } = await query;
-                
+
                 if (error) {
                     console.error(`Error fetching progress for ${item.media_type} ${item.media_id}:`, error);
                 } else if (data && data.length > 0) {
                     const progressData = data[0];
                     // Use media_type to match the key format expected by History.jsx
                     const key = `${item.media_id}-${item.media_type}-${item.season_number || 0}-${item.episode_number || 0}`;
-                    
+
                     // Include progress data even if it's small - let the UI decide what to show
                     if (progressData.progress_seconds >= 0 && progressData.duration_seconds > 0) {
                         progressMap[key] = {
@@ -1227,7 +1238,7 @@ export const getWatchHistoryWithProgress = async (userId) => {
         }
 
         console.log('🔄 Fetching combined watch history and progress via RPC...');
-        
+
         const { data, error } = await supabase.rpc('get_watch_history_with_progress');
 
         if (error) {
@@ -1246,7 +1257,7 @@ export const getWatchHistoryWithProgress = async (userId) => {
         console.error('Exception in getWatchHistoryWithProgress:', error);
         return [];
     }
-}; 
+};
 
 // Sync offline progress saved in localStorage when connectivity returns
 export const syncOfflineProgress = async (userId) => {
@@ -1256,7 +1267,7 @@ export const syncOfflineProgress = async (userId) => {
             console.log('Still not authenticated, cannot sync offline progress');
             return;
         }
-        
+
         // Find all localStorage keys for offline progress
         const offlineKeys = [];
         for (let i = 0; i < localStorage.length; i++) {
@@ -1265,22 +1276,22 @@ export const syncOfflineProgress = async (userId) => {
                 offlineKeys.push(key);
             }
         }
-        
+
         if (offlineKeys.length === 0) {
             return; // No offline progress to sync
         }
-        
+
         console.log(`🔄 Found ${offlineKeys.length} offline progress items to sync`);
-        
+
         // Process each offline progress item
         let syncCount = 0;
         for (const key of offlineKeys) {
             try {
                 const progressDataStr = localStorage.getItem(key);
                 if (!progressDataStr) continue;
-                
+
                 const progressData = JSON.parse(progressDataStr);
-                
+
                 // Convert to item format expected by saveWatchProgress
                 const item = {
                     id: progressData.media_id,
@@ -1288,18 +1299,18 @@ export const syncOfflineProgress = async (userId) => {
                     season: progressData.season_number,
                     episode: progressData.episode_number
                 };
-                
+
                 // Skip very old entries (older than 48 hours)
                 const timestamp = new Date(progressData.timestamp);
                 const now = new Date();
                 const hoursSinceSync = (now - timestamp) / (1000 * 60 * 60);
-                
+
                 if (hoursSinceSync > 48) {
                     console.log(`Skipping old offline progress from ${hoursSinceSync.toFixed(1)} hours ago`);
                     localStorage.removeItem(key);
                     continue;
                 }
-                
+
                 // Try to sync with server
                 console.log(`Syncing offline progress for ${progressData.media_type} ${progressData.media_id}`);
                 const result = await saveWatchProgressFallback(
@@ -1309,7 +1320,7 @@ export const syncOfflineProgress = async (userId) => {
                     progressData.duration_seconds,
                     false // Don't force history entry for synced items
                 );
-                
+
                 if (result) {
                     // Remove from localStorage on successful sync
                     localStorage.removeItem(key);
@@ -1319,7 +1330,7 @@ export const syncOfflineProgress = async (userId) => {
                 console.error('Error syncing offline progress item:', itemError);
             }
         }
-        
+
         console.log(`✅ Successfully synced ${syncCount}/${offlineKeys.length} offline progress items`);
     } catch (error) {
         console.error('Error syncing offline progress:', error);

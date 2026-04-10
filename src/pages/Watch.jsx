@@ -6,7 +6,7 @@ import { useStore } from '../store';
 import MovieCard from '../components/MovieCard';
 import { getWatchProgressForMedia, saveWatchProgress, getSeriesHistory, getLastWatchedEpisode, getLastWatchedEpisodeWithProgress, syncOfflineProgress } from '../utils/watchHistory';
 import { useAuth } from '../context/Auth';
-import { useMiniPlayer } from '../context/MiniPlayer';
+
 import { addFavoriteShow, removeFavoriteShow } from '../utils/favorites';
 import './Watch.css';
 import { API_BASE_URL, IMAGE_BASE_URL, getProxiedImageUrl } from '../config';
@@ -66,12 +66,14 @@ const Watch = (props) => {
     const lastHistoryUpdateRef = useRef({});
     const lastProgressSaveTime = useRef(0); // For throttling
     const pendingSaveTimeout = useRef(null); // For debouncing
-    const currentProgressRef = useRef({ progress: 0, duration: 0 }); // Track current progress for MiniPlayer
+    const latestProgressRef = useRef(null); // For visibility change events
+
+
 
     const { user, session } = useAuth(); // Get authentication state
     const userId = user?.id;
     const tmdbType = 'tv'; // Always use 'tv' for TMDB anime lookups
-    const { openMiniPlayer, closeMiniPlayer, isActive: isMiniPlayerActive, isSupported: isMiniPlayerSupported } = useMiniPlayer();
+
 
     // Debug authentication status on component load
     useEffect(() => {
@@ -227,86 +229,7 @@ const Watch = (props) => {
         };
     }, [mediaDetails, type, setCurrentMediaItem]);
 
-    // Handle mini-player activation on navigation away
-    useEffect(() => {
-        // Close mini-player when returning to the Watch page
-        if (isMiniPlayerActive) {
-            console.log('👁️ Watch page mounted, closing mini-player');
-            closeMiniPlayer();
-        }
 
-        // Capture refs early so they're available during cleanup
-        // This is crucial because refs get cleared during unmount
-        const captureRefs = () => {
-            return {
-                iframe: document.querySelector('iframe[title="Video Player"]'),
-                container: playerContainerRef.current
-            };
-        };
-
-        // Also handle component unmount for SPA navigation
-        return () => {
-            console.log('🚪 Watch component unmounting - checking mini-player conditions');
-
-            // Capture element references at cleanup time
-            const { iframe, container } = captureRefs();
-            const hasVideo = iframe && streamUrl && playerReady;
-
-            console.log('🔍 Mini-player pre-flight check:', {
-                hasIframe: !!iframe,
-                hasStreamUrl: !!streamUrl,
-                playerReady,
-                hasVideo,
-                isMiniPlayerSupported,
-                isMiniPlayerActive,
-                hasMediaDetails: !!mediaDetails,
-                hasContainer: !!container
-            });
-
-            if (hasVideo && isMiniPlayerSupported && !isMiniPlayerActive && mediaDetails && container) {
-                console.log('✅ All conditions met, activating mini-player');
-
-                // Prepare video information for mini-player
-                const videoInfo = {
-                    title: mediaDetails.title || mediaDetails.name || 'Video',
-                    url: window.location.href,
-                    type: type,
-                    id: id,
-                    season: currentSeason,
-                    id: id,
-                    season: currentSeason,
-                    episode: currentEpisode,
-                    progress: currentProgressRef.current?.progress || 0,
-                    duration: currentProgressRef.current?.duration || 0
-                };
-
-                console.log('📞 Calling openMiniPlayer with:', { videoInfo });
-                // Call synchronously during unmount
-                try {
-                    openMiniPlayer(iframe, container, videoInfo);
-                } catch (err) {
-                    console.error('❌ Failed to open mini-player:', err);
-                }
-            } else {
-                console.log('❌ Conditions NOT met for mini-player');
-                if (!container) {
-                    console.error('❌ Container not found - ref not attached to DOM element');
-                }
-            }
-        };
-    }, [
-        streamUrl,
-        playerReady,
-        isMiniPlayerSupported,
-        isMiniPlayerActive,
-        mediaDetails,
-        type,
-        id,
-        currentSeason,
-        currentEpisode,
-        openMiniPlayer,
-        closeMiniPlayer
-    ]);
 
     useEffect(() => {
         if (!id || !type) {
@@ -704,13 +627,17 @@ const Watch = (props) => {
             const seasonToSave = progressData.season || currentSeason;
             const episodeToSave = progressData.episode || currentEpisode;
 
-            // Update ref for MiniPlayer
+            // Update ref for visibility/unload events
             if (progressData && progressData.progress >= 0) {
-                currentProgressRef.current = {
-                    progress: progressData.progress,
-                    duration: progressData.duration
+                latestProgressRef.current = {
+                    ...progressData,
+                    season: seasonToSave,
+                    episode: episodeToSave
                 };
             }
+
+
+
 
             if (progressData && progressData.progress >= 0 && progressData.duration > 0) {
                 const now = Date.now();
@@ -1044,6 +971,56 @@ const Watch = (props) => {
         }
     }, [mediaDetails, isDirectSource, videoRef, currentSeason, currentEpisode, userId]);
 
+    // Handle visibility change and page unload to save progress immediately
+    useEffect(() => {
+        const handleVisibilityChange = () => {
+            if (document.visibilityState === 'hidden' && latestProgressRef.current) {
+                const data = latestProgressRef.current;
+                console.log('🙈 Page hidden/unloaded, forcing progress save:', data);
+
+                const seasonToSave = data.season;
+                const episodeToSave = data.episode;
+                const currentUserId = userIdRef.current; // Use ref for latest userId
+
+                // 1. LocalStorage backup first (sync & fast)
+                try {
+                    const key = `offline_progress_${type}_${id}_${seasonToSave || 0}_${episodeToSave || 0}`;
+                    const offlineData = {
+                        media_id: id,
+                        media_type: type,
+                        season_number: seasonToSave,
+                        episode_number: episodeToSave,
+                        progress_seconds: data.progress,
+                        duration_seconds: data.duration,
+                        timestamp: new Date().toISOString()
+                    };
+                    localStorage.setItem(key, JSON.stringify(offlineData));
+                } catch (e) { console.error('Backup save failed', e); }
+
+                // 2. Attempt async save if we have a user
+                if (currentUserId && mediaDetails) {
+                    saveWatchProgress(
+                        currentUserId,
+                        { ...mediaDetails, id: mediaDetails.id, type, season: seasonToSave, episode: episodeToSave },
+                        data.progress,
+                        data.duration,
+                        false,
+                        session
+                    ).catch(e => console.error('Visibility save failed', e));
+                }
+            }
+        };
+
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+        window.addEventListener('pagehide', handleVisibilityChange);
+
+        return () => {
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+            window.removeEventListener('pagehide', handleVisibilityChange);
+        };
+    }, [mediaDetails, type, id, session]);
+
+
     // This effect specifically handles the player ready timeout logic.
     // It only runs when a stream URL for an iframe is present.
     useEffect(() => {
@@ -1363,15 +1340,7 @@ const Watch = (props) => {
                             >
                                 <i class="fas fa-film"></i> Trailer
                             </button>
-                            {isMiniPlayerSupported && (
-                                <button
-                                    onClick={handlePiPClick}
-                                    class={`favorite-btn pip-btn ${isMiniPlayerActive ? 'active' : ''}`}
-                                    title={isMiniPlayerActive ? "Close Mini Player" : "Open Mini Player"}
-                                >
-                                    <i class="fas fa-compress-alt"></i> {isMiniPlayerActive ? 'Close PiP' : 'Mini Player'}
-                                </button>
-                            )}
+
                             {!user && (
                                 <span class="login-hint">
                                     <small>

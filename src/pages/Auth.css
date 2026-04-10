@@ -727,6 +727,32 @@ button.social-button.google:hover {
   margin-bottom: 1.5rem;
 }
 
+.auth-form .auth-links {
+  display: flex;
+  justify-content: center;
+  text-align: center;
+}
+
+.auth-form .auth-links p {
+  margin: 0;
+  color: var(--text-secondary);
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.auth-form .auth-switch-button {
+  width: auto;
+  min-width: 92px;
+  margin: 0;
+  padding: 0.5rem 0.9rem;
+  font-size: 0.85rem;
+  border-radius: var(--radius-sm);
+  display: inline-flex;
+  text-decoration: none;
+  line-height: 1;
+}
+
 /* Auth divider - Modern 2025 style */
 .auth-divider {
   position: relative;

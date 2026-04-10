@@ -3,7 +3,7 @@ import { useEffect, useState } from 'preact/hooks';
 import { Router } from 'preact-router';
 import { createHashHistory } from 'history';
 import { AuthProvider, useAuth } from './context/Auth';
-import { MiniPlayerProvider } from './context/MiniPlayer';
+
 import { Toaster } from './components/Toast';
 import { initializeTheme } from './utils/themeUtils';
 import { useStore } from './store';
@@ -57,7 +57,7 @@ const MainApp = () => {
         if (warning.show) {
             setNetworkWarning(warning.message);
         }
-        
+
         // Setup network listeners
         const cleanup = setupNetworkListeners(
             () => {
@@ -71,7 +71,7 @@ const MainApp = () => {
                 console.warn('❌ Network connection lost');
             }
         );
-        
+
         return cleanup;
     }, []);
 
@@ -111,8 +111,8 @@ const MainApp = () => {
                     <div style="position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); text-align: center; width: 90%; max-width: 400px; padding: 2rem; background: rgba(255, 0, 0, 0.1); border: 1px solid rgba(255, 0, 0, 0.3); border-radius: 8px; z-index: 1001;">
                         <p style="color: #ff6b6b; font-weight: bold; margin-bottom: 0.5rem;">⚠️ Connection Issue</p>
                         <p style="color: #fff; font-size: 0.9rem;">{authError}</p>
-                        <button 
-                            onClick={() => window.location.reload()} 
+                        <button
+                            onClick={() => window.location.reload()}
                             style="margin-top: 1rem; padding: 0.5rem 1rem; background: #4CAF50; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 0.9rem;"
                         >
                             Refresh Page
@@ -169,7 +169,7 @@ const App = () => {
     useEffect(() => {
         initializeTheme();
         setupErrorHandler();
-        
+
         // Initialize iOS-specific optimizations
         if (isIOS()) {
             console.log('🍎 iOS device detected, applying optimizations...');
@@ -179,9 +179,7 @@ const App = () => {
 
     return (
         <AuthProvider>
-            <MiniPlayerProvider>
-                <MainApp />
-            </MiniPlayerProvider>
+            <MainApp />
         </AuthProvider>
     );
 };

@@ -15,6 +15,9 @@ export default function Login() {
     try {
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider,
+        options: {
+          redirectTo: window.location.origin,
+        },
       });
       if (error) throw error;
     } catch (error) {
@@ -176,7 +179,7 @@ export default function Login() {
         <div className="auth-links">
           <p>
             Don't have an account?
-            <a href="/signup" className="button"> Sign up</a>
+            <a href="/signup" className="button auth-switch-button">Sign up</a>
           </p>
         </div>
       </div>

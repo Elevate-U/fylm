@@ -61,8 +61,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     auth: {
         storage: customStorage, // Use our custom storage implementation
-        // Disable auto-refresh to prevent CORS error loops - we'll handle manually
-        autoRefreshToken: false,
+        autoRefreshToken: true,
         persistSession: true,
         detectSessionInUrl: true, // Enable to better handle iOS Safari redirects
         // Add timeout settings to prevent hanging requests
@@ -78,51 +77,34 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
             //'Content-Type': 'application/json',
             'X-Client-Info': 'supabase-js-web'
         },
-        // Enhanced fetch with timeout for mobile networks
-      fetch: async (input, init) => {
+        fetch: async (input, init) => {
             const maxRetries = 1;
             let attempt = 0;
-            
-            // Mobile-friendly timeout (15 seconds for slower connections)
-            const MOBILE_TIMEOUT = 15000;
-            
-            // Do a very light retry once on network errors to reduce false refresh failures
+            const TIMEOUT_MS = 15000;
+
             while (true) {
                 try {
-                  // Lightweight request logging for Supabase calls to aid debugging
-                  try {
-                      const urlStr = typeof input === 'string' ? input : (input && input.url) ? input.url : '';
-                      if (urlStr && supabaseUrl && urlStr.startsWith(supabaseUrl)) {
-                          const method = (init && init.method) ? init.method : (typeof input !== 'string' && input && input.method) ? input.method : 'GET';
-                          const shortUrl = urlStr.replace(supabaseUrl, `${supabaseUrl}/`).split('?')[0];
-                          const kind = shortUrl.includes('/rest/v1/rpc/') ? 'rpc' : shortUrl.includes('/rest/v1/') ? 'rest' : 'auth';
-                          console.log(`🔌 Supabase ${kind.toUpperCase()} → ${method} ${shortUrl}`);
-                      }
-                  } catch (_) { /* ignore logging errors */ }
-                  
-                  // Add timeout to fetch for mobile networks
-                  const controller = new AbortController();
-                  const timeoutId = setTimeout(() => controller.abort(), MOBILE_TIMEOUT);
-                  
-                  try {
-                      const response = await fetch(input, {
-                          ...init,
-                          signal: controller.signal
-                      });
-                      clearTimeout(timeoutId);
-                      return response;
-                  } catch (fetchError) {
-                      clearTimeout(timeoutId);
-                      if (fetchError.name === 'AbortError') {
-                          console.warn('⚠️ Supabase request timeout after 15s');
-                          throw new Error('Request timeout - please check your connection');
-                      }
-                      throw fetchError;
-                  }
+                    const controller = new AbortController();
+                    const timeoutId = setTimeout(() => controller.abort(), TIMEOUT_MS);
+
+                    if (init?.signal) {
+                        init.signal.addEventListener('abort', () => controller.abort());
+                    }
+
+                    try {
+                        const response = await fetch(input, {
+                            ...init,
+                            signal: controller.signal
+                        });
+                        clearTimeout(timeoutId);
+                        return response;
+                    } catch (fetchError) {
+                        clearTimeout(timeoutId);
+                        throw fetchError;
+                    }
                 } catch (err) {
                     if (attempt >= maxRetries) throw err;
                     attempt++;
-                    // Small delay before retry for mobile networks
                     await new Promise(resolve => setTimeout(resolve, 500));
                 }
             }
